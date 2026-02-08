@@ -2,7 +2,6 @@
 
 Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) building blocks for [MuJoCo](https://mujoco.org/) WASM simulations. Works with **any robot, any scene** — you provide the MJCF model, the library handles physics, rendering, and IK.
 
-Think [react-three-rapier](https://github.com/pmndrs/react-three-rapier) but for MuJoCo.
 
 ## Install
 
