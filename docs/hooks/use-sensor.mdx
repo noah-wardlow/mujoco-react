@@ -1,0 +1,67 @@
+---
+title: "useSensor"
+description: "Read sensor values by name"
+icon: "gauge"
+---
+
+Read a MuJoCo sensor's value by name. Returns a ref updated every physics frame.
+
+## Signature
+
+```tsx
+useSensor(name: string): {
+  value: React.RefObject<Float64Array>;
+  size: number;
+}
+```
+
+## Usage
+
+```tsx
+import { useSensor } from 'mujoco-react';
+
+function ForceSensorDisplay() {
+  const { value, size } = useSensor('force_sensor');
+  const textRef = useRef<any>(null);
+
+  useFrame(() => {
+    const force = Math.sqrt(
+      value.current[0] ** 2 +
+      value.current[1] ** 2 +
+      value.current[2] ** 2
+    );
+    if (textRef.current) textRef.current.text = `${force.toFixed(2)} N`;
+  });
+
+  return <Text ref={textRef} position={[0, 0.5, 0]} />;
+}
+```
+
+## Return Value
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `value` | `RefObject<Float64Array>` | Sensor reading from `data.sensordata` |
+| `size` | `number` | Number of values (e.g., 3 for a force sensor, 1 for a scalar) |
+
+## Sensor Types
+
+Common MuJoCo sensor types and their dimensions:
+
+| Sensor Type | `dim` | Description |
+|-------------|-------|-------------|
+| `touch` | 1 | Contact normal force |
+| `accelerometer` | 3 | Linear acceleration |
+| `gyro` | 3 | Angular velocity |
+| `force` | 3 | Constraint force |
+| `torque` | 3 | Constraint torque |
+| `jointpos` | 1 | Joint position |
+| `jointvel` | 1 | Joint velocity |
+| `framepos` | 3 | Frame position |
+| `framequat` | 4 | Frame orientation |
+
+## Notes
+
+- The value ref is updated every frame via `useAfterPhysicsStep`
+- If the sensor doesn't exist, `value.current` will be an empty `Float64Array`
+- For enumerating all sensors, see [`useActuators`](/hooks/use-actuators) or use `api.getSensors()`

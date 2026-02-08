@@ -1,0 +1,72 @@
+---
+title: "useAfterPhysicsStep"
+description: "Inject logic after mj_step each frame"
+icon: "arrow-right-from-bracket"
+---
+
+Register a callback that runs **after** `mj_step` every physics frame. Use this for reading simulation results, computing rewards, or logging.
+
+## Signature
+
+```tsx
+useAfterPhysicsStep(
+  callback: (model: MujocoModel, data: MujocoData) => void
+): void
+```
+
+## Usage
+
+### Reading State
+
+```tsx
+useAfterPhysicsStep((model, data) => {
+  const pos = data.xpos.subarray(3, 6); // Body 1 position
+  console.log('Body position:', pos[0], pos[1], pos[2]);
+});
+```
+
+### Computing Rewards (RL)
+
+```tsx
+useAfterPhysicsStep((model, data) => {
+  const targetPos = [0.5, 0, 0.3];
+  const eePos = data.xpos.subarray(eeSiteId * 3, eeSiteId * 3 + 3);
+  const dist = Math.sqrt(
+    (eePos[0] - targetPos[0]) ** 2 +
+    (eePos[1] - targetPos[1]) ** 2 +
+    (eePos[2] - targetPos[2]) ** 2
+  );
+  rewardRef.current = -dist;
+});
+```
+
+### Logging Sensor Data
+
+```tsx
+useAfterPhysicsStep((model, data) => {
+  if (data.time % 0.1 < model.opt.timestep) {
+    logRef.current.push({
+      time: data.time,
+      qpos: Array.from(data.qpos),
+      sensordata: Array.from(data.sensordata),
+    });
+  }
+});
+```
+
+## Execution Order
+
+```
+1. Provider zeros qfrc_applied
+2. useBeforePhysicsStep callbacks
+3. IK solving (if enabled)
+4. mj_step
+5. → Your useAfterPhysicsStep callbacks run here ←
+```
+
+## Notes
+
+- After-step runs at physics rate, not render rate
+- Results are available immediately for rendering in the same frame
+- Multiple after-step hooks compose — all run each frame
+- Write results to refs (not React state) to avoid re-renders at 60fps

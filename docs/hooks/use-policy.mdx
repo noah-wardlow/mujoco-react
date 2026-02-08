@@ -1,0 +1,122 @@
+---
+title: "usePolicy"
+description: "Framework-agnostic RL policy decimation loop"
+icon: "brain"
+---
+
+Run a policy inference loop at a fixed frequency (decimation), independent of the physics or render rate. Designed for deploying RL policies trained in frameworks like Isaac Gym, Brax, or MuJoCo MPC.
+
+## Signature
+
+```tsx
+usePolicy(config: {
+  frequency: number;
+  onObservation: (model: MujocoModel, data: MujocoData) => Float32Array;
+  onAction: (obs: Float32Array, model: MujocoModel, data: MujocoData) => void;
+}): {
+  start: () => void;
+  stop: () => void;
+  isRunning: boolean;
+  lastObservation: Float32Array | null;
+}
+```
+
+## Usage
+
+```tsx
+import { usePolicy } from 'mujoco-react';
+
+function PolicyRunner({ model: nnModel }) {
+  const policy = usePolicy({
+    frequency: 50, // 50 Hz policy rate
+
+    onObservation: (model, data) => {
+      // Build observation vector
+      const obs = new Float32Array(model.nq + model.nv);
+      for (let i = 0; i < model.nq; i++) obs[i] = data.qpos[i];
+      for (let i = 0; i < model.nv; i++) obs[model.nq + i] = data.qvel[i];
+      return obs;
+    },
+
+    onAction: (obs, model, data) => {
+      // Run inference and apply actions
+      const action = nnModel.predict(obs); // Your ML model
+      for (let i = 0; i < model.nu; i++) {
+        data.ctrl[i] = action[i];
+      }
+    },
+  });
+
+  return (
+    <div>
+      <button onClick={policy.start}>Start Policy</button>
+      <button onClick={policy.stop}>Stop Policy</button>
+    </div>
+  );
+}
+```
+
+## Config
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `frequency` | `number` | Policy inference rate in Hz |
+| `onObservation` | `(model, data) => Float32Array` | Build observation vector from simulation state |
+| `onAction` | `(obs, model, data) => void` | Run inference, write actions to `data.ctrl` |
+
+## Return Value
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `start` | `() => void` | Start the policy loop |
+| `stop` | `() => void` | Stop the policy loop |
+| `isRunning` | `boolean` | Whether the policy is currently active |
+| `lastObservation` | `Float32Array \| null` | Most recent observation vector |
+
+## How It Works
+
+1. The hook registers a `useBeforePhysicsStep` callback
+2. Each physics step, it checks if enough time has elapsed since the last inference (based on `frequency`)
+3. If so, it calls `onObservation` to build the observation vector
+4. Then calls `onAction` with the observation to run inference and apply actions
+5. Between inference steps, the previous actions continue to be applied (zero-order hold)
+
+## Example: TensorFlow.js Policy
+
+```tsx
+import * as tf from '@tensorflow/tfjs';
+
+function TFPolicy() {
+  const modelRef = useRef<tf.LayersModel | null>(null);
+
+  useEffect(() => {
+    tf.loadLayersModel('/policy/model.json').then(m => { modelRef.current = m; });
+  }, []);
+
+  const policy = usePolicy({
+    frequency: 50,
+    onObservation: (model, data) => {
+      const obs = new Float32Array(48);
+      // ... fill observation
+      return obs;
+    },
+    onAction: (obs, model, data) => {
+      if (!modelRef.current) return;
+      const tensor = tf.tensor2d(obs, [1, obs.length]);
+      const action = modelRef.current.predict(tensor) as tf.Tensor;
+      const values = action.dataSync();
+      for (let i = 0; i < model.nu; i++) data.ctrl[i] = values[i];
+      tensor.dispose();
+      action.dispose();
+    },
+  });
+
+  return <button onClick={policy.start}>Run Policy</button>;
+}
+```
+
+## Notes
+
+- Disable IK when running a policy: `api.setIkEnabled(false)`
+- The policy runs inside `useBeforePhysicsStep`, so it executes at physics rate but only does inference at `frequency` Hz
+- Observation building and action application happen synchronously — keep them fast

@@ -1,0 +1,92 @@
+---
+title: "useKeyboardTeleop"
+description: "Map keyboard keys to actuator controls"
+icon: "keyboard"
+---
+
+Map keyboard keys to actuator controls for teleoperation. Supports delta (hold), toggle (press), and set (hold) modes.
+
+## Signature
+
+```tsx
+useKeyboardTeleop(config: {
+  bindings: Record<string, KeyBinding>;
+  enabled?: boolean;
+}): void
+```
+
+## Usage
+
+```tsx
+import { useKeyboardTeleop } from 'mujoco-react';
+
+function TeleopControls() {
+  useKeyboardTeleop({
+    bindings: {
+      'w': { actuator: 'joint1', delta: 0.1 },
+      's': { actuator: 'joint1', delta: -0.1 },
+      'a': { actuator: 'joint2', delta: 0.1 },
+      'd': { actuator: 'joint2', delta: -0.1 },
+      'space': { actuator: 'gripper', toggle: [0, 0.04] },
+    },
+    enabled: true,
+  });
+
+  return null;
+}
+```
+
+## Binding Modes
+
+### `delta` — Increment while held
+
+Add a delta value to the actuator each frame while the key is held:
+
+```tsx
+'w': { actuator: 'forward', delta: 0.1 }
+// While 'w' is held: ctrl[forward] += 0.1 per frame
+```
+
+### `toggle` — Toggle between two values on press
+
+Press once to set the first value, press again for the second:
+
+```tsx
+'space': { actuator: 'gripper', toggle: [0, 0.04] }
+// Press space: ctrl[gripper] = 0
+// Press again: ctrl[gripper] = 0.04
+```
+
+### `set` — Set value while held
+
+Set a fixed value while the key is held, revert when released:
+
+```tsx
+'x': { actuator: 'brake', set: 1.0 }
+// While 'x' is held: ctrl[brake] = 1.0
+// On release: ctrl[brake] = previous value
+```
+
+## Config
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `bindings` | `Record<string, KeyBinding>` | **required** | Key → actuator mapping |
+| `enabled` | `boolean` | `true` | Enable/disable all bindings |
+
+## KeyBinding
+
+```tsx
+interface KeyBinding {
+  actuator: string;           // Actuator name
+  delta?: number;             // Increment per frame while held
+  toggle?: [number, number];  // Two values to alternate on press
+  set?: number;               // Value while held
+}
+```
+
+## Notes
+
+- Key names use `KeyboardEvent.key` (lowercase for letters, `' '` for space, etc.)
+- Multiple keys can target the same actuator
+- Disabled when `enabled: false` — useful for modal UIs

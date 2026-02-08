@@ -1,0 +1,86 @@
+---
+title: "useGamepad"
+description: "Map gamepad axes and buttons to actuator controls"
+icon: "gamepad"
+---
+
+Map gamepad (controller) axes and buttons to MuJoCo actuators. Supports deadzones and scaling.
+
+## Signature
+
+```tsx
+useGamepad(config: {
+  axes?: Record<number, string>;
+  buttons?: Record<number, string>;
+  deadzone?: number;
+  scale?: number;
+  gamepadIndex?: number;
+  enabled?: boolean;
+}): void
+```
+
+## Usage
+
+```tsx
+import { useGamepad } from 'mujoco-react';
+
+function GamepadControl() {
+  useGamepad({
+    axes: {
+      0: 'joint1',   // Left stick X → joint1
+      1: 'joint2',   // Left stick Y → joint2
+      2: 'joint3',   // Right stick X → joint3
+      3: 'joint4',   // Right stick Y → joint4
+    },
+    buttons: {
+      0: 'gripper',  // A button → gripper
+    },
+    deadzone: 0.1,
+    scale: 1.0,
+    gamepadIndex: 0,
+    enabled: true,
+  });
+
+  return null;
+}
+```
+
+## Config
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `axes` | `Record<number, string>` | — | Axis index → actuator name |
+| `buttons` | `Record<number, string>` | — | Button index → actuator name |
+| `deadzone` | `number` | `0.1` | Axis values below this are treated as zero |
+| `scale` | `number` | `1.0` | Multiplier for axis values |
+| `gamepadIndex` | `number` | `0` | Which gamepad to use (if multiple connected) |
+| `enabled` | `boolean` | `true` | Enable/disable gamepad input |
+
+## Standard Gamepad Axes
+
+| Index | Axis |
+|-------|------|
+| `0` | Left stick X |
+| `1` | Left stick Y |
+| `2` | Right stick X |
+| `3` | Right stick Y |
+
+## Standard Gamepad Buttons
+
+| Index | Button |
+|-------|--------|
+| `0` | A / Cross |
+| `1` | B / Circle |
+| `2` | X / Square |
+| `3` | Y / Triangle |
+| `4` | Left bumper |
+| `5` | Right bumper |
+| `6` | Left trigger |
+| `7` | Right trigger |
+
+## Notes
+
+- Uses the [Gamepad API](https://developer.mozilla.org/en-US/docs/Web/API/Gamepad_API)
+- Gamepad state is polled each frame via `navigator.getGamepads()`
+- Axes values are in the range `[-1, 1]` after deadzone filtering
+- Button values map to `[0, 1]` (pressed = 1)

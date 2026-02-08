@@ -1,0 +1,110 @@
+---
+title: "useContacts"
+description: "Query contacts and subscribe to contact events"
+icon: "circle-nodes"
+---
+
+Two hooks for working with MuJoCo contacts: `useContacts` for per-frame contact queries, and `useContactEvents` for enter/exit transitions.
+
+## useContacts
+
+Query contacts involving a specific body (or all contacts).
+
+### Signature
+
+```tsx
+useContacts(
+  bodyName?: string,
+  callback?: (contacts: ContactInfo[]) => void
+): React.RefObject<ContactInfo[]>
+```
+
+### Usage
+
+```tsx
+import { useContacts } from 'mujoco-react';
+
+function ContactCounter() {
+  const contacts = useContacts('block_1');
+
+  useFrame(() => {
+    if (contacts.current.length > 0) {
+      console.log(`${contacts.current.length} contacts on block_1`);
+    }
+  });
+
+  return null;
+}
+```
+
+### With Callback
+
+```tsx
+const contacts = useContacts('gripper_left', (contacts) => {
+  const touchingCube = contacts.some(c =>
+    c.geom1Name === 'cube' || c.geom2Name === 'cube'
+  );
+  if (touchingCube) console.log('Gripper touching cube!');
+});
+```
+
+### All Contacts
+
+```tsx
+const allContacts = useContacts(); // No body filter
+```
+
+## useContactEvents
+
+Subscribe to contact enter/exit transitions for a body.
+
+### Signature
+
+```tsx
+useContactEvents(
+  bodyName: string,
+  handlers: {
+    onEnter?: (info: ContactInfo) => void;
+    onExit?: (info: ContactInfo) => void;
+  }
+): void
+```
+
+### Usage
+
+```tsx
+import { useContactEvents } from 'mujoco-react';
+
+function CollisionSound() {
+  useContactEvents('ball', {
+    onEnter: (info) => {
+      playSound('bounce', { volume: Math.min(info.depth * 10, 1) });
+    },
+    onExit: (info) => {
+      console.log('Lost contact with', info.geom2Name);
+    },
+  });
+
+  return null;
+}
+```
+
+## ContactInfo
+
+```tsx
+interface ContactInfo {
+  geom1: number;        // Geom ID of first body
+  geom1Name: string;    // Name of first geom
+  geom2: number;        // Geom ID of second body
+  geom2Name: string;    // Name of second geom
+  pos: [number, number, number];  // Contact point
+  depth: number;        // Penetration depth
+}
+```
+
+## Notes
+
+- Contact data is read from `data.contact` every physics frame
+- `useContactEvents` diffs the contact list between frames to detect transitions
+- Contact reads are wrapped in try/catch (can fail with large `ncon`)
+- For a component-based API, see [`<ContactListener>`](/components/contact-listener)

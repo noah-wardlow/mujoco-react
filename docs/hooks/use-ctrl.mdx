@@ -1,0 +1,63 @@
+---
+title: "useCtrl"
+description: "Read/write a single actuator control by name"
+icon: "sliders"
+---
+
+Provides read/write access to a single actuator's control value by name.
+
+## Signature
+
+```tsx
+useCtrl(name: string): [
+  value: React.RefObject<number>,
+  setValue: (v: number) => void
+]
+```
+
+## Usage
+
+```tsx
+import { useCtrl } from 'mujoco-react';
+
+function GripperControl() {
+  const [gripperValue, setGripper] = useCtrl('gripper');
+
+  return (
+    <div>
+      <button onClick={() => setGripper(0.04)}>Open</button>
+      <button onClick={() => setGripper(0.0)}>Close</button>
+    </div>
+  );
+}
+```
+
+### Reading in useFrame
+
+```tsx
+function GripperDisplay() {
+  const [value] = useCtrl('gripper');
+  const textRef = useRef<any>(null);
+
+  useFrame(() => {
+    if (textRef.current) {
+      textRef.current.text = `Gripper: ${value.current.toFixed(3)}`;
+    }
+  });
+
+  return <Text ref={textRef} position={[0, 0.5, 0]} />;
+}
+```
+
+## Return Value
+
+| Index | Type | Description |
+|-------|------|-------------|
+| `[0]` | `RefObject<number>` | Current control value (updated each frame) |
+| `[1]` | `(v: number) => void` | Setter function to update the control value |
+
+## Notes
+
+- The setter writes to `data.ctrl` on the next physics step
+- For setting multiple actuators at once, use `api.setCtrl({ name: value, ... })`
+- The actuator is looked up by name once on mount

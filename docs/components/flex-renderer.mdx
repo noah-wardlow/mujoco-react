@@ -1,0 +1,37 @@
+---
+title: "FlexRenderer"
+description: "Render deformable flex bodies"
+icon: "cloud"
+---
+
+Renders MuJoCo flex (deformable) bodies. Currently renders as a point cloud since triangle face data is not yet available in the JS bindings.
+
+## Usage
+
+```tsx
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <FlexRenderer />
+</MujocoCanvas>
+```
+
+## Props
+
+`FlexRenderer` takes no props.
+
+## How It Works
+
+1. Creates a `BufferGeometry` per flex body
+2. Updates vertex positions from `data.flexvert_xpos` every frame
+3. Renders as a `Points` material (point cloud)
+
+## Limitations
+
+<Warning>
+  `flex_face` (triangle indices) is not available in mujoco-js 0.0.7. Flex bodies render as point clouds instead of solid meshes. This will be resolved when the binding adds face data support.
+</Warning>
+
+## Notes
+
+- If the model has no flex bodies, this component renders nothing
+- Point size and color use sensible defaults

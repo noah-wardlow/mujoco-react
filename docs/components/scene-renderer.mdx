@@ -1,0 +1,54 @@
+---
+title: "SceneRenderer"
+description: "Sync MuJoCo bodies to Three.js meshes"
+icon: "cube"
+---
+
+Renders all MuJoCo bodies as Three.js meshes. Updates positions and rotations from `data.xpos` / `data.xquat` every frame.
+
+## Usage
+
+```tsx
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+</MujocoCanvas>
+```
+
+This is the primary visual component — without it, you won't see any physics bodies.
+
+## Props
+
+`SceneRenderer` takes no props. It reads all configuration from the simulation context.
+
+## How It Works
+
+1. **On load**: Creates a Three.js group hierarchy mirroring MuJoCo's body tree. Each body gets child meshes for its geoms, built from MuJoCo's geom type, size, and RGBA.
+
+2. **Every frame** (priority 0): Updates each body group's `position` and `quaternion` from `data.xpos` and `data.xquat`.
+
+3. **Selection**: Double-clicking a body fires the `onSelection` callback on `MujocoCanvas`.
+
+## Geom Types
+
+The renderer handles all standard MuJoCo geom types:
+
+| Type | Three.js Geometry |
+|------|-------------------|
+| `box` | BoxGeometry |
+| `sphere` | SphereGeometry |
+| `cylinder` | CylinderGeometry |
+| `capsule` | Custom CapsuleGeometry |
+| `plane` | PlaneGeometry |
+| `mesh` | Loaded from STL/OBJ assets |
+| `ellipsoid` | Scaled SphereGeometry |
+
+## Quaternion Convention
+
+MuJoCo stores quaternions as `[w, x, y, z]`. Three.js expects `(x, y, z, w)`. The renderer handles this conversion automatically.
+
+## Notes
+
+- Body 0 (the world body) is skipped — it doesn't move
+- Geom colors come from `model.geom_rgba`
+- Mesh geoms require the asset files to be accessible at the model's `baseUrl`
+- The renderer uses `userData.bodyID` on meshes for raycasting and selection

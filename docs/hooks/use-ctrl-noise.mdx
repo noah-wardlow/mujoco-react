@@ -1,0 +1,61 @@
+---
+title: "useCtrlNoise"
+description: "Apply Gaussian noise to controls for robustness testing"
+icon: "wave-square"
+---
+
+Adds Gaussian noise to actuator controls each frame. Useful for testing controller robustness or simulating actuator noise.
+
+## Signature
+
+```tsx
+useCtrlNoise(config: {
+  rate?: number;
+  std?: number;
+  enabled?: boolean;
+}): void
+```
+
+## Usage
+
+```tsx
+import { useCtrlNoise } from 'mujoco-react';
+
+function NoisySimulation() {
+  useCtrlNoise({
+    rate: 0.01,
+    std: 0.05,
+    enabled: true,
+  });
+
+  return null;
+}
+```
+
+## Config
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `rate` | `number` | `0.01` | Exponential filter rate (0 = no change, 1 = pure noise) |
+| `std` | `number` | `0.05` | Standard deviation of the Gaussian noise |
+| `enabled` | `boolean` | `true` | Enable/disable noise injection |
+
+## How It Works
+
+Each frame, for each actuator:
+
+```
+noise[i] = (1 - rate) * noise[i] + rate * N(0, std)
+ctrl[i] += noise[i]
+```
+
+This produces temporally-correlated noise (not white noise), which is more physically realistic. The `rate` parameter controls the correlation:
+- **Low rate** (0.01): Smooth, slowly-varying noise
+- **High rate** (0.5): Rapidly-changing noise
+- **Rate = 1.0**: Independent samples each frame (white noise)
+
+## Notes
+
+- Noise is applied in `useBeforePhysicsStep`, composing with other control sources
+- The noise state is maintained internally — each actuator has its own noise value
+- Disable with `enabled: false` rather than removing the hook

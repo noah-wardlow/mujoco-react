@@ -1,0 +1,138 @@
+---
+title: "Forces"
+description: "Apply forces, torques, and generalized forces"
+icon: "arrows-to-circle"
+---
+
+Methods for applying external forces and torques to bodies.
+
+## applyForce(bodyName, force, point?)
+
+Apply a force to a body at an optional point.
+
+```tsx
+// Push body upward
+api.applyForce('block', new THREE.Vector3(0, 0, 10));
+
+// Push at a specific point (creates torque)
+api.applyForce('block',
+  new THREE.Vector3(5, 0, 0),
+  new THREE.Vector3(0.1, 0, 0.05)
+);
+```
+
+<ParamField body="bodyName" type="string" required>
+  Name of the body to apply force to.
+</ParamField>
+
+<ParamField body="force" type="THREE.Vector3" required>
+  Force vector in world coordinates (Newtons).
+</ParamField>
+
+<ParamField body="point" type="THREE.Vector3">
+  Application point in world coordinates. If omitted, force is applied at the body's center of mass.
+</ParamField>
+
+## applyTorque(bodyName, torque)
+
+Apply a pure torque to a body.
+
+```tsx
+api.applyTorque('wheel', new THREE.Vector3(0, 0, 5)); // Spin around Z
+```
+
+<ParamField body="bodyName" type="string" required>
+  Name of the body.
+</ParamField>
+
+<ParamField body="torque" type="THREE.Vector3" required>
+  Torque vector in world coordinates (N·m).
+</ParamField>
+
+## setExternalForce(bodyName, force, torque)
+
+Set both force and torque on a body via `xfrc_applied`.
+
+```tsx
+api.setExternalForce(
+  'block',
+  new THREE.Vector3(0, 0, 10),  // Force
+  new THREE.Vector3(0, 0, 1),   // Torque
+);
+```
+
+<ParamField body="bodyName" type="string" required>
+  Name of the body.
+</ParamField>
+
+<ParamField body="force" type="THREE.Vector3" required>
+  Force vector (N).
+</ParamField>
+
+<ParamField body="torque" type="THREE.Vector3" required>
+  Torque vector (N·m).
+</ParamField>
+
+<Note>
+  `xfrc_applied` layout per body is `[torque(3), force(3)]`. This method writes both components.
+</Note>
+
+## applyGeneralizedForce(values)
+
+Apply forces in generalized (joint) coordinates.
+
+```tsx
+const forces = new Float64Array(model.nv).fill(0);
+forces[0] = 10; // Torque on first joint
+api.applyGeneralizedForce(forces);
+```
+
+<ParamField body="values" type="Float64Array | number[]" required>
+  Array of length `model.nv` with forces/torques in generalized coordinates.
+</ParamField>
+
+## Important: Force Lifecycle
+
+The provider **zeros `qfrc_applied`** at the start of each frame. Forces applied via these API methods (or `useBeforePhysicsStep`) only persist for one physics step.
+
+To apply a continuous force, call it every frame:
+
+```tsx
+useBeforePhysicsStep(() => {
+  api.applyForce('block', new THREE.Vector3(0, 0, 9.81 * mass)); // Hover
+});
+```
+
+## setCtrl(nameOrValues, value?)
+
+Set actuator controls by name or as a batch.
+
+```tsx
+// Single actuator by name
+api.setCtrl('gripper', 0.04);
+
+// Multiple actuators at once
+api.setCtrl({
+  joint1: 0.5,
+  joint2: -0.3,
+  gripper: 0.04,
+});
+```
+
+<ParamField body="nameOrValues" type="string | Record<string, number>" required>
+  Actuator name (with `value` param) or object mapping names to values.
+</ParamField>
+
+<ParamField body="value" type="number">
+  Control value (when `nameOrValues` is a string).
+</ParamField>
+
+## getCtrl()
+
+Get all actuator control values.
+
+```tsx
+const ctrl = api.getCtrl(); // Float64Array of length nu
+```
+
+**Returns:** `Float64Array`

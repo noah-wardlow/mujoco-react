@@ -1,0 +1,171 @@
+---
+title: "Spatial Queries"
+description: "Raycasting, 2D-to-3D projection, and canvas capture"
+icon: "crosshairs"
+---
+
+Methods for spatial queries — raycasting, screen-to-world projection, and canvas snapshots.
+
+## raycast(origin, direction, maxDist?)
+
+Cast a ray and find the first intersection with a geom.
+
+```tsx
+const hit = api.raycast(
+  new THREE.Vector3(0, 0, 1),    // Origin
+  new THREE.Vector3(0, 0, -1),   // Direction (downward)
+  10                               // Max distance
+);
+
+if (hit) {
+  console.log('Hit body', hit.bodyId, 'at distance', hit.distance);
+  console.log('Point:', hit.point);
+}
+```
+
+<ParamField body="origin" type="THREE.Vector3" required>
+  Ray origin in world coordinates.
+</ParamField>
+
+<ParamField body="direction" type="THREE.Vector3" required>
+  Ray direction (will be normalized).
+</ParamField>
+
+<ParamField body="maxDist" type="number" default="100">
+  Maximum ray distance.
+</ParamField>
+
+**Returns:** `RayHit | null`
+
+```tsx
+interface RayHit {
+  point: THREE.Vector3;
+  bodyId: number;
+  geomId: number;
+  distance: number;
+}
+```
+
+## project2DTo3D(x, y, cameraPos, lookAt)
+
+Project a 2D screen point to a 3D world point via raycasting.
+
+```tsx
+// Project center of screen
+const hit = api.project2DTo3D(
+  0.5, 0.5,                                    // Normalized coords (0-1)
+  new THREE.Vector3(2, -1.5, 2.5),             // Camera position
+  new THREE.Vector3(0, 0, 0),                  // Camera look-at
+);
+
+if (hit) {
+  console.log('World point:', hit.point);
+  console.log('Body:', hit.bodyId);
+}
+```
+
+<ParamField body="x" type="number" required>
+  Normalized X coordinate (0 = left, 1 = right).
+</ParamField>
+
+<ParamField body="y" type="number" required>
+  Normalized Y coordinate (0 = top, 1 = bottom).
+</ParamField>
+
+<ParamField body="cameraPos" type="THREE.Vector3" required>
+  Camera world position.
+</ParamField>
+
+<ParamField body="lookAt" type="THREE.Vector3" required>
+  Camera look-at point.
+</ParamField>
+
+**Returns:** `{ point: THREE.Vector3, bodyId: number, geomId: number } | null`
+
+## getCanvasSnapshot(width?, height?, mimeType?)
+
+Capture the current canvas as a base64-encoded image.
+
+```tsx
+const base64 = api.getCanvasSnapshot();
+// "data:image/png;base64,iVBORw0KGgo..."
+
+// Custom size and format
+const jpeg = api.getCanvasSnapshot(640, 480, 'image/jpeg');
+```
+
+<ParamField body="width" type="number">
+  Output width. Defaults to canvas width.
+</ParamField>
+
+<ParamField body="height" type="number">
+  Output height. Defaults to canvas height.
+</ParamField>
+
+<ParamField body="mimeType" type="string" default="image/png">
+  Image format: `'image/png'`, `'image/jpeg'`, `'image/webp'`.
+</ParamField>
+
+**Returns:** `string` — base64 data URL.
+
+## getCameraState()
+
+Get the current camera position and target.
+
+```tsx
+const cam = api.getCameraState();
+console.log('Camera at:', cam.position);
+console.log('Looking at:', cam.target);
+```
+
+**Returns:** `{ position: THREE.Vector3, target: THREE.Vector3 }`
+
+## moveCameraTo(position, target, durationMs)
+
+Smoothly animate the camera to a new position.
+
+```tsx
+await api.moveCameraTo(
+  new THREE.Vector3(3, 0, 2),    // New position
+  new THREE.Vector3(0, 0, 0.5),  // New look-at
+  1000                            // 1 second animation
+);
+```
+
+<ParamField body="position" type="THREE.Vector3" required>
+  Target camera position.
+</ParamField>
+
+<ParamField body="target" type="THREE.Vector3" required>
+  Target look-at point.
+</ParamField>
+
+<ParamField body="durationMs" type="number" required>
+  Animation duration in milliseconds.
+</ParamField>
+
+**Returns:** `Promise<void>` — resolves when animation completes.
+
+## Example: Vision Pipeline
+
+```tsx
+async function detectObjects(api: MujocoSimAPI) {
+  // 1. Capture scene
+  const image = api.getCanvasSnapshot(1024, 1024);
+
+  // 2. Send to vision model
+  const detections = await callVisionAPI(image);
+
+  // 3. Project 2D detections to 3D
+  const cam = api.getCameraState();
+  const worldPoints = detections.map(det => {
+    const hit = api.project2DTo3D(
+      det.x / 1000, det.y / 1000,
+      cam.position, cam.target
+    );
+    return hit?.point;
+  });
+
+  return worldPoints.filter(Boolean);
+}
+```

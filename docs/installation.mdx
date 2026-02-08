@@ -1,0 +1,90 @@
+---
+title: "Installation"
+description: "Install mujoco-react and its peer dependencies"
+icon: "download"
+---
+
+## Install
+
+```bash
+npm install mujoco-react mujoco-js @react-three/fiber @react-three/drei three
+```
+
+### Peer Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `mujoco-js` | `>=0.0.7` | MuJoCo WASM module (physics engine) |
+| `@react-three/fiber` | `>=8` | React renderer for Three.js |
+| `@react-three/drei` | `>=9` | R3F helpers (PivotControls, etc.) |
+| `three` | `>=0.150` | 3D rendering |
+| `react` | `>=18` | React |
+
+### TypeScript
+
+```bash
+npm install -D @types/three
+```
+
+mujoco-react ships with full TypeScript types. No `@types/` package needed for the library itself.
+
+## Bundler Setup
+
+### Vite (Recommended)
+
+mujoco-js includes a WASM binary embedded in its JS bundle. No special WASM configuration is needed — it works out of the box with Vite:
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+});
+```
+
+### Next.js
+
+Since mujoco-js uses WASM, it must run client-side only:
+
+```tsx
+import dynamic from 'next/dynamic';
+
+const MujocoApp = dynamic(() => import('./MujocoApp'), { ssr: false });
+```
+
+### Create React App
+
+Works out of the box. No additional configuration needed.
+
+## Verify Installation
+
+```tsx
+import { MujocoProvider, MujocoCanvas, SceneRenderer } from 'mujoco-react';
+
+function App() {
+  return (
+    <MujocoProvider>
+      <MujocoCanvas
+        config={{
+          robotId: 'franka_emika_panda',
+          sceneFile: 'scene.xml',
+        }}
+        style={{ width: '100%', height: '100vh' }}
+        onReady={() => console.log('MuJoCo loaded!')}
+        onError={(err) => console.error('Load failed:', err)}
+      >
+        <SceneRenderer />
+        <ambientLight />
+      </MujocoCanvas>
+    </MujocoProvider>
+  );
+}
+```
+
+If you see a Franka Panda robot in your browser, everything is working.
+
+<Note>
+  The first load may take a few seconds as the WASM module initializes and model assets are fetched from GitHub. Subsequent loads are faster due to browser caching.
+</Note>

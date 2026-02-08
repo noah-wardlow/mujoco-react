@@ -1,0 +1,82 @@
+---
+title: "useTrajectoryPlayer"
+description: "Play back recorded trajectories"
+icon: "play"
+---
+
+Play back a recorded qpos trajectory, driving joint positions from recorded frames.
+
+## Signature
+
+```tsx
+useTrajectoryPlayer(
+  trajectory: number[][],
+  options?: {
+    fps?: number;
+    loop?: boolean;
+  }
+): {
+  play: () => void;
+  pause: () => void;
+  seek: (frame: number) => void;
+  reset: () => void;
+  frame: number;
+  playing: boolean;
+  totalFrames: number;
+}
+```
+
+## Usage
+
+```tsx
+import { useTrajectoryPlayer } from 'mujoco-react';
+
+function PlaybackControls({ trajectory }) {
+  const player = useTrajectoryPlayer(trajectory, {
+    fps: 30,
+    loop: true,
+  });
+
+  return (
+    <div>
+      <button onClick={player.playing ? player.pause : player.play}>
+        {player.playing ? 'Pause' : 'Play'}
+      </button>
+      <button onClick={player.reset}>Reset</button>
+      <input
+        type="range"
+        min={0}
+        max={player.totalFrames - 1}
+        value={player.frame}
+        onChange={(e) => player.seek(Number(e.target.value))}
+      />
+      <span>{player.frame} / {player.totalFrames}</span>
+    </div>
+  );
+}
+```
+
+## Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `fps` | `number` | `30` | Playback frame rate |
+| `loop` | `boolean` | `false` | Loop when reaching the end |
+
+## Return Value
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `play` | `() => void` | Start playback |
+| `pause` | `() => void` | Pause playback |
+| `seek` | `(frame: number) => void` | Jump to a specific frame |
+| `reset` | `() => void` | Reset to frame 0 |
+| `frame` | `number` | Current frame index |
+| `playing` | `boolean` | Whether currently playing |
+| `totalFrames` | `number` | Total number of frames in trajectory |
+
+## Notes
+
+- The simulation is paused during playback
+- `data.qpos` is set from the trajectory each frame, then `mj_forward` is called
+- For a declarative component API, see [`<TrajectoryPlayer>`](/components/trajectory-player)

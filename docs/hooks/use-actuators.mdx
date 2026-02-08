@@ -1,0 +1,55 @@
+---
+title: "useActuators"
+description: "Get all actuators with metadata"
+icon: "gears"
+---
+
+Returns a stable array of all actuators in the model with their IDs, names, and ranges.
+
+## Signature
+
+```tsx
+useActuators(): ActuatorInfo[]
+```
+
+## Usage
+
+```tsx
+import { useActuators } from 'mujoco-react';
+
+function ActuatorPanel() {
+  const actuators = useActuators();
+
+  return (
+    <ul>
+      {actuators.map((a) => (
+        <li key={a.id}>
+          {a.name} (range: {a.range[0].toFixed(2)} to {a.range[1].toFixed(2)})
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+## Return Value
+
+```tsx
+interface ActuatorInfo {
+  id: number;
+  name: string;
+  range: [number, number];
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `number` | Actuator index in the model |
+| `name` | `string` | Actuator name from MJCF |
+| `range` | `[number, number]` | Control range `[min, max]` |
+
+## Notes
+
+- The array is recomputed only when the model changes (e.g., after `loadScene()`)
+- Returns a stable reference — safe to use in dependency arrays
+- For reading/writing individual actuator values, see [`useCtrl`](/hooks/use-ctrl)

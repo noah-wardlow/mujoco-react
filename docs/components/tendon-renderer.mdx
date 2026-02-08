@@ -1,0 +1,42 @@
+---
+title: "TendonRenderer"
+description: "Render MuJoCo tendons as tubes"
+icon: "bezier-curve"
+---
+
+Renders MuJoCo tendons as smooth tube geometry. Useful for visualizing tendon-driven systems (e.g., robotic hands).
+
+## Usage
+
+```tsx
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <TendonRenderer />
+</MujocoCanvas>
+```
+
+## Props
+
+`TendonRenderer` takes no props. Tendons are rendered with default styling.
+
+## How It Works
+
+1. Reads wrap path data from `model.ten_wrapadr`, `model.ten_wrapnum`
+2. Gets wrap point positions from `data.wrap_xpos`
+3. Creates a `CatmullRomCurve3` through the wrap points
+4. Renders as `TubeGeometry` with radius `0.002`
+5. Updates positions every frame
+
+## Defaults
+
+| Property | Value |
+|----------|-------|
+| Color | `#4d4d80` |
+| Tube radius | `0.002` |
+| Tube segments | `32` |
+
+## Notes
+
+- Requires tendons defined in the MJCF model
+- `ten_rgba` and `ten_width` are not available in mujoco-js 0.0.7 — defaults are used instead
+- If the model has no tendons, this component renders nothing

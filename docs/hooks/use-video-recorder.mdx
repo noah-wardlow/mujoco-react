@@ -1,0 +1,77 @@
+---
+title: "useVideoRecorder"
+description: "Record the canvas to a video file"
+icon: "video"
+---
+
+Record the R3F canvas output to a video file using the MediaRecorder API.
+
+## Signature
+
+```tsx
+useVideoRecorder(options?: {
+  fps?: number;
+  mimeType?: string;
+}): {
+  start: () => void;
+  stop: () => Promise<Blob>;
+  download: (filename?: string) => void;
+  recording: boolean;
+}
+```
+
+## Usage
+
+```tsx
+import { useVideoRecorder } from 'mujoco-react';
+
+function VideoControls() {
+  const video = useVideoRecorder({ fps: 30 });
+
+  return (
+    <div>
+      {video.recording ? (
+        <button onClick={async () => {
+          await video.stop();
+          video.download('simulation.webm');
+        }}>
+          Stop Recording
+        </button>
+      ) : (
+        <button onClick={video.start}>Record Video</button>
+      )}
+    </div>
+  );
+}
+```
+
+## Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `fps` | `number` | `30` | Target frame rate |
+| `mimeType` | `string` | `'video/webm'` | Video container format |
+
+## Return Value
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `start` | `() => void` | Begin recording |
+| `stop` | `() => Promise<Blob>` | Stop recording and return the video blob |
+| `download` | `(filename?: string) => void` | Download the last recorded video |
+| `recording` | `boolean` | Whether currently recording |
+
+## Supported Formats
+
+| MIME Type | Extension | Browser Support |
+|-----------|-----------|----------------|
+| `video/webm` | `.webm` | Chrome, Firefox, Edge |
+| `video/webm;codecs=vp9` | `.webm` | Chrome, Edge |
+| `video/mp4` | `.mp4` | Safari (limited) |
+
+## Notes
+
+- Uses the [MediaRecorder API](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) on the canvas stream
+- Recording quality depends on canvas resolution and browser encoding
+- `stop()` returns a Promise since the MediaRecorder needs to finalize the file
+- WebM is the most widely supported format for canvas recording

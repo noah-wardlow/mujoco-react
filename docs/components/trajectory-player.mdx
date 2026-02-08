@@ -1,0 +1,60 @@
+---
+title: "TrajectoryPlayer"
+description: "Component for playing back recorded trajectories"
+icon: "play"
+---
+
+Declarative component for playing back recorded qpos trajectories. Pauses the simulation and drives joint positions from recorded frames.
+
+## Usage
+
+```tsx
+const trajectory = [[0, 0, 0, ...], [0.01, 0.02, ...], ...]; // Array of qpos arrays
+
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <TrajectoryPlayer
+    trajectory={trajectory}
+    fps={30}
+    loop
+    playing={isPlaying}
+    onFrame={(idx) => console.log('Frame:', idx)}
+  />
+</MujocoCanvas>
+```
+
+## Props
+
+<ParamField body="trajectory" type="number[][]" required>
+  Array of qpos arrays. Each inner array is one frame of joint positions.
+</ParamField>
+
+<ParamField body="fps" type="number" default="30">
+  Playback frame rate.
+</ParamField>
+
+<ParamField body="loop" type="boolean" default="false">
+  Loop playback when reaching the end.
+</ParamField>
+
+<ParamField body="playing" type="boolean">
+  Declarative play/pause control.
+</ParamField>
+
+<ParamField body="onFrame" type="(frameIdx: number) => void">
+  Called each time a new frame is displayed.
+</ParamField>
+
+## How It Works
+
+1. When `playing` becomes `true`, the simulation is paused
+2. Each render frame, the component advances the trajectory index based on elapsed time and `fps`
+3. The current frame's qpos values are written to `data.qpos`
+4. `mj_forward` is called to update positions without stepping physics
+5. When playback ends (or `playing` becomes `false`), simulation resumes
+
+## Notes
+
+- The simulation is paused during playback to prevent physics from interfering
+- Use `useTrajectoryRecorder` to capture trajectories, then play them back with this component
+- For hook-based control, see [`useTrajectoryPlayer`](/hooks/use-trajectory-player)

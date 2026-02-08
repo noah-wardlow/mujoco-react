@@ -1,0 +1,96 @@
+---
+title: "IkGizmo"
+description: "Interactive IK target with PivotControls"
+icon: "arrows-up-down-left-right"
+---
+
+A draggable 3D gizmo (powered by drei's PivotControls) that drives inverse kinematics. Drag the gizmo to move the robot's end-effector.
+
+## Usage
+
+```tsx
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <IkGizmo />
+</MujocoCanvas>
+```
+
+### Custom Site
+
+```tsx
+<IkGizmo siteName="left_hand" scale={0.25} />
+```
+
+### Custom Drag Handler
+
+```tsx
+<IkGizmo
+  onDrag={(pos, quat) => {
+    // Consumer handles the response — IK is NOT auto-enabled
+    console.log('Target:', pos, quat);
+  }}
+/>
+```
+
+## Props
+
+<ParamField body="siteName" type="string" default="config.tcpSiteName">
+  MuJoCo site to track and solve IK towards.
+</ParamField>
+
+<ParamField body="scale" type="number" default="0.18">
+  Visual scale of the gizmo handles.
+</ParamField>
+
+<ParamField body="onDrag" type="(pos: THREE.Vector3, quat: THREE.Quaternion) => void">
+  Custom drag callback. When provided, the gizmo does **not** automatically enable IK — the consumer is responsible for handling the drag.
+</ParamField>
+
+## Behavior
+
+**When not dragging:**
+- The gizmo tracks the MuJoCo site's world position and orientation each frame
+- It "follows" the end-effector as the robot moves
+
+**When dragging (no `onDrag` prop):**
+- IK is automatically enabled
+- The gizmo's position/orientation is written to the provider's IK target
+- The IK solver runs each frame to compute joint angles
+- OrbitControls are disabled during drag
+
+**When dragging (with `onDrag` prop):**
+- The `onDrag` callback fires with position and quaternion
+- IK is NOT automatically enabled — the consumer decides what to do
+- OrbitControls are disabled during drag
+
+## IK Solver
+
+The gizmo uses the library's built-in Damped Least-Squares IK solver (`GenericIK`). The solver:
+
+- Computes a 6D error (3D position + 3D orientation)
+- Builds a Jacobian via finite differences
+- Solves a damped least-squares system
+- Iterates up to 50 times per frame
+
+## Programmatic Control
+
+You can move the IK target programmatically via the API:
+
+```tsx
+const { api } = useMujocoSim();
+
+// Animate the gizmo to a position over 500ms
+api.moveTarget(new THREE.Vector3(0.5, 0, 0.3), 500);
+
+// Snap the gizmo to current TCP position
+api.syncTargetToSite();
+
+// Enable/disable IK solving
+api.setIkEnabled(true);
+```
+
+## Notes
+
+- Requires a `tcpSiteName` (or custom `siteName`) defined in the MuJoCo model
+- The IK solver respects `numArmJoints` from the scene config
+- Disable IK with `api.setIkEnabled(false)` when using custom control (e.g., `useBeforePhysicsStep`)

@@ -1,0 +1,63 @@
+---
+title: "MujocoProvider"
+description: "WASM module lifecycle provider"
+icon: "microchip"
+---
+
+The outermost wrapper that loads the MuJoCo WASM module and provides it to all children.
+
+## Usage
+
+```tsx
+import { MujocoProvider } from 'mujoco-react';
+
+function App() {
+  return (
+    <MujocoProvider onError={(err) => console.error(err)}>
+      <MujocoCanvas config={config}>
+        {/* ... */}
+      </MujocoCanvas>
+    </MujocoProvider>
+  );
+}
+```
+
+## Props
+
+<ParamField body="children" type="React.ReactNode" required>
+  Child components that need access to MuJoCo.
+</ParamField>
+
+<ParamField body="onError" type="(error: Error) => void">
+  Called if the WASM module fails to load.
+</ParamField>
+
+## useMujoco Hook
+
+Access the WASM module status from any child component:
+
+```tsx
+import { useMujoco } from 'mujoco-react';
+
+function LoadingIndicator() {
+  const { status, error } = useMujoco();
+
+  if (status === 'loading') return <div>Loading WASM...</div>;
+  if (status === 'error') return <div>Error: {error}</div>;
+  return null;
+}
+```
+
+### Return Value
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mujoco` | `MujocoModule \| null` | The raw WASM module, or null while loading |
+| `status` | `'loading' \| 'ready' \| 'error'` | Current lifecycle state |
+| `error` | `string \| null` | Error message if loading failed |
+
+## Notes
+
+- Must wrap any component that uses `MujocoCanvas` or mujoco-react hooks
+- The WASM module is loaded once on mount. The embedded binary in `mujoco-js` is ~2MB.
+- Loading typically takes 1-3 seconds on first visit; subsequent visits use the browser cache

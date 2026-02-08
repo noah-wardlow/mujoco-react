@@ -1,0 +1,73 @@
+---
+title: "Debug"
+description: "Visualization overlays for debugging simulations"
+icon: "bug"
+---
+
+Renders debug overlays for MuJoCo simulation elements — geom wireframes, site markers, joint axes, contact forces, center of mass, and more.
+
+## Usage
+
+```tsx
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <Debug showSites showJoints showContacts />
+</MujocoCanvas>
+```
+
+## Props
+
+<ParamField body="showGeoms" type="boolean" default="false">
+  Show wireframe outlines of collision geoms.
+</ParamField>
+
+<ParamField body="showSites" type="boolean" default="false">
+  Show MuJoCo sites as small octahedrons.
+</ParamField>
+
+<ParamField body="showJoints" type="boolean" default="false">
+  Show joint axes as colored arrows.
+</ParamField>
+
+<ParamField body="showContacts" type="boolean" default="false">
+  Show contact force vectors as arrows.
+</ParamField>
+
+<ParamField body="showCOM" type="boolean" default="false">
+  Show center of mass markers for each body.
+</ParamField>
+
+<ParamField body="showInertia" type="boolean" default="false">
+  Show inertia ellipsoids.
+</ParamField>
+
+<ParamField body="showTendons" type="boolean" default="false">
+  Show tendon paths.
+</ParamField>
+
+## How It Works
+
+- **Static geometry** (geoms, sites, joints) is created once when the model loads
+- **Positions** are updated every frame to track body motion
+- **Contact arrows** are recreated every frame (limited to 50 for performance)
+
+## Example: Debug Panel Toggle
+
+```tsx
+function App() {
+  const [debug, setDebug] = useState({
+    sites: false, joints: false, contacts: false,
+  });
+
+  return (
+    <MujocoCanvas config={config}>
+      <SceneRenderer />
+      <Debug
+        showSites={debug.sites}
+        showJoints={debug.joints}
+        showContacts={debug.contacts}
+      />
+    </MujocoCanvas>
+  );
+}
+```

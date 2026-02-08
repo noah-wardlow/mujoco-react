@@ -1,0 +1,66 @@
+---
+title: "SceneLights"
+description: "Auto-create Three.js lights from MJCF definitions"
+icon: "lightbulb"
+---
+
+Reads `<light>` elements from the loaded MuJoCo model and creates corresponding Three.js lights.
+
+## Usage
+
+```tsx
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <SceneLights />
+</MujocoCanvas>
+```
+
+### With Intensity Multiplier
+
+```tsx
+<SceneLights intensity={1.5} />
+```
+
+## Props
+
+<ParamField body="intensity" type="number" default="1.0">
+  Multiplier applied to all light intensities.
+</ParamField>
+
+## Light Mapping
+
+| MJCF `light_type` | Three.js Light |
+|----|------|
+| `0` (directional) | `DirectionalLight` |
+| `1` (spot) | `SpotLight` |
+
+The component reads from the MuJoCo model:
+- `model.nlight` — number of lights
+- `light_pos` — position
+- `light_dir` — direction
+- `light_diffuse` — color
+- `light_castshadow` — shadow casting
+- `light_attenuation` — attenuation coefficients
+- `light_cutoff` — spotlight cone angle
+
+## Alternative
+
+You can also enable MJCF lights via the `mjcfLights` prop on `MujocoCanvas`:
+
+```tsx
+<MujocoCanvas config={config} mjcfLights>
+```
+
+Or skip both and define your own Three.js lights:
+
+```tsx
+<MujocoCanvas config={config}>
+  <ambientLight intensity={0.7} />
+  <directionalLight position={[1, 2, 5]} castShadow />
+</MujocoCanvas>
+```
+
+## Notes
+
+- Lights are created once when the model loads and cleaned up on unmount
+- If your MJCF has no `<light>` elements, this component does nothing

@@ -1,0 +1,76 @@
+---
+title: "ContactListener"
+description: "Subscribe to contact enter/exit events"
+icon: "bell"
+---
+
+A component wrapper for contact event subscriptions. Fires callbacks when a body starts or stops touching other bodies.
+
+## Usage
+
+```tsx
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <ContactListener
+    body="cube"
+    onContactEnter={(info) => console.log('Touch!', info.geom2Name)}
+    onContactExit={(info) => console.log('Released!', info.geom2Name)}
+  />
+</MujocoCanvas>
+```
+
+## Props
+
+<ParamField body="body" type="string" required>
+  Name of the MuJoCo body to monitor for contacts.
+</ParamField>
+
+<ParamField body="onContactEnter" type="(info: ContactInfo) => void">
+  Fired when a new contact begins (geom pair not in previous frame's contacts).
+</ParamField>
+
+<ParamField body="onContactExit" type="(info: ContactInfo) => void">
+  Fired when a contact ends (geom pair was in previous frame but not current).
+</ParamField>
+
+## ContactInfo
+
+```tsx
+interface ContactInfo {
+  geom1: number;
+  geom1Name: string;
+  geom2: number;
+  geom2Name: string;
+  pos: [number, number, number];
+  depth: number;
+}
+```
+
+## Example: Pickup Detection
+
+```tsx
+function PickupDetector() {
+  const [holding, setHolding] = useState(false);
+
+  return (
+    <>
+      <ContactListener
+        body="gripper_left"
+        onContactEnter={(info) => {
+          if (info.geom2Name === 'cube') setHolding(true);
+        }}
+        onContactExit={(info) => {
+          if (info.geom2Name === 'cube') setHolding(false);
+        }}
+      />
+      {holding && <Billboard>Holding cube!</Billboard>}
+    </>
+  );
+}
+```
+
+## Notes
+
+- This is a component wrapper around the `useContactEvents` hook
+- Contact transitions are computed by diffing the contact list frame-to-frame
+- Renders nothing visually

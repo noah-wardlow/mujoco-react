@@ -1,0 +1,204 @@
+---
+title: "Loading Models"
+description: "SceneConfig, Menagerie, custom model sources, and XML patching"
+icon: "file-code"
+---
+
+## SceneConfig
+
+Every simulation starts with a `SceneConfig` object that tells mujoco-react what to load and how to configure the robot:
+
+```tsx
+import type { SceneConfig } from 'mujoco-react';
+
+const config: SceneConfig = {
+  robotId: 'franka_emika_panda',
+  sceneFile: 'scene.xml',
+  numArmJoints: 7,
+  tcpSiteName: 'tcp',
+  gripperActuatorName: 'gripper',
+  homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
+};
+```
+
+### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `robotId` | `string` | Directory name in the model repository (e.g. `'franka_emika_panda'`) |
+| `sceneFile` | `string` | Entry MJCF file to load (e.g. `'scene.xml'`) |
+
+### Optional Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `baseUrl` | `string` | Menagerie GitHub | URL prefix for fetching model files |
+| `numArmJoints` | `number` | `7` | Number of arm joints for IK |
+| `tcpSiteName` | `string` | `'tcp'` | MuJoCo site name for IK target |
+| `gripperActuatorName` | `string` | `'gripper'` | Actuator name for gripper control |
+| `homeJoints` | `number[]` | — | Joint positions applied on reset |
+| `sceneObjects` | `SceneObject[]` | — | Dynamic objects injected into scene |
+| `xmlPatches` | `XmlPatch[]` | — | XML transformations before compilation |
+| `onReset` | `(model, data) => void` | — | Custom logic run after each reset |
+
+## Model Sources
+
+### DeepMind Menagerie (Default)
+
+By default, models are fetched from the [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) on GitHub. The `robotId` maps to a directory in the repository:
+
+```tsx
+// Loads from: github.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/scene.xml
+const config: SceneConfig = {
+  robotId: 'franka_emika_panda',
+  sceneFile: 'scene.xml',
+};
+```
+
+Available robots include `franka_emika_panda`, `universal_robots_ur5e`, `kuka_iiwa_14`, `robotiq_2f85`, and [many more](https://github.com/google-deepmind/mujoco_menagerie).
+
+### Custom Base URL
+
+Point `baseUrl` to any HTTP server hosting MJCF files:
+
+```tsx
+const config: SceneConfig = {
+  robotId: 'my_robot',
+  sceneFile: 'scene.xml',
+  baseUrl: 'https://my-server.com/models',
+};
+// Fetches: https://my-server.com/models/my_robot/scene.xml
+```
+
+### GitHub Repositories
+
+Use raw GitHub URLs for models hosted in your own repos:
+
+```tsx
+const config: SceneConfig = {
+  robotId: 'my_robot',
+  sceneFile: 'robot.xml',
+  baseUrl: 'https://raw.githubusercontent.com/myorg/myrepo/main',
+};
+```
+
+## Scene Objects
+
+Inject dynamic objects (boxes, spheres, cylinders) into the scene without modifying MJCF files:
+
+```tsx
+const config: SceneConfig = {
+  robotId: 'franka_emika_panda',
+  sceneFile: 'scene.xml',
+  sceneObjects: [
+    {
+      name: 'red_cube',
+      type: 'box',
+      size: [0.025, 0.025, 0.025],
+      position: [0.5, 0.0, 0.025],
+      rgba: [1, 0, 0, 1],
+      mass: 0.1,
+      freejoint: true,
+    },
+    {
+      name: 'blue_sphere',
+      type: 'sphere',
+      size: [0.02, 0, 0],
+      position: [0.4, 0.1, 0.02],
+      rgba: [0, 0, 1, 1],
+      mass: 0.05,
+      freejoint: true,
+    },
+  ],
+};
+```
+
+### SceneObject Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | `string` | **required** | Unique body/geom name |
+| `type` | `'box' \| 'sphere' \| 'cylinder'` | **required** | Geom type |
+| `size` | `[number, number, number]` | **required** | Geom size (MuJoCo semantics) |
+| `position` | `[number, number, number]` | **required** | Initial world position |
+| `rgba` | `[number, number, number, number]` | **required** | Color (0-1 range) |
+| `mass` | `number` | — | Body mass in kg |
+| `freejoint` | `boolean` | — | Add a free joint (6-DOF) |
+| `friction` | `string` | — | MuJoCo friction spec |
+| `solref` | `string` | — | MuJoCo solver reference |
+| `solimp` | `string` | — | MuJoCo solver impedance |
+| `condim` | `number` | — | Contact dimensionality |
+
+Objects are injected into `</worldbody>` before the model is compiled.
+
+## XML Patching
+
+For more advanced model customization, use `xmlPatches` to transform the MJCF XML before it reaches MuJoCo:
+
+```tsx
+const config: SceneConfig = {
+  robotId: 'franka_emika_panda',
+  sceneFile: 'scene.xml',
+  xmlPatches: [
+    // Replace a value in the XML
+    {
+      target: 'scene.xml',
+      replace: ['timestep="0.002"', 'timestep="0.001"'],
+    },
+    // Inject XML after a specific tag
+    {
+      target: 'scene.xml',
+      inject: '<body name="table" pos="0.5 0 0"><geom type="box" size="0.3 0.3 0.01" rgba="0.6 0.4 0.2 1"/></body>',
+      injectAfter: '<worldbody>',
+    },
+  ],
+};
+```
+
+### XmlPatch Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `target` | `string` | Filename to patch |
+| `replace` | `[string, string]` | `[search, replacement]` string substitution |
+| `inject` | `string` | XML string to inject |
+| `injectAfter` | `string` | Insert `inject` after this string |
+
+## Reset Callback
+
+Run custom logic after each simulation reset (e.g., randomize object positions for domain randomization):
+
+```tsx
+const config: SceneConfig = {
+  robotId: 'franka_emika_panda',
+  sceneFile: 'scene.xml',
+  sceneObjects: [
+    { name: 'cube', type: 'box', size: [0.025, 0.025, 0.025],
+      position: [0.5, 0, 0.025], rgba: [1, 0, 0, 1],
+      mass: 0.1, freejoint: true },
+  ],
+  onReset: (model, data) => {
+    // Randomize cube position on each reset
+    const bodyId = 1; // or use findBodyByName
+    const qposAdr = model.jnt_qposadr[0];
+    data.qpos[qposAdr + 0] = 0.4 + Math.random() * 0.2; // x
+    data.qpos[qposAdr + 1] = -0.1 + Math.random() * 0.2; // y
+    data.qpos[qposAdr + 2] = 0.025; // z
+  },
+};
+```
+
+## Runtime Scene Loading
+
+Swap the entire model at runtime without remounting:
+
+```tsx
+const { api } = useMujocoSim();
+
+async function switchRobot() {
+  await api.loadScene({
+    robotId: 'universal_robots_ur5e',
+    sceneFile: 'scene.xml',
+  });
+}
+```

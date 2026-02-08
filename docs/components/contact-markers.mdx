@@ -1,0 +1,52 @@
+---
+title: "ContactMarkers"
+description: "Visualize MuJoCo contact points"
+icon: "circle-dot"
+---
+
+Renders contact points as small spheres using `InstancedMesh` for performance. Useful for debugging contact behavior.
+
+## Usage
+
+```tsx
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <ContactMarkers />
+</MujocoCanvas>
+```
+
+### Customized
+
+```tsx
+<ContactMarkers
+  maxContacts={50}
+  radius={0.01}
+  color="#ff4444"
+  visible={showContacts}
+/>
+```
+
+## Props
+
+<ParamField body="maxContacts" type="number" default="100">
+  Maximum number of contact points to render. Limits are important to avoid WASM out-of-memory when reading contact data.
+</ParamField>
+
+<ParamField body="radius" type="number" default="0.005">
+  Sphere radius for each contact marker.
+</ParamField>
+
+<ParamField body="color" type="string" default="#4f46e5">
+  Color of the contact markers.
+</ParamField>
+
+<ParamField body="visible" type="boolean" default="true">
+  Toggle visibility. Useful for a debug panel toggle.
+</ParamField>
+
+## Notes
+
+- Contact data is read from `data.contact` every frame
+- Access is wrapped in try/catch since contact reads can fail if `ncon` is large
+- The component always checks `data.ncon` before iterating contacts
+- Uses `InstancedMesh` for efficient rendering of many small spheres

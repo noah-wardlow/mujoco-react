@@ -1,0 +1,57 @@
+---
+title: "Roadmap"
+description: "Planned features and known limitations"
+icon: "map"
+---
+
+## Planned Features
+
+<CardGroup cols={1}>
+  <Card title="Multi-robot scenes" icon="robot">
+    Support multiple independent robot configs in a single scene with per-robot IK and control contexts.
+  </Card>
+  <Card title="Physics worker thread" icon="microchip">
+    Move `mj_step` to a Web Worker for truly independent physics and render rates, enabling higher-fidelity simulations without frame drops.
+  </Card>
+  <Card title="Mesh decimation" icon="compress">
+    Automatic mesh simplification for visual geoms to reduce GPU load on complex Menagerie models.
+  </Card>
+  <Card title="useConstraint hook" icon="link">
+    Declarative equality constraints (weld, connect, joint) that can be added/removed at runtime from React components.
+  </Card>
+  <Card title="Offscreen rendering" icon="camera">
+    Headless canvas rendering for automated data collection, CI testing, and server-side image generation.
+  </Card>
+  <Card title="URDF import" icon="file-import">
+    Load robots from URDF files (with automatic MJCF conversion) for ROS ecosystem compatibility.
+  </Card>
+  <Card title="Multiplayer sync" icon="users">
+    WebSocket-based state synchronization for collaborative simulation viewing and multi-operator teleoperation.
+  </Card>
+</CardGroup>
+
+## Known Limitations
+
+### WASM Binding Gaps (mujoco-js 0.0.7)
+
+These are limitations of the underlying `mujoco-js` WASM bindings, not mujoco-react itself:
+
+| Feature | Status | Impact |
+|---------|--------|--------|
+| `flex_face` | Not exposed | FlexRenderer renders as point cloud, not solid mesh |
+| `ten_rgba`, `ten_width` | Not exposed | TendonRenderer uses hardcoded color/width |
+| `mj_ray` body filtering | Not exposed | Raycasts hit all geoms (no body exclusion) |
+| `mjv_scene` rendering | Not available | No native MuJoCo rendering pipeline (Three.js only) |
+
+### Browser Constraints
+
+- **WASM memory**: Large models (100+ bodies) may approach browser WASM memory limits
+- **Contact reads**: Accessing `data.contact` with high `ncon` can cause OOM — always check `data.ncon` first
+- **Single thread**: Physics runs on the main thread (Web Worker support planned)
+- **No GPU compute**: MuJoCo's GPU pipeline is not available in WASM
+
+### Architecture Notes
+
+- `SceneConfig.config` is read on mount only — prop changes after mount require `api.loadScene()`
+- All mutable state lives in refs to avoid 60fps re-renders — hooks return `RefObject`, not state values
+- `qfrc_applied` is zeroed each frame by the provider — always **add** to it, never assign

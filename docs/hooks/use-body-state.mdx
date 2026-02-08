@@ -1,0 +1,71 @@
+---
+title: "useBodyState"
+description: "Track body position, rotation, and velocities"
+icon: "cube"
+---
+
+Returns refs tracking a body's position, quaternion, linear velocity, and angular velocity. Updated every physics frame without triggering re-renders.
+
+## Signature
+
+```tsx
+useBodyState(name: string): {
+  position: React.RefObject<THREE.Vector3>;
+  quaternion: React.RefObject<THREE.Quaternion>;
+  linearVelocity: React.RefObject<THREE.Vector3>;
+  angularVelocity: React.RefObject<THREE.Vector3>;
+}
+```
+
+## Usage
+
+```tsx
+import { useBodyState } from 'mujoco-react';
+import { useFrame } from '@react-three/fiber';
+
+function BodyTracker() {
+  const { position, quaternion } = useBodyState('block_1');
+
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame(() => {
+    // Mirror the body's position on a custom mesh
+    meshRef.current?.position.copy(position.current);
+    meshRef.current?.quaternion.copy(quaternion.current);
+  });
+
+  return <mesh ref={meshRef}><sphereGeometry args={[0.01]} /></mesh>;
+}
+```
+
+### Velocity Tracking
+
+```tsx
+function SpeedDisplay() {
+  const { linearVelocity } = useBodyState('ball');
+  const textRef = useRef<any>(null);
+
+  useFrame(() => {
+    const speed = linearVelocity.current.length();
+    if (textRef.current) textRef.current.text = `${speed.toFixed(2)} m/s`;
+  });
+
+  return <Text ref={textRef} position={[0, 0.5, 0]} />;
+}
+```
+
+## Return Value
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `position` | `RefObject<THREE.Vector3>` | World position from `data.xpos` |
+| `quaternion` | `RefObject<THREE.Quaternion>` | World rotation from `data.xquat` (converted to Three.js order) |
+| `linearVelocity` | `RefObject<THREE.Vector3>` | Linear velocity from `data.cvel` |
+| `angularVelocity` | `RefObject<THREE.Vector3>` | Angular velocity from `data.cvel` |
+
+## Notes
+
+- Returns are **refs**, not state — read `.current` in `useFrame` or event handlers
+- No re-renders on updates — this is intentional for 60fps performance
+- The body is looked up by name once; if the name doesn't exist, values stay at zero
+- `cvel` layout is `[angular(3), linear(3)]` per body — the hook reorders for you

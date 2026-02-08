@@ -1,0 +1,142 @@
+---
+title: "State Management"
+description: "Save, restore, and manipulate simulation state"
+icon: "floppy-disk"
+---
+
+Methods for saving/restoring simulation snapshots and manipulating joint state.
+
+## saveState()
+
+Capture a snapshot of the current simulation state.
+
+```tsx
+const snapshot = api.saveState();
+```
+
+**Returns:** `StateSnapshot`
+
+```tsx
+interface StateSnapshot {
+  time: number;
+  qpos: Float64Array;
+  qvel: Float64Array;
+  ctrl: Float64Array;
+  act: Float64Array;
+  qfrc_applied: Float64Array;
+}
+```
+
+## restoreState(snapshot)
+
+Restore a previously saved state.
+
+```tsx
+const snapshot = api.saveState();
+// ... simulation runs ...
+api.restoreState(snapshot); // Back to saved state
+```
+
+<ParamField body="snapshot" type="StateSnapshot" required>
+  Snapshot from a previous `saveState()` call.
+</ParamField>
+
+## setQpos(values)
+
+Set all generalized positions.
+
+```tsx
+api.setQpos(new Float64Array([0, 0, 0.5, 1, 0, 0, 0])); // Free joint
+```
+
+<ParamField body="values" type="Float64Array | number[]" required>
+  Array of length `model.nq`.
+</ParamField>
+
+## getQpos()
+
+Get all generalized positions.
+
+```tsx
+const qpos = api.getQpos(); // Float64Array of length nq
+```
+
+**Returns:** `Float64Array`
+
+## setQvel(values)
+
+Set all generalized velocities.
+
+```tsx
+api.setQvel(new Float64Array(model.nv).fill(0)); // Zero all velocities
+```
+
+<ParamField body="values" type="Float64Array | number[]" required>
+  Array of length `model.nv`.
+</ParamField>
+
+## getQvel()
+
+Get all generalized velocities.
+
+```tsx
+const qvel = api.getQvel(); // Float64Array of length nv
+```
+
+**Returns:** `Float64Array`
+
+## applyKeyframe(nameOrIndex)
+
+Apply a named or indexed keyframe from the model.
+
+```tsx
+api.applyKeyframe('home');  // By name
+api.applyKeyframe(0);       // By index
+```
+
+<ParamField body="nameOrIndex" type="string | number" required>
+  Keyframe name or index. Keyframes are defined in MJCF with `<key>` elements.
+</ParamField>
+
+## getKeyframeNames()
+
+Get all keyframe names.
+
+```tsx
+const names = api.getKeyframeNames(); // ['home', 'pose1', ...]
+```
+
+**Returns:** `string[]`
+
+## getKeyframeCount()
+
+Get the number of keyframes.
+
+```tsx
+const count = api.getKeyframeCount(); // e.g., 3
+```
+
+**Returns:** `number`
+
+## Example: Checkpoint System
+
+```tsx
+function CheckpointControls() {
+  const { api } = useMujocoSim();
+  const snapshots = useRef<StateSnapshot[]>([]);
+
+  return (
+    <div>
+      <button onClick={() => snapshots.current.push(api.saveState())}>
+        Save Checkpoint ({snapshots.current.length})
+      </button>
+      <button onClick={() => {
+        const snap = snapshots.current.pop();
+        if (snap) api.restoreState(snap);
+      }}>
+        Restore
+      </button>
+    </div>
+  );
+}
+```

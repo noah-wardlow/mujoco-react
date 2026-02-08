@@ -1,0 +1,161 @@
+---
+title: "Architecture"
+description: "Provider pattern, physics loop, and rendering pipeline"
+icon: "sitemap"
+---
+
+## Provider Hierarchy
+
+mujoco-react uses a layered provider pattern:
+
+```
+MujocoProvider          ← WASM module lifecycle
+  └─ MujocoCanvas       ← R3F Canvas + scene config
+       └─ MujocoSimProvider  ← Physics loop + API (internal)
+            └─ children       ← Your components
+```
+
+### MujocoProvider
+
+The outermost wrapper. Loads the `mujoco-js` WASM module and provides it to all children. Must wrap your entire app (or at least the part that uses mujoco-react).
+
+### MujocoCanvas
+
+A thin wrapper around R3F's `<Canvas>`. It accepts a `SceneConfig` and all standard Canvas props (`camera`, `shadows`, `style`, etc.). Internally creates a `MujocoSimProvider` that loads the model and starts the physics loop.
+
+### MujocoSimProvider (internal)
+
+You don't use this directly — `MujocoCanvas` creates it. It:
+- Loads the model from `SceneConfig`
+- Runs the physics loop via `useFrame` at priority `-1`
+- Exposes the `MujocoSimAPI` via React context
+- Manages IK solver state and animation
+
+## Physics Loop
+
+The physics loop runs inside `useFrame` at **priority -1**, ensuring it executes before any rendering:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Priority -1 (MujocoSimProvider)                    │
+│                                                      │
+│  1. Zero qfrc_applied                               │
+│  2. Run useBeforePhysicsStep callbacks               │
+│  3. IK solving (if enabled)                          │
+│  4. mj_step × substeps (loop until sim catches up)  │
+│  5. Run useAfterPhysicsStep callbacks                │
+│  6. Fire onStep callback                             │
+└─────────────────────────────────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────┐
+│  Priority 0 (default)                               │
+│                                                      │
+│  - SceneRenderer: sync body meshes to xpos/xquat    │
+│  - ContactMarkers: update contact positions          │
+│  - Your useFrame callbacks                           │
+└─────────────────────────────────────────────────────┘
+          │
+          ▼
+        Render
+```
+
+### Timing
+
+Physics stepping is decoupled from the render frame rate. Each render frame, the provider advances simulation time to match wall-clock time (scaled by `speed`). If the browser drops frames, multiple `mj_step` calls run in a single render frame to catch up.
+
+```tsx
+// Pseudocode of the stepping loop
+while (simTime < wallTime * speed) {
+  mj_step(model, data);
+  simTime += timestep;
+}
+```
+
+## State Management
+
+All mutable simulation state lives in **refs**, not React state. This is critical for performance — React state updates trigger re-renders, and at 60fps that would be catastrophic.
+
+```tsx
+// ✅ Correct: refs for physics data
+const mjModelRef = useRef<MujocoModel | null>(null);
+const mjDataRef = useRef<MujocoData | null>(null);
+
+// ❌ Wrong: React state for per-frame data
+const [qpos, setQpos] = useState<Float64Array>();  // Don't do this
+```
+
+Hooks like `useBodyState` and `useJointState` return refs that update every frame without re-rendering:
+
+```tsx
+const { position } = useBodyState('block');
+
+useFrame(() => {
+  // Read current position — no re-renders
+  console.log(position.current.x);
+});
+```
+
+## Composability
+
+Everything inside `<MujocoCanvas>` is a standard R3F child. You mix library components with your own:
+
+```tsx
+<MujocoCanvas config={config}>
+  {/* Library: physics visualization */}
+  <SceneRenderer />
+  <IkGizmo />
+
+  {/* Library: debugging */}
+  <Debug showSites showJoints />
+  <ContactMarkers />
+
+  {/* Yours: scene decoration */}
+  <OrbitControls makeDefault />
+  <ambientLight intensity={0.7} />
+  <Grid args={[10, 10]} />
+
+  {/* Yours: game logic */}
+  <MyRobotController />
+  <RewardVisualizer />
+</MujocoCanvas>
+```
+
+## Accessing the API
+
+Two ways to access the simulation API:
+
+### 1. `onReady` callback (outside R3F)
+
+```tsx
+function App() {
+  const apiRef = useRef<MujocoSimAPI | null>(null);
+
+  return (
+    <MujocoCanvas
+      config={config}
+      onReady={(api) => { apiRef.current = api; }}
+    >
+      {/* ... */}
+    </MujocoCanvas>
+  );
+}
+```
+
+### 2. `useMujocoSim()` hook (inside R3F)
+
+```tsx
+function MyComponent() {
+  const { api } = useMujocoSim();
+
+  useEffect(() => {
+    api.setSpeed(2.0);
+  }, []);
+
+  return null;
+}
+```
+
+<Warning>
+  `useMujocoSim()` can only be called from components that are children of `MujocoCanvas`. Calling it outside will throw an error.
+</Warning>

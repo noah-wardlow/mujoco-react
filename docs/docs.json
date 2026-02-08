@@ -1,0 +1,111 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "mujoco-react",
+  "theme": "quill",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0D7377",
+    "light": "#14B8A6",
+    "dark": "#0D7377",
+    "anchors": {
+      "from": "#0D7377",
+      "to": "#14B8A6"
+    }
+  },
+  "modeToggle": {
+    "default": "dark",
+    "isHidden": false
+  },
+  "tabs": [
+    {
+      "name": "Components",
+      "url": "components"
+    },
+    {
+      "name": "Hooks",
+      "url": "hooks"
+    },
+    {
+      "name": "API Reference",
+      "url": "api"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "installation",
+        "architecture",
+        "loading-models"
+      ]
+    },
+    {
+      "group": "Components",
+      "pages": [
+        "components/mujoco-provider",
+        "components/mujoco-canvas",
+        "components/scene-renderer",
+        "components/ik-gizmo",
+        "components/drag-interaction",
+        "components/contact-markers",
+        "components/scene-lights",
+        "components/debug",
+        "components/tendon-renderer",
+        "components/flex-renderer",
+        "components/contact-listener",
+        "components/selection-highlight",
+        "components/trajectory-player"
+      ]
+    },
+    {
+      "group": "Hooks",
+      "pages": [
+        "hooks/use-mujoco-sim",
+        "hooks/use-before-physics-step",
+        "hooks/use-after-physics-step",
+        "hooks/use-body-state",
+        "hooks/use-joint-state",
+        "hooks/use-site-position",
+        "hooks/use-sensor",
+        "hooks/use-ctrl",
+        "hooks/use-contacts",
+        "hooks/use-keyboard-teleop",
+        "hooks/use-gamepad",
+        "hooks/use-actuators",
+        "hooks/use-policy",
+        "hooks/use-trajectory-recorder",
+        "hooks/use-trajectory-player",
+        "hooks/use-video-recorder",
+        "hooks/use-ctrl-noise",
+        "hooks/use-gravity-compensation"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api/simulation-control",
+        "api/state-management",
+        "api/forces",
+        "api/model-introspection",
+        "api/model-mutation",
+        "api/spatial-queries",
+        "api/ik-control",
+        "api/scene-management"
+      ]
+    },
+    {
+      "group": "More",
+      "pages": [
+        "roadmap"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/nicepkg/mujoco-react"
+  }
+}

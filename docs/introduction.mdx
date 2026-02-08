@@ -1,0 +1,101 @@
+---
+title: "Introduction"
+description: "Composable React Three Fiber components for MuJoCo physics simulations"
+icon: "rocket"
+---
+
+# mujoco-react
+
+**mujoco-react** brings the [MuJoCo](https://mujoco.org/) physics engine to React via WebAssembly. It provides composable [React Three Fiber](https://r3f.docs.pmnd.rs/) components for loading models, stepping physics, rendering bodies, and interacting with simulations — all with a familiar React API.
+
+<CardGroup cols={2}>
+  <Card title="Composable" icon="puzzle-piece">
+    Drop `<SceneRenderer />`, `<IkGizmo />`, `<Debug />` and more into your R3F scene as children. No monolithic wrapper.
+  </Card>
+  <Card title="Declarative" icon="code">
+    Configure physics via props — `paused`, `speed`, `gravity`, `timestep`. React state drives the simulation.
+  </Card>
+  <Card title="Extensible" icon="plug">
+    `useBeforePhysicsStep` and `useAfterPhysicsStep` let you inject control logic, RL policies, or teleoperation at 60fps.
+  </Card>
+  <Card title="Full MuJoCo" icon="atom">
+    Contacts, sensors, tendons, flex bodies, IK, raycasting, domain randomization — the full MuJoCo API, React-ified.
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+```bash
+npm install mujoco-react mujoco-js @react-three/fiber @react-three/drei three
+```
+
+```tsx
+import { MujocoProvider, MujocoCanvas, SceneRenderer, IkGizmo } from 'mujoco-react';
+import { OrbitControls } from '@react-three/drei';
+
+function App() {
+  return (
+    <MujocoProvider>
+      <MujocoCanvas
+        config={{
+          robotId: 'franka_emika_panda',
+          sceneFile: 'scene.xml',
+          tcpSiteName: 'tcp',
+          homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
+        }}
+        camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
+        shadows
+        style={{ width: '100%', height: '100vh' }}
+      >
+        <OrbitControls makeDefault />
+        <SceneRenderer />
+        <IkGizmo />
+        <ambientLight intensity={0.7} />
+        <directionalLight position={[1, 2, 5]} castShadow />
+      </MujocoCanvas>
+    </MujocoProvider>
+  );
+}
+```
+
+This loads the Franka Panda from [DeepMind Menagerie](https://github.com/google-deepmind/mujoco_menagerie), renders all bodies, and adds an interactive IK gizmo on the end-effector — in under 30 lines.
+
+## Design Philosophy
+
+mujoco-react follows the same pattern as [react-three-rapier](https://github.com/pmndrs/react-three-rapier):
+
+- **Library handles MuJoCo concerns only** — WASM lifecycle, physics stepping, body rendering, IK solving
+- **Consumers compose everything else** — lights, grid, camera controls, UI, game logic
+- **All scene elements are R3F children** — no config objects for visual-only things
+
+```tsx
+<MujocoCanvas config={config}>
+  {/* Library components */}
+  <SceneRenderer />
+  <IkGizmo />
+  <ContactMarkers />
+
+  {/* Your components — standard R3F */}
+  <OrbitControls />
+  <ambientLight />
+  <Grid />
+  <MyGameLogic />
+</MujocoCanvas>
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Peer dependencies, bundler setup, and WASM notes
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture">
+    Provider → Canvas → children pattern and physics loop
+  </Card>
+  <Card title="Loading Models" icon="file-code" href="/loading-models">
+    SceneConfig, Menagerie, custom model sources
+  </Card>
+  <Card title="Components" icon="puzzle-piece" href="/components/mujoco-provider">
+    Full component reference
+  </Card>
+</CardGroup>

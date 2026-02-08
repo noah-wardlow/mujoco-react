@@ -1,0 +1,50 @@
+---
+title: "SelectionHighlight"
+description: "Emissive highlight on selected bodies"
+icon: "highlighter"
+---
+
+Applies an emissive glow to the selected body's meshes. Works with the `onSelection` callback from `MujocoCanvas`.
+
+## Usage
+
+```tsx
+function App() {
+  const [selectedBody, setSelectedBody] = useState<number | null>(null);
+
+  return (
+    <MujocoCanvas
+      config={config}
+      onSelection={(bodyId, name) => setSelectedBody(bodyId)}
+    >
+      <SceneRenderer />
+      <SelectionHighlight bodyId={selectedBody} />
+    </MujocoCanvas>
+  );
+}
+```
+
+## Props
+
+<ParamField body="bodyId" type="number | null" required>
+  ID of the body to highlight. Pass `null` to clear the highlight.
+</ParamField>
+
+<ParamField body="color" type="string" default="#ff4444">
+  Emissive highlight color.
+</ParamField>
+
+<ParamField body="emissiveIntensity" type="number" default="0.3">
+  Intensity of the emissive glow.
+</ParamField>
+
+## How It Works
+
+1. Traverses the scene graph for meshes with matching `userData.bodyID`
+2. Sets the mesh material's `emissive` color and `emissiveIntensity`
+3. Restores original emissive values when the selection changes or the component unmounts
+
+## Notes
+
+- Double-click a body in `SceneRenderer` to trigger the `onSelection` callback
+- The highlight applies to all geom meshes belonging to the body

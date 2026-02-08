@@ -1,0 +1,88 @@
+---
+title: "useBeforePhysicsStep"
+description: "Inject logic before mj_step each frame"
+icon: "arrow-right-to-bracket"
+---
+
+Register a callback that runs **before** `mj_step` every physics frame. This is the primary hook for writing control logic.
+
+## Signature
+
+```tsx
+useBeforePhysicsStep(
+  callback: (model: MujocoModel, data: MujocoData) => void
+): void
+```
+
+## Usage
+
+### Setting Actuator Controls
+
+```tsx
+useBeforePhysicsStep((model, data) => {
+  // Sinusoidal control on the first actuator
+  data.ctrl[0] = Math.sin(data.time * 2.0);
+});
+```
+
+### Applying Forces
+
+```tsx
+useBeforePhysicsStep((model, data) => {
+  // Push body 3 upward
+  // xfrc_applied layout: 6 per body [torque(3), force(3)]
+  const offset = 3 * 6;
+  data.xfrc_applied[offset + 3] = 0;   // fx
+  data.xfrc_applied[offset + 4] = 0;   // fy
+  data.xfrc_applied[offset + 5] = 10;  // fz (upward)
+});
+```
+
+### PD Controller
+
+```tsx
+function PDController({ jointIndex, target, kp, kd }) {
+  useBeforePhysicsStep((model, data) => {
+    const q = data.qpos[jointIndex];
+    const dq = data.qvel[jointIndex];
+    data.ctrl[jointIndex] = kp * (target - q) - kd * dq;
+  });
+  return null;
+}
+```
+
+## Execution Order
+
+```
+1. Provider zeros qfrc_applied
+2. → Your useBeforePhysicsStep callbacks run here ←
+3. IK solving (if enabled)
+4. mj_step
+5. useAfterPhysicsStep callbacks
+```
+
+## Composability
+
+Multiple `useBeforePhysicsStep` hooks compose correctly. Each callback adds to the simulation state rather than overwriting:
+
+```tsx
+// Component A: gravity compensation
+useBeforePhysicsStep((model, data) => {
+  for (let i = 0; i < model.nv; i++) {
+    data.qfrc_applied[i] += data.qfrc_bias[i];
+  }
+});
+
+// Component B: custom control
+useBeforePhysicsStep((model, data) => {
+  data.ctrl[0] = computeControl();
+});
+```
+
+Both run each frame. Since the provider zeros `qfrc_applied` at the start, you should **add** to it (not assign).
+
+## Notes
+
+- The callback receives the same model/data objects that `mj_step` will use
+- If using IK (via `IkGizmo`), your before-step runs first, then IK may overwrite `ctrl`. Disable IK with `api.setIkEnabled(false)` when writing your own control.
+- The callback is called at physics rate, not render rate. Multiple physics steps may run per render frame.

@@ -1,0 +1,119 @@
+---
+title: "Scene Management"
+description: "Runtime model loading and scene configuration"
+icon: "rotate"
+---
+
+Methods for loading and swapping models at runtime.
+
+## loadScene(newConfig)
+
+Load a new model, replacing the current scene entirely.
+
+```tsx
+await api.loadScene({
+  robotId: 'universal_robots_ur5e',
+  sceneFile: 'scene.xml',
+  numArmJoints: 6,
+  tcpSiteName: 'tcp',
+});
+```
+
+<ParamField body="newConfig" type="SceneConfig" required>
+  New scene configuration. See [Loading Models](/loading-models) for all fields.
+</ParamField>
+
+**Returns:** `Promise<void>` — resolves when the new model is loaded and ready.
+
+This method:
+1. Fetches the new model files
+2. Applies XML patches and injects scene objects
+3. Compiles the model with `mj_loadXML`
+4. Creates new model/data objects
+5. Rebuilds the scene graph (SceneRenderer will re-render)
+6. Fires the `onReady` callback with the updated API
+
+## Example: Robot Switcher
+
+```tsx
+function RobotSelector() {
+  const { api } = useMujocoSim();
+  const [loading, setLoading] = useState(false);
+
+  const robots = [
+    { id: 'franka_emika_panda', label: 'Franka Panda', joints: 7 },
+    { id: 'universal_robots_ur5e', label: 'UR5e', joints: 6 },
+    { id: 'kuka_iiwa_14', label: 'KUKA iiwa', joints: 7 },
+  ];
+
+  async function switchRobot(robot: typeof robots[0]) {
+    setLoading(true);
+    await api.loadScene({
+      robotId: robot.id,
+      sceneFile: 'scene.xml',
+      numArmJoints: robot.joints,
+      tcpSiteName: 'tcp',
+    });
+    setLoading(false);
+  }
+
+  return (
+    <div>
+      {robots.map(r => (
+        <button key={r.id} onClick={() => switchRobot(r)} disabled={loading}>
+          {r.label}
+        </button>
+      ))}
+      {loading && <span>Loading...</span>}
+    </div>
+  );
+}
+```
+
+## Utility Functions
+
+These standalone functions are exported for advanced use cases (e.g., building custom loaders).
+
+### getName(model, address)
+
+Read a null-terminated C string from the WASM model's name buffer.
+
+```tsx
+import { getName } from 'mujoco-react';
+const bodyName = getName(model, model.name_bodyadr[bodyId]);
+```
+
+### find*ByName(model, name)
+
+Look up element indices by name. All return `-1` if not found.
+
+```tsx
+import {
+  findBodyByName,
+  findJointByName,
+  findGeomByName,
+  findSiteByName,
+  findActuatorByName,
+  findSensorByName,
+  findTendonByName,
+  findKeyframeByName,
+} from 'mujoco-react';
+
+const bodyId = findBodyByName(model, 'gripper');
+const jointId = findJointByName(model, 'joint1');
+const siteId = findSiteByName(model, 'tcp');
+const actuatorId = findActuatorByName(model, 'gripper');
+```
+
+### loadScene(mujoco, config, onProgress?)
+
+The standalone scene loader function (used internally by the provider).
+
+```tsx
+import { loadScene } from 'mujoco-react';
+
+const result = await loadScene(mujoco, config, (msg) => {
+  console.log('Loading:', msg);
+});
+// result: { mjModel, mjData, siteId, gripperId }
+```

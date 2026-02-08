@@ -1,0 +1,89 @@
+---
+title: "useTrajectoryRecorder"
+description: "Record simulation trajectories"
+icon: "circle-dot"
+---
+
+Record simulation trajectories (qpos, qvel, ctrl, sensordata) for playback, analysis, or export.
+
+## Signature
+
+```tsx
+useTrajectoryRecorder(options?: {
+  fields?: ('qpos' | 'qvel' | 'ctrl' | 'sensordata')[];
+}): {
+  start: () => void;
+  stop: () => TrajectoryFrame[];
+  recording: boolean;
+  frameCount: number;
+  frames: TrajectoryFrame[];
+  downloadJSON: () => void;
+  downloadCSV: () => void;
+}
+```
+
+## Usage
+
+```tsx
+import { useTrajectoryRecorder } from 'mujoco-react';
+
+function RecordButton() {
+  const recorder = useTrajectoryRecorder({
+    fields: ['qpos', 'qvel', 'ctrl'],
+  });
+
+  return (
+    <div>
+      {recorder.recording ? (
+        <button onClick={() => {
+          const frames = recorder.stop();
+          console.log(`Recorded ${frames.length} frames`);
+        }}>
+          Stop ({recorder.frameCount} frames)
+        </button>
+      ) : (
+        <button onClick={recorder.start}>Record</button>
+      )}
+      <button onClick={recorder.downloadJSON}>Export JSON</button>
+      <button onClick={recorder.downloadCSV}>Export CSV</button>
+    </div>
+  );
+}
+```
+
+## Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `fields` | `string[]` | `['qpos', 'qvel', 'ctrl', 'sensordata']` | Which fields to record each frame |
+
+## Return Value
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `start` | `() => void` | Begin recording |
+| `stop` | `() => TrajectoryFrame[]` | Stop recording and return frames |
+| `recording` | `boolean` | Whether currently recording |
+| `frameCount` | `number` | Number of frames recorded so far |
+| `frames` | `TrajectoryFrame[]` | Recorded frames (grows during recording) |
+| `downloadJSON` | `() => void` | Download trajectory as JSON file |
+| `downloadCSV` | `() => void` | Download qpos as CSV file |
+
+## TrajectoryFrame
+
+```tsx
+interface TrajectoryFrame {
+  time: number;
+  qpos: Float64Array;
+  qvel?: Float64Array;
+  ctrl?: Float64Array;
+  sensordata?: Float64Array;
+}
+```
+
+## Notes
+
+- Recording happens in `useAfterPhysicsStep` — one frame per physics step
+- Each frame is a snapshot (arrays are copied, not referenced)
+- JSON export includes all recorded fields; CSV includes qpos only
+- For playback, use [`useTrajectoryPlayer`](/hooks/use-trajectory-player) or [`<TrajectoryPlayer>`](/components/trajectory-player)

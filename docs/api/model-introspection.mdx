@@ -1,0 +1,219 @@
+---
+title: "Model Introspection"
+description: "Query bodies, joints, geoms, sensors, and actuators"
+icon: "magnifying-glass"
+---
+
+Methods for querying the structure of the loaded MuJoCo model.
+
+## getBodies()
+
+Get all bodies in the model.
+
+```tsx
+const bodies = api.getBodies();
+// [{ id: 0, name: 'world', mass: 0, parentId: -1 }, ...]
+```
+
+**Returns:** `BodyInfo[]`
+
+```tsx
+interface BodyInfo {
+  id: number;
+  name: string;
+  mass: number;
+  parentId: number;
+}
+```
+
+## getJoints()
+
+Get all joints in the model.
+
+```tsx
+const joints = api.getJoints();
+joints.forEach(j => {
+  console.log(`${j.name}: ${j.typeName}, range [${j.range}]`);
+});
+```
+
+**Returns:** `JointInfo[]`
+
+```tsx
+interface JointInfo {
+  id: number;
+  name: string;
+  type: number;
+  typeName: 'free' | 'ball' | 'slide' | 'hinge';
+  range: [number, number];
+  limited: boolean;
+  bodyId: number;
+  qposAdr: number;
+  dofAdr: number;
+}
+```
+
+## getGeoms()
+
+Get all geoms in the model.
+
+```tsx
+const geoms = api.getGeoms();
+```
+
+**Returns:** `GeomInfo[]`
+
+```tsx
+interface GeomInfo {
+  id: number;
+  name: string;
+  type: number;
+  typeName: string;
+  size: [number, number, number];
+  bodyId: number;
+}
+```
+
+## getSites()
+
+Get all sites in the model.
+
+```tsx
+const sites = api.getSites();
+const tcp = sites.find(s => s.name === 'tcp');
+```
+
+**Returns:** `SiteInfo[]`
+
+```tsx
+interface SiteInfo {
+  id: number;
+  name: string;
+  bodyId: number;
+}
+```
+
+## getActuators()
+
+Get all actuators in the model.
+
+```tsx
+const actuators = api.getActuators();
+actuators.forEach(a => {
+  console.log(`${a.name}: range [${a.range[0]}, ${a.range[1]}]`);
+});
+```
+
+**Returns:** `ActuatorInfo[]`
+
+```tsx
+interface ActuatorInfo {
+  id: number;
+  name: string;
+  range: [number, number];
+}
+```
+
+## getSensors()
+
+Get all sensors in the model.
+
+```tsx
+const sensors = api.getSensors();
+sensors.forEach(s => {
+  console.log(`${s.name}: ${s.typeName}, dim=${s.dim}`);
+});
+```
+
+**Returns:** `SensorInfo[]`
+
+```tsx
+interface SensorInfo {
+  id: number;
+  name: string;
+  type: number;
+  typeName: string;
+  dim: number;
+  adr: number;
+}
+```
+
+## getSensorData(name)
+
+Read a specific sensor's current values.
+
+```tsx
+const force = api.getSensorData('wrist_force');
+if (force) {
+  console.log('Force:', force[0], force[1], force[2]);
+}
+```
+
+<ParamField body="name" type="string" required>
+  Sensor name.
+</ParamField>
+
+**Returns:** `Float64Array | null` — sensor values, or null if not found.
+
+## getContacts()
+
+Get all current contacts.
+
+```tsx
+const contacts = api.getContacts();
+contacts.forEach(c => {
+  console.log(`${c.geom1Name} ↔ ${c.geom2Name} at depth ${c.depth}`);
+});
+```
+
+**Returns:** `ContactInfo[]`
+
+```tsx
+interface ContactInfo {
+  geom1: number;
+  geom1Name: string;
+  geom2: number;
+  geom2Name: string;
+  pos: [number, number, number];
+  depth: number;
+}
+```
+
+## getModelOption()
+
+Get simulation options.
+
+```tsx
+const opts = api.getModelOption();
+console.log('Timestep:', opts.timestep);
+console.log('Gravity:', opts.gravity);
+```
+
+**Returns:** `ModelOptions`
+
+```tsx
+interface ModelOptions {
+  timestep: number;
+  gravity: [number, number, number];
+  integrator: number;
+}
+```
+
+## Example: Model Summary
+
+```tsx
+function ModelInfo() {
+  const { api } = useMujocoSim();
+  const [info, setInfo] = useState('');
+
+  useEffect(() => {
+    const bodies = api.getBodies();
+    const joints = api.getJoints();
+    const actuators = api.getActuators();
+    const sensors = api.getSensors();
+    setInfo(`${bodies.length} bodies, ${joints.length} joints, ${actuators.length} actuators, ${sensors.length} sensors`);
+  }, []);
+
+  return <div>{info}</div>;
+}
+```

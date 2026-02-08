@@ -1,0 +1,126 @@
+---
+title: "MujocoCanvas"
+description: "R3F Canvas wrapper with physics simulation"
+icon: "display"
+---
+
+A thin wrapper around React Three Fiber's `<Canvas>` that sets up the physics simulation. Accepts all standard R3F Canvas props plus MuJoCo-specific configuration.
+
+## Usage
+
+```tsx
+import { MujocoProvider, MujocoCanvas, SceneRenderer } from 'mujoco-react';
+import { OrbitControls } from '@react-three/drei';
+
+function App() {
+  return (
+    <MujocoProvider>
+      <MujocoCanvas
+        config={{
+          robotId: 'franka_emika_panda',
+          sceneFile: 'scene.xml',
+        }}
+        camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
+        shadows
+        paused={false}
+        speed={1.0}
+        onReady={(api) => console.log('Loaded!', api)}
+        style={{ width: '100%', height: '100vh' }}
+      >
+        <OrbitControls makeDefault />
+        <SceneRenderer />
+        <ambientLight intensity={0.7} />
+      </MujocoCanvas>
+    </MujocoProvider>
+  );
+}
+```
+
+## Props
+
+### MuJoCo Props
+
+<ParamField body="config" type="SceneConfig" required>
+  Scene configuration — robot ID, model file, joints, etc. See [Loading Models](/loading-models).
+</ParamField>
+
+<ParamField body="onReady" type="(api: MujocoSimAPI) => void">
+  Fires when the model is loaded and simulation is ready. Receives the full API object.
+</ParamField>
+
+<ParamField body="onError" type="(error: Error) => void">
+  Called if model loading or simulation fails.
+</ParamField>
+
+<ParamField body="onStep" type="(time: number) => void">
+  Called after each physics step with the current simulation time.
+</ParamField>
+
+<ParamField body="onSelection" type="(bodyId: number, name: string) => void">
+  Fired when a body is double-clicked in `SceneRenderer`.
+</ParamField>
+
+### Physics Props
+
+<ParamField body="paused" type="boolean" default="false">
+  Pause/resume the simulation declaratively.
+</ParamField>
+
+<ParamField body="speed" type="number" default="1.0">
+  Simulation speed multiplier. `0.5` = half speed, `2.0` = double speed.
+</ParamField>
+
+<ParamField body="gravity" type="[number, number, number]">
+  Override gravity vector (m/s^2). Default: model's gravity.
+</ParamField>
+
+<ParamField body="timestep" type="number">
+  Override simulation timestep (seconds). Default: model's timestep.
+</ParamField>
+
+<ParamField body="substeps" type="number">
+  Number of physics substeps per frame for improved stability.
+</ParamField>
+
+<ParamField body="interpolate" type="boolean" default="false">
+  Interpolate body positions between physics steps for smoother rendering on high-refresh displays.
+</ParamField>
+
+<ParamField body="gravityCompensation" type="boolean" default="false">
+  Apply gravity compensation torques each frame.
+</ParamField>
+
+<ParamField body="mjcfLights" type="boolean" default="false">
+  Automatically create Three.js lights from MJCF `<light>` definitions.
+</ParamField>
+
+### R3F Canvas Props
+
+All standard `@react-three/fiber` Canvas props are passed through:
+
+```tsx
+<MujocoCanvas
+  camera={{ position: [2, 2, 2], fov: 45, up: [0, 0, 1] }}
+  shadows
+  dpr={[1, 2]}
+  gl={{ antialias: true }}
+  style={{ width: '100%', height: '100vh' }}
+  className="my-canvas"
+>
+```
+
+## Ref
+
+`MujocoCanvas` forwards its ref to the underlying R3F Canvas:
+
+```tsx
+const canvasRef = useRef<HTMLCanvasElement>(null);
+
+<MujocoCanvas ref={canvasRef} config={config}>
+```
+
+## Notes
+
+- Must be a child of `<MujocoProvider>`
+- Children can use all mujoco-react hooks (`useMujocoSim`, `useBeforePhysicsStep`, etc.)
+- The `config` prop is read on mount and when `api.loadScene()` is called — changing it after mount has no effect

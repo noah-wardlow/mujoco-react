@@ -1,0 +1,65 @@
+---
+title: "useSitePosition"
+description: "Track MuJoCo site world position and orientation"
+icon: "location-dot"
+---
+
+Returns refs tracking a MuJoCo site's world position and orientation. Useful for tracking end-effectors, sensors, or reference frames.
+
+## Signature
+
+```tsx
+useSitePosition(siteName: string): {
+  position: React.RefObject<THREE.Vector3>;
+  quaternion: React.RefObject<THREE.Quaternion>;
+}
+```
+
+## Usage
+
+```tsx
+import { useSitePosition } from 'mujoco-react';
+
+function TCPTracker() {
+  const { position, quaternion } = useSitePosition('tcp');
+
+  useFrame(() => {
+    console.log('TCP at:', position.current.toArray());
+  });
+
+  return null;
+}
+```
+
+### Visual Marker at Site
+
+```tsx
+function SiteMarker({ siteName }: { siteName: string }) {
+  const { position } = useSitePosition(siteName);
+  const ref = useRef<THREE.Mesh>(null);
+
+  useFrame(() => {
+    ref.current?.position.copy(position.current);
+  });
+
+  return (
+    <mesh ref={ref}>
+      <sphereGeometry args={[0.01]} />
+      <meshStandardMaterial color="red" />
+    </mesh>
+  );
+}
+```
+
+## Return Value
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `position` | `RefObject<THREE.Vector3>` | World position from `data.site_xpos` |
+| `quaternion` | `RefObject<THREE.Quaternion>` | World orientation from `data.site_xmat` (converted to quaternion) |
+
+## Notes
+
+- Updated every frame via `useAfterPhysicsStep`
+- Returns refs, not state — no re-renders
+- The site must exist in the MuJoCo model

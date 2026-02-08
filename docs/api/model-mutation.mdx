@@ -1,0 +1,115 @@
+---
+title: "Model Mutation"
+description: "Modify physics parameters at runtime for domain randomization"
+icon: "shuffle"
+---
+
+Methods for modifying model parameters at runtime. Useful for domain randomization in RL training.
+
+## setGravity(g)
+
+Change the gravity vector.
+
+```tsx
+api.setGravity([0, 0, -9.81]);    // Earth gravity (Z-up)
+api.setGravity([0, 0, -1.62]);    // Moon gravity
+api.setGravity([0, 0, 0]);        // Zero gravity
+```
+
+<ParamField body="g" type="[number, number, number]" required>
+  Gravity vector in m/s^2.
+</ParamField>
+
+## setTimestep(dt)
+
+Change the simulation timestep.
+
+```tsx
+api.setTimestep(0.001);  // 1ms (more stable, slower)
+api.setTimestep(0.005);  // 5ms (faster, less stable)
+```
+
+<ParamField body="dt" type="number" required>
+  Timestep in seconds.
+</ParamField>
+
+<Warning>
+  Changing the timestep affects simulation stability. Smaller values are more stable but slower. Large values may cause the simulation to explode.
+</Warning>
+
+## setBodyMass(name, mass)
+
+Change a body's mass.
+
+```tsx
+api.setBodyMass('block', 0.5);   // 500g
+api.setBodyMass('block', 2.0);   // 2kg
+```
+
+<ParamField body="name" type="string" required>
+  Body name.
+</ParamField>
+
+<ParamField body="mass" type="number" required>
+  New mass in kg.
+</ParamField>
+
+## setGeomFriction(name, friction)
+
+Change a geom's friction coefficients.
+
+```tsx
+api.setGeomFriction('floor', [1.0, 0.005, 0.0001]);  // High friction
+api.setGeomFriction('ice', [0.1, 0.001, 0.00001]);    // Low friction
+```
+
+<ParamField body="name" type="string" required>
+  Geom name.
+</ParamField>
+
+<ParamField body="friction" type="[number, number, number]" required>
+  MuJoCo friction coefficients: `[slide, torsional, rolling]`.
+</ParamField>
+
+## setGeomSize(name, size)
+
+Change a geom's size.
+
+```tsx
+api.setGeomSize('box', [0.05, 0.05, 0.05]);  // 10cm cube
+api.setGeomSize('ball', [0.03, 0, 0]);        // 3cm radius sphere
+```
+
+<ParamField body="name" type="string" required>
+  Geom name.
+</ParamField>
+
+<ParamField body="size" type="[number, number, number]" required>
+  New size (semantics depend on geom type — see [MuJoCo docs](https://mujoco.readthedocs.io/en/latest/XMLreference.html#body-geom)).
+</ParamField>
+
+## Example: Domain Randomization
+
+```tsx
+function DomainRandomizer() {
+  const { api } = useMujocoSim();
+
+  function randomize() {
+    // Randomize gravity
+    const gz = -9.81 + (Math.random() - 0.5) * 2;
+    api.setGravity([0, 0, gz]);
+
+    // Randomize object mass
+    api.setBodyMass('cube', 0.05 + Math.random() * 0.2);
+
+    // Randomize floor friction
+    const friction = 0.5 + Math.random() * 1.0;
+    api.setGeomFriction('floor', [friction, 0.005, 0.0001]);
+
+    // Reset to apply changes
+    api.reset();
+  }
+
+  return <button onClick={randomize}>Randomize</button>;
+}
+```

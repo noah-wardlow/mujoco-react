@@ -1,0 +1,63 @@
+---
+title: "useGravityCompensation"
+description: "Apply gravity compensation torques"
+icon: "weight-hanging"
+---
+
+Applies gravity compensation each frame by adding `qfrc_bias` to `qfrc_applied`. This allows joints to hold their position against gravity without active control.
+
+## Signature
+
+```tsx
+useGravityCompensation(enabled?: boolean): void
+```
+
+## Usage
+
+```tsx
+import { useGravityCompensation } from 'mujoco-react';
+
+function GravCompRobot() {
+  useGravityCompensation(true);
+  return null;
+}
+```
+
+### Toggle via State
+
+```tsx
+function Controls() {
+  const [gravComp, setGravComp] = useState(true);
+  useGravityCompensation(gravComp);
+
+  return (
+    <button onClick={() => setGravComp(!gravComp)}>
+      Gravity Comp: {gravComp ? 'ON' : 'OFF'}
+    </button>
+  );
+}
+```
+
+## How It Works
+
+Each physics frame (via `useBeforePhysicsStep`):
+
+```tsx
+for (let i = 0; i < model.nv; i++) {
+  data.qfrc_applied[i] += data.qfrc_bias[i];
+}
+```
+
+`qfrc_bias` contains the passive forces (gravity, Coriolis, centrifugal) computed by MuJoCo. Adding these to `qfrc_applied` exactly cancels gravity, making the robot behave as if it's weightless.
+
+## When to Use
+
+- **IK gizmo interaction**: Prevents the arm from collapsing when you drag the end-effector
+- **Teleoperation**: Lets the operator focus on desired motion without fighting gravity
+- **Testing**: Isolate control issues from gravity effects
+
+## Notes
+
+- Also available as a prop on `MujocoCanvas`: `<MujocoCanvas gravityCompensation />`
+- Composes correctly with other `useBeforePhysicsStep` hooks since the provider zeros `qfrc_applied` first and all hooks add to it
+- This is different from `api.setGravity([0, 0, 0])` which removes gravity for all bodies. Gravity compensation only affects actuated joints.

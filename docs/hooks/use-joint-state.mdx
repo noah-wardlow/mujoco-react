@@ -1,0 +1,58 @@
+---
+title: "useJointState"
+description: "Track joint position and velocity"
+icon: "link"
+---
+
+Returns refs tracking a joint's position and velocity values. Updated every physics frame without re-renders.
+
+## Signature
+
+```tsx
+useJointState(name: string): {
+  position: React.RefObject<Float64Array>;
+  velocity: React.RefObject<Float64Array>;
+}
+```
+
+## Usage
+
+```tsx
+import { useJointState } from 'mujoco-react';
+
+function JointDisplay() {
+  const { position, velocity } = useJointState('joint1');
+  const textRef = useRef<any>(null);
+
+  useFrame(() => {
+    const angle = position.current[0]; // Radians for hinge joints
+    if (textRef.current) {
+      textRef.current.text = `${(angle * 180 / Math.PI).toFixed(1)}°`;
+    }
+  });
+
+  return <Text ref={textRef} position={[0, 0.3, 0]} />;
+}
+```
+
+## Return Value
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `position` | `RefObject<Float64Array>` | Joint position(s) from `data.qpos` |
+| `velocity` | `RefObject<Float64Array>` | Joint velocity/velocities from `data.qvel` |
+
+### Array Size by Joint Type
+
+| Joint Type | Position Size | Velocity Size |
+|------------|--------------|---------------|
+| `hinge` | 1 (angle) | 1 (angular vel) |
+| `slide` | 1 (displacement) | 1 (linear vel) |
+| `ball` | 4 (quaternion) | 3 (angular vel) |
+| `free` | 7 (pos + quat) | 6 (lin vel + ang vel) |
+
+## Notes
+
+- Returns refs for zero-overhead per-frame reads
+- For hinge joints, `position.current[0]` is the angle in radians
+- For free joints, position is `[x, y, z, qw, qx, qy, qz]`

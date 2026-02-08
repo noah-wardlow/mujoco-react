@@ -1,0 +1,89 @@
+---
+title: "Simulation Control"
+description: "Reset, pause, step, and control simulation timing"
+icon: "gauge-high"
+---
+
+Methods for controlling the simulation lifecycle and timing. Access via `useMujocoSim().api` or the `onReady` callback.
+
+## reset()
+
+Reset the simulation to its initial state.
+
+```tsx
+api.reset();
+```
+
+Applies `homeJoints` from the scene config (if set), runs `mj_forward`, and calls the `onReset` callback.
+
+## setPaused(paused)
+
+Pause or resume the simulation.
+
+```tsx
+api.setPaused(true);   // Pause
+api.setPaused(false);  // Resume
+```
+
+<ParamField body="paused" type="boolean" required>
+  Whether the simulation should be paused.
+</ParamField>
+
+## togglePause()
+
+Toggle pause state. Returns the new paused state.
+
+```tsx
+const isPaused = api.togglePause(); // true or false
+```
+
+**Returns:** `boolean` — the new paused state.
+
+## step(n?)
+
+Advance the simulation by `n` steps while paused.
+
+```tsx
+api.step();    // Advance 1 step
+api.step(10);  // Advance 10 steps
+```
+
+<ParamField body="n" type="number" default="1">
+  Number of physics steps to advance.
+</ParamField>
+
+Has no effect if the simulation is not paused.
+
+## setSpeed(multiplier)
+
+Set the simulation speed multiplier.
+
+```tsx
+api.setSpeed(2.0);  // 2× speed
+api.setSpeed(0.5);  // Half speed
+api.setSpeed(0.1);  // Slow motion
+```
+
+<ParamField body="multiplier" type="number" required>
+  Speed multiplier. `1.0` = real-time, `0.5` = half speed, `2.0` = double speed.
+</ParamField>
+
+## getTime()
+
+Get the current simulation time in seconds.
+
+```tsx
+const t = api.getTime(); // e.g., 1.234
+```
+
+**Returns:** `number` — simulation time in seconds.
+
+## getTimestep()
+
+Get the current simulation timestep.
+
+```tsx
+const dt = api.getTimestep(); // e.g., 0.002
+```
+
+**Returns:** `number` — timestep in seconds.

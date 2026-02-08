@@ -1,0 +1,48 @@
+---
+title: "DragInteraction"
+description: "Click-drag to apply spring forces to bodies"
+icon: "hand"
+---
+
+Enables mouse-driven interaction with physics bodies. Hold Ctrl/Cmd and drag to pull bodies with a spring force.
+
+## Usage
+
+```tsx
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <DragInteraction />
+</MujocoCanvas>
+```
+
+### Custom Stiffness
+
+```tsx
+<DragInteraction stiffness={500} showArrow={false} />
+```
+
+## Props
+
+<ParamField body="stiffness" type="number" default="250">
+  Spring stiffness multiplier. The actual force is `(mouseWorld - grabPoint) * body_mass * stiffness`.
+</ParamField>
+
+<ParamField body="showArrow" type="boolean" default="true">
+  Show a red arrow indicating the drag direction and force magnitude.
+</ParamField>
+
+## How It Works
+
+1. **Ctrl/Cmd + Click** on a body starts the drag
+2. The component raycasts to find the clicked body and grab point
+3. Each frame, a spring force is computed: `F = (mouseWorld - grabWorld) * mass * stiffness`
+4. The force is applied via `useBeforePhysicsStep`, adding to `qfrc_applied`
+5. Releasing the mouse ends the drag
+
+The Ctrl/Cmd modifier is required to avoid conflicting with OrbitControls.
+
+## Notes
+
+- Forces are applied in the `useBeforePhysicsStep` callback, composing correctly with other force sources
+- The arrow visual is a Three.js `ArrowHelper` updated each frame
+- Body 0 (world body) cannot be dragged

@@ -1,0 +1,88 @@
+---
+title: "useMujocoSim"
+description: "Access the simulation API and internal state"
+icon: "plug"
+---
+
+The primary hook for accessing the MuJoCo simulation API from any component inside `<MujocoCanvas>`.
+
+## Usage
+
+```tsx
+import { useMujocoSim } from 'mujoco-react';
+
+function MyComponent() {
+  const { api, status } = useMujocoSim();
+
+  if (status !== 'ready') return null;
+
+  return (
+    <button onClick={() => api.reset()}>Reset</button>
+  );
+}
+```
+
+## Return Value
+
+```tsx
+interface MujocoSimContext {
+  api: MujocoSimAPI;
+  mjModelRef: React.RefObject<MujocoModel | null>;
+  mjDataRef: React.RefObject<MujocoData | null>;
+  mujocoRef: React.RefObject<MujocoModule>;
+  status: 'loading' | 'ready' | 'error';
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `api` | `MujocoSimAPI` | Full simulation API (see [API Reference](/api/simulation-control)) |
+| `mjModelRef` | `RefObject` | Direct access to the MuJoCo model (advanced) |
+| `mjDataRef` | `RefObject` | Direct access to the MuJoCo data (advanced) |
+| `mujocoRef` | `RefObject` | Direct access to the WASM module (advanced) |
+| `status` | `string` | Current loading state |
+
+## The API Object
+
+The `api` object provides methods grouped into categories:
+
+- **[Simulation Control](/api/simulation-control)** — `reset()`, `setPaused()`, `setSpeed()`, `step()`, `getTime()`
+- **[State Management](/api/state-management)** — `saveState()`, `restoreState()`, `setQpos()`, `applyKeyframe()`
+- **[Forces](/api/forces)** — `applyForce()`, `applyTorque()`, `setExternalForce()`
+- **[Model Introspection](/api/model-introspection)** — `getBodies()`, `getJoints()`, `getSensors()`
+- **[Model Mutation](/api/model-mutation)** — `setGravity()`, `setBodyMass()`, `setGeomFriction()`
+- **[Spatial Queries](/api/spatial-queries)** — `raycast()`, `project2DTo3D()`, `getCanvasSnapshot()`
+- **[IK Control](/api/ik-control)** — `setIkEnabled()`, `moveTarget()`, `solveIK()`
+- **[Scene Management](/api/scene-management)** — `loadScene()`, `setCtrl()`
+
+## Direct Model/Data Access
+
+For advanced use cases, access the raw MuJoCo model and data objects:
+
+```tsx
+function AdvancedComponent() {
+  const { mjModelRef, mjDataRef } = useMujocoSim();
+
+  useFrame(() => {
+    const model = mjModelRef.current;
+    const data = mjDataRef.current;
+    if (!model || !data) return;
+
+    // Read raw WASM arrays
+    const nq = model.nq;
+    const qpos = data.qpos; // Float64Array
+  });
+
+  return null;
+}
+```
+
+<Warning>
+  Direct model/data access bypasses the API's safety checks. Be careful with array indexing and avoid writing to arrays that the provider manages (e.g., `qfrc_applied` is zeroed each frame).
+</Warning>
+
+## Notes
+
+- Must be called from a component inside `<MujocoCanvas>`
+- The `api` object is stable (same reference across renders)
+- Check `status === 'ready'` before calling API methods
