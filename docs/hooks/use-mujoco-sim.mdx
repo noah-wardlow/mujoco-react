@@ -14,7 +14,7 @@ import { useMujocoSim } from 'mujoco-react';
 function MyComponent() {
   const { api, status } = useMujocoSim();
 
-  if (status !== 'ready') return null;
+  if (!api) return null;
 
   return (
     <button onClick={() => api.reset()}>Reset</button>
@@ -30,7 +30,7 @@ interface MujocoSimContext {
   mjModelRef: React.RefObject<MujocoModel | null>;
   mjDataRef: React.RefObject<MujocoData | null>;
   mujocoRef: React.RefObject<MujocoModule>;
-  status: 'loading' | 'ready' | 'error';
+  status: 'pending' | 'error';
 }
 ```
 
@@ -85,4 +85,4 @@ function AdvancedComponent() {
 
 - Must be called from a component inside `<MujocoCanvas>`
 - The `api` object is stable (same reference across renders)
-- Check `status === 'ready'` before calling API methods
+- Check that `api` is truthy before calling methods

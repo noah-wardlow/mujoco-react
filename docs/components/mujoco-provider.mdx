@@ -40,10 +40,11 @@ Access the WASM module status from any child component:
 import { useMujoco } from 'mujoco-react';
 
 function LoadingIndicator() {
-  const { status, error } = useMujoco();
+  const { mujoco, status, error } = useMujoco();
 
-  if (status === 'loading') return <div>Loading WASM...</div>;
+  if (status === 'pending') return <div>Loading WASM...</div>;
   if (status === 'error') return <div>Error: {error}</div>;
+  // mujoco is now available
   return null;
 }
 ```
@@ -52,8 +53,8 @@ function LoadingIndicator() {
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `mujoco` | `MujocoModule \| null` | The raw WASM module, or null while loading |
-| `status` | `'loading' \| 'ready' \| 'error'` | Current lifecycle state |
+| `mujoco` | `MujocoModule \| null` | The raw WASM module, or `null` while pending |
+| `status` | `'pending' \| 'error'` | Current lifecycle state (absent once loaded) |
 | `error` | `string \| null` | Error message if loading failed |
 
 ## Notes
