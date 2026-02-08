@@ -1,0 +1,64 @@
+{
+  "name": "mujoco-react",
+  "version": "0.1.0",
+  "description": "Composable React Three Fiber building blocks for MuJoCo WASM simulations",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "mujoco",
+    "react",
+    "three",
+    "r3f",
+    "react-three-fiber",
+    "physics",
+    "simulation",
+    "robotics",
+    "wasm"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/noah/mujoco-react"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "@react-three/drei": ">=9",
+    "@react-three/fiber": ">=8",
+    "react": ">=18",
+    "three": ">=0.160.0"
+  },
+  "dependencies": {
+    "mujoco-js": "0.0.7"
+  },
+  "devDependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "@types/react": "^19.0.0",
+    "@types/three": "^0.181.0",
+    "react": "^19.2.0",
+    "three": "^0.181.0",
+    "tsup": "^8.4.0",
+    "typescript": "~5.8.2"
+  }
+}

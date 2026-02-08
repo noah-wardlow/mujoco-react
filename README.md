@@ -1,0 +1,511 @@
+# mujoco-react
+
+Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) building blocks for [MuJoCo](https://mujoco.org/) WASM simulations. Works with **any robot, any scene** — you provide the MJCF model, the library handles physics, rendering, and IK.
+
+Think [react-three-rapier](https://github.com/pmndrs/react-three-rapier) but for MuJoCo.
+
+## Install
+
+```bash
+npm install mujoco-react three @react-three/fiber @react-three/drei
+```
+
+## Quick Start
+
+```tsx
+import {
+  MujocoProvider,
+  MujocoCanvas,
+  SceneRenderer,
+  IkGizmo,
+} from 'mujoco-react';
+import type { SceneConfig, MujocoSimAPI } from 'mujoco-react';
+import { OrbitControls } from '@react-three/drei';
+
+const config: SceneConfig = {
+  robotId: 'franka_emika_panda',
+  sceneFile: 'scene.xml',
+  numArmJoints: 7,
+  tcpSiteName: 'tcp',
+  gripperActuatorName: 'gripper',
+  homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
+};
+
+function App() {
+  const apiRef = useRef<MujocoSimAPI | null>(null);
+
+  return (
+    <MujocoProvider>
+      <MujocoCanvas
+        config={config}
+        onReady={(api) => { apiRef.current = api; }}
+        camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
+        shadows
+        style={{ width: '100%', height: '100vh' }}
+      >
+        <OrbitControls enableDamping makeDefault />
+        <SceneRenderer />
+        <IkGizmo />
+        <ambientLight intensity={0.7} />
+        <directionalLight position={[1, 2, 5]} intensity={1.2} castShadow />
+      </MujocoCanvas>
+    </MujocoProvider>
+  );
+}
+```
+
+## Architecture
+
+```
+<MujocoProvider>              ← WASM module lifecycle
+  <MujocoCanvas config={...}> ← Thin R3F Canvas wrapper + physics context
+    <OrbitControls />          ← You add your own controls
+    <SceneRenderer />          ← Syncs MuJoCo bodies to Three.js meshes
+    <IkGizmo />                ← PivotControls-based IK handle
+    <YourLights />             ← You compose your own scene
+    <YourGrid />
+    <YourCustomLogic />        ← Your hooks + components
+  </MujocoCanvas>
+</MujocoProvider>
+```
+
+The library provides **only MuJoCo engine concerns**: WASM lifecycle, physics stepping, body rendering, IK solving. Everything else (lighting, grid, markers, game logic) is composed by the consumer as R3F children.
+
+## Loading Models
+
+Models are loaded from any HTTP source via `SceneConfig.baseUrl`. Defaults to [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) on GitHub.
+
+```tsx
+// Menagerie robots — just set robotId
+const franka: SceneConfig = {
+  robotId: 'franka_emika_panda',
+  sceneFile: 'scene.xml',
+};
+
+// Any GitHub repo
+const so101: SceneConfig = {
+  robotId: 'so101',
+  sceneFile: 'SO101.xml',
+  baseUrl: 'https://raw.githubusercontent.com/Vector-Wangel/MuJoCo-GS-Web/main/assets/robots/xlerobot/',
+};
+
+// Self-hosted
+const custom: SceneConfig = {
+  robotId: 'my_robot',
+  sceneFile: 'robot.xml',
+  baseUrl: 'http://localhost:3000/models/my_robot/',
+};
+```
+
+The loader fetches the scene XML, parses it for dependencies (meshes, textures, includes), recursively fetches those too, applies any XML patches, and writes everything to MuJoCo's in-memory WASM filesystem.
+
+## SceneConfig
+
+```ts
+interface SceneConfig {
+  robotId: string;                  // e.g. 'franka_emika_panda'
+  sceneFile: string;                // Entry XML file, e.g. 'scene.xml'
+  baseUrl?: string;                 // Base URL for fetching model files
+  sceneObjects?: SceneObject[];     // Objects injected into scene XML at load time
+  tcpSiteName?: string;             // MuJoCo site for IK. Default: 'tcp'
+  gripperActuatorName?: string;     // Gripper actuator name. Default: 'gripper'
+  numArmJoints?: number;            // Number of arm joints for IK. Default: 7
+  homeJoints?: number[];            // Initial joint positions
+  xmlPatches?: XmlPatch[];          // Patches applied to XML files during loading
+  onReset?: (model, data) => void;  // Called during reset after mj_resetData
+}
+```
+
+### Adding Objects to Any Scene
+
+```tsx
+const config: SceneConfig = {
+  robotId: 'franka_emika_panda',
+  sceneFile: 'scene.xml',
+  sceneObjects: [
+    { name: 'ball', type: 'sphere', size: [0.03, 0.03, 0.03],
+      position: [0.5, 0, 0.1], rgba: [1, 0, 0, 1], mass: 0.1, freejoint: true },
+    { name: 'platform', type: 'box', size: [0.2, 0.2, 0.01],
+      position: [0.4, 0.3, 0], rgba: [0.5, 0.5, 0.5, 1] },
+  ],
+};
+```
+
+### XML Patching
+
+```tsx
+xmlPatches: [{
+  target: 'panda.xml',
+  replace: ['name="actuator8"', 'name="gripper"'],
+  inject: '<site name="tcp" pos="0 0 0.1" size="0.01"/>',
+  injectAfter: '<body name="hand"',
+}]
+```
+
+## Components
+
+### `<MujocoProvider>`
+
+Loads the MuJoCo WASM module. Wrap your entire app in this.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `wasmUrl` | `string?` | Custom WASM URL override |
+| `onError` | `(error: Error) => void` | Called if WASM fails to load |
+
+### `<MujocoCanvas>`
+
+Thin wrapper around R3F `<Canvas>`. Accepts all R3F Canvas props plus:
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `config` | `SceneConfig` | **Required.** Scene/robot configuration |
+| `onReady` | `(api: MujocoSimAPI) => void` | Fires when model is loaded |
+| `onError` | `(error: Error) => void` | Fires on scene load failure |
+| `onStep` | `(time: number) => void` | Called each physics step |
+| `onSelection` | `(bodyId: number, name: string) => void` | Called on double-click |
+| `gravity` | `[number, number, number]` | Override model gravity |
+| `timestep` | `number` | Override model.opt.timestep |
+| `substeps` | `number` | mj_step calls per frame |
+| `paused` | `boolean` | Declarative pause |
+| `speed` | `number` | Simulation speed multiplier |
+| `interpolate` | `boolean` | Interpolate body transforms between physics frames |
+| `gravityCompensation` | `boolean` | Auto-apply gravity compensation |
+| `mjcfLights` | `boolean` | Auto-create lights from MJCF model |
+
+### `<SceneRenderer />`
+
+Syncs MuJoCo bodies to Three.js meshes every frame. Must be inside `<MujocoCanvas>`.
+
+### `<IkGizmo />`
+
+drei PivotControls gizmo that tracks a MuJoCo site and drives IK on drag.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `siteName` | `string?` | config.tcpSiteName | MuJoCo site to track |
+| `scale` | `number?` | `0.18` | Gizmo handle scale |
+| `onDrag` | `(pos, quat) => void` | — | Custom drag handler (disables auto-IK) |
+
+### `<DragInteraction />`
+
+Click-drag to apply spring forces to bodies. Raycasts to find bodies, applies `F = (mouseWorld - grabWorld) * body_mass * stiffness` via `mj_applyFT`.
+
+### `<ContactMarkers />`
+
+InstancedMesh showing MuJoCo contact points for debugging.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `maxContacts` | `number?` | `100` | Max contacts to display |
+| `size` | `number?` | `0.005` | Marker sphere radius |
+| `color` | `string?` | `'red'` | Marker color |
+
+### `<SceneLights />`
+
+Auto-creates Three.js lights from MJCF `<light>` elements.
+
+### `<Debug />`
+
+Visualization overlays:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `showGeoms` | `boolean?` | `false` | Wireframe collision geoms |
+| `showSites` | `boolean?` | `false` | Site markers |
+| `showJoints` | `boolean?` | `false` | Joint axes |
+| `showContacts` | `boolean?` | `false` | Contact force vectors |
+| `showCOM` | `boolean?` | `false` | Center of mass markers |
+
+### `<TendonRenderer />`
+
+Renders tendons as tube geometry from wrap paths.
+
+### `<FlexRenderer />`
+
+Renders deformable flex bodies from `flexvert_xpos`.
+
+### `<ContactListener />`
+
+Component wrapper for contact events:
+
+```tsx
+<ContactListener
+  body="block_1"
+  onContactEnter={(info) => console.log('contact!', info)}
+  onContactExit={(info) => console.log('released', info)}
+/>
+```
+
+### `<SelectionHighlight />`
+
+Emissive highlight on selected body meshes.
+
+### `<TrajectoryPlayer />`
+
+Plays back recorded qpos trajectories with scrubbing.
+
+## Hooks
+
+### `useMujocoSim()`
+
+Access the simulation API and internal refs:
+
+```tsx
+const { api, mjModelRef, mjDataRef } = useMujocoSim();
+```
+
+### `useBeforePhysicsStep(callback)`
+
+Run logic **before** `mj_step` each frame. Write to `data.ctrl`, apply forces, drive automation.
+
+```tsx
+useBeforePhysicsStep((model, data) => {
+  data.ctrl[0] = Math.sin(data.time);
+});
+```
+
+### `useAfterPhysicsStep(callback)`
+
+Run logic **after** `mj_step` each frame. Read results, compute rewards, log telemetry.
+
+### `useSensor(name)` / `useSensors()`
+
+Read sensor values by name (ref-based, no re-renders):
+
+```tsx
+const { value, size, type } = useSensor('force_sensor_1');
+```
+
+### `useBodyState(name)`
+
+Position, quaternion, linear/angular velocity of a body (ref-based):
+
+```tsx
+const { position, quaternion, linearVelocity, angularVelocity } = useBodyState('block_1');
+```
+
+### `useJointState(name)`
+
+Joint position and velocity:
+
+```tsx
+const { position, velocity } = useJointState('joint1');
+```
+
+### `useCtrl(name)`
+
+Read/write actuator control by name:
+
+```tsx
+const [value, setValue] = useCtrl('gripper');
+```
+
+### `useContacts(bodyName?)` / `useContactEvents(bodyName, handlers)`
+
+Query contacts or subscribe to enter/exit events:
+
+```tsx
+useContactEvents('block_1', {
+  onEnter: (info) => console.log('contact!', info),
+  onExit: (info) => console.log('released', info),
+});
+```
+
+### `useKeyboardTeleop(config)`
+
+Map keyboard keys to actuators:
+
+```tsx
+useKeyboardTeleop({
+  bindings: {
+    'w': { actuator: 'forward', delta: 0.1 },
+    's': { actuator: 'forward', delta: -0.1 },
+    'v': { actuator: 'gripper', toggle: [0, 0.04] },
+  },
+});
+```
+
+### `useGamepad(config)`
+
+Map gamepad axes/buttons to actuators:
+
+```tsx
+useGamepad({
+  axes: { 0: 'joint1', 1: 'joint2' },
+  buttons: { 0: 'gripper' },
+  deadzone: 0.1,
+});
+```
+
+### `usePolicy(config)`
+
+Framework-agnostic decimation loop for RL policies:
+
+```tsx
+const { step, isRunning } = usePolicy({
+  frequency: 50,
+  onObservation: (model, data) => buildObs(model, data),
+  onAction: (action, model, data) => applyAction(action, data),
+});
+```
+
+### `useTrajectoryRecorder(config)` / `useTrajectoryPlayer(trajectory, config)`
+
+Record and play back simulation trajectories:
+
+```tsx
+const recorder = useTrajectoryRecorder({ fields: ['qpos', 'qvel', 'ctrl'] });
+// recorder.start(), recorder.stop(), recorder.downloadJSON(), recorder.downloadCSV()
+
+const player = useTrajectoryPlayer(trajectory, { fps: 30, loop: true });
+// player.play(), player.pause(), player.seek(frameIdx)
+```
+
+### `useVideoRecorder(config)`
+
+Record the canvas as video:
+
+```tsx
+const video = useVideoRecorder({ fps: 30, mimeType: 'video/webm' });
+// video.start(), video.stop() → returns Blob
+```
+
+### `useCtrlNoise(config)`
+
+Apply Gaussian noise to controls for robustness testing:
+
+```tsx
+useCtrlNoise({ rate: 0.01, std: 0.05 });
+```
+
+### `useGravityCompensation(enabled?)`
+
+Applies `qfrc_bias` to `qfrc_applied` so joints hold position against gravity.
+
+### `useActuators()`
+
+Returns actuator metadata for building control UIs.
+
+### `useSitePosition(siteName)`
+
+Ref-based site position/quaternion tracking.
+
+## MujocoSimAPI
+
+The full API object returned by `onReady` and available via `useMujocoSim().api`:
+
+### Simulation Control
+
+| Method | Description |
+|--------|-------------|
+| `reset()` | Reset sim, re-apply home joints |
+| `setPaused(paused)` | Set pause state |
+| `togglePause()` | Toggle pause, returns new state |
+| `setSpeed(multiplier)` | Set simulation speed |
+| `step(n?)` | Advance exactly n steps while paused |
+| `getTime()` | Current simulation time |
+| `getTimestep()` | Current timestep |
+
+### State Management
+
+| Method | Description |
+|--------|-------------|
+| `saveState()` | Snapshot qpos, qvel, ctrl, time, act |
+| `restoreState(snapshot)` | Restore from snapshot |
+| `setQpos(values)` / `getQpos()` | Direct qpos access |
+| `setQvel(values)` / `getQvel()` | Direct qvel access |
+| `setCtrl(nameOrValues, value?)` | Set control by name or batch |
+| `getCtrl(name?)` | Get control values |
+| `applyKeyframe(nameOrIndex)` | Apply a keyframe |
+| `getKeyframeNames()` / `getKeyframeCount()` | Keyframe introspection |
+
+### Forces
+
+| Method | Description |
+|--------|-------------|
+| `applyForce(bodyName, force, point?)` | Apply force via `mj_applyFT` |
+| `applyTorque(bodyName, torque)` | Apply torque via `mj_applyFT` |
+| `setExternalForce(bodyName, force, torque)` | Write to `xfrc_applied` |
+| `applyGeneralizedForce(values)` | Write to `qfrc_applied` |
+
+### Model Introspection
+
+| Method | Description |
+|--------|-------------|
+| `getBodies()` | All bodies with id, name, mass, parentId |
+| `getJoints()` | All joints with id, name, type, range, bodyId |
+| `getGeoms()` | All geoms with id, name, type, size, bodyId |
+| `getSites()` | All sites with id, name, bodyId |
+| `getActuators()` | All actuators with id, name, range |
+| `getSensors()` | All sensors with id, name, type, dim |
+| `getSensorData(name)` | Read sensor value by name |
+| `getContacts()` | All active contacts |
+| `getModelOption()` | Timestep, gravity, integrator |
+
+### Model Mutation
+
+| Method | Description |
+|--------|-------------|
+| `setGravity(g)` | Set gravity vector |
+| `setTimestep(dt)` | Set timestep |
+| `setBodyMass(name, mass)` | Domain randomization |
+| `setGeomFriction(name, friction)` | Domain randomization |
+| `setGeomSize(name, size)` | Domain randomization |
+
+### Spatial Queries
+
+| Method | Description |
+|--------|-------------|
+| `raycast(origin, direction, maxDist?)` | Physics raycast via `mj_ray` |
+| `project2DTo3D(x, y, camPos, lookAt)` | Screen-to-world raycast (returns bodyId + geomId) |
+| `getCameraState()` | Camera position and orbit target |
+| `moveCameraTo(pos, target, ms)` | Smooth camera animation |
+
+### IK Control
+
+| Method | Description |
+|--------|-------------|
+| `setIkEnabled(enabled)` | Enable/disable IK tracking |
+| `moveTarget(pos, duration?)` | Move IK target with optional animation |
+| `syncTargetToSite()` | Snap IK target to current TCP position |
+| `solveIK(pos, quat, currentQ)` | Solve IK for a target pose |
+
+### Scene Management
+
+| Method | Description |
+|--------|-------------|
+| `loadScene(newConfig)` | Runtime model swap |
+| `getCanvasSnapshot(w?, h?, mime?)` | Base64 screenshot |
+
+## useFrame Priority
+
+| Priority | Owner | Purpose |
+|----------|-------|---------|
+| -1 | MujocoSimProvider | beforeStep, IK, mj_step, afterStep |
+| 0 (default) | SceneRenderer, your code | Body mesh sync, rendering |
+
+## Roadmap
+
+Features planned but not yet implemented:
+
+| Feature | Priority | Description |
+|---------|----------|-------------|
+| **User-uploaded model loading** | P2 | `loadFromFiles(FileList)` — detect meshdir, write to VFS |
+| **URDF loading** | P2 | Load URDF models via MuJoCo's built-in URDF compiler |
+| **XML mutation / recompile** | P1 | `addBody()`, `removeBody()`, `recompile()` for runtime XML editing |
+| **Observation builder utilities** | P2 | Helpers for projected gravity, joint positions/velocities for RL |
+| **Physics interpolation** | P1 | Smooth rendering between physics ticks for 120Hz+ displays |
+| **Instanced geom rendering** | P2 | `<InstancedGeomRenderer />` for particle/granular sims |
+| **Web Worker physics** | P2 | Run `mj_step` off main thread via SharedArrayBuffer |
+
+### WASM Limitations (mujoco-js 0.0.7)
+
+These MuJoCo features are not yet exposed in the WASM binding:
+
+- `flex_faceadr` / `flex_facenum` / `flex_face` — FlexRenderer renders vertices without face indices
+- `ten_rgba` / `ten_width` — TendonRenderer uses default color/width
+
+## License
+
+Apache-2.0
