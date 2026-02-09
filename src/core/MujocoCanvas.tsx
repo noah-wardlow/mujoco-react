@@ -7,14 +7,16 @@ import { Canvas } from '@react-three/fiber';
 import { forwardRef, useEffect } from 'react';
 import { useMujoco } from './MujocoProvider';
 import { MujocoSimProvider } from './MujocoSimProvider';
-import { MujocoCanvasProps } from '../types';
+import { MujocoCanvasProps, MujocoSimAPI } from '../types';
 
 /**
  * MujocoCanvas — thin R3F Canvas wrapper for MuJoCo scenes.
  * Accepts all R3F Canvas props and forwards them through.
  * Supports declarative physics config props (spec 1.1).
+ *
+ * Forward ref exposes MujocoSimAPI (not the canvas element).
  */
-export const MujocoCanvas = forwardRef<HTMLCanvasElement, MujocoCanvasProps>(
+export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
   function MujocoCanvas(
     {
       config,
@@ -49,10 +51,11 @@ export const MujocoCanvas = forwardRef<HTMLCanvasElement, MujocoCanvasProps>(
     }
 
     return (
-      <Canvas ref={ref} {...canvasProps}>
+      <Canvas {...canvasProps}>
         <MujocoSimProvider
           mujoco={mujoco}
           config={config}
+          apiRef={ref}
           onReady={onReady}
           onError={onError}
           onStep={onStep}

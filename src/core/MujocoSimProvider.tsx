@@ -157,6 +157,7 @@ export function useAfterPhysicsStep(callback: PhysicsStepCallback) {
 interface MujocoSimProviderProps {
   mujoco: MujocoModule;
   config: SceneConfig;
+  apiRef?: React.ForwardedRef<MujocoSimAPI>;
   onReady?: (api: MujocoSimAPI) => void;
   onError?: (error: Error) => void;
   onStep?: (time: number) => void;
@@ -174,6 +175,7 @@ interface MujocoSimProviderProps {
 export function MujocoSimProvider({
   mujoco,
   config,
+  apiRef: externalApiRef,
   onReady,
   onError,
   onStep,
@@ -355,10 +357,19 @@ export function MujocoSimProvider({
     };
   }, [mujoco, config]);
 
-  // Fire onReady when status changes to ready
+  // Fire onReady and assign external ref when status changes to ready
   useEffect(() => {
-    if (status === 'ready' && onReady) {
-      onReady(apiRef.current);
+    if (status === 'ready') {
+      const api = apiRef.current;
+      if (onReady) onReady(api);
+      // Assign the forwarded ref
+      if (externalApiRef) {
+        if (typeof externalApiRef === 'function') {
+          externalApiRef(api);
+        } else {
+          (externalApiRef as React.MutableRefObject<MujocoSimAPI | null>).current = api;
+        }
+      }
     }
   }, [status]);
 

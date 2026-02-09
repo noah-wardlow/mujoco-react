@@ -31,13 +31,13 @@ const config: SceneConfig = {
 };
 
 function App() {
-  const apiRef = useRef<MujocoSimAPI | null>(null);
+  const apiRef = useRef<MujocoSimAPI>(null);
 
   return (
     <MujocoProvider>
       <MujocoCanvas
+        ref={apiRef}
         config={config}
-        onReady={(api) => { apiRef.current = api; }}
         camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
         shadows
         style={{ width: '100%', height: '100vh' }}
@@ -392,7 +392,7 @@ Ref-based site position/quaternion tracking.
 
 ## MujocoSimAPI
 
-The full API object returned by `onReady` and available via `useMujocoSim().api`:
+The full API object available via `ref` or `useMujocoSim().api`:
 
 ### Simulation Control
 

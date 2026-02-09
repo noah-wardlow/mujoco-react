@@ -125,20 +125,19 @@ Everything inside `<MujocoCanvas>` is a standard R3F child. You mix library comp
 
 Two ways to access the simulation API:
 
-### 1. `onReady` callback (outside R3F)
+### 1. Ref (outside R3F)
 
 ```tsx
 function App() {
-  const apiRef = useRef<MujocoSimAPI | null>(null);
+  const apiRef = useRef<MujocoSimAPI>(null);
 
   return (
-    <MujocoCanvas
-      config={config}
-      onReady={(api) => { apiRef.current = api; }}
-    >
+    <MujocoCanvas ref={apiRef} config={config}>
       {/* ... */}
     </MujocoCanvas>
   );
+
+  // apiRef.current is the MujocoSimAPI once loaded
 }
 ```
 
