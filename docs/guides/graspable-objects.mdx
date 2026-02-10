@@ -1,0 +1,112 @@
+---
+title: "Graspable Objects"
+description: "Configure objects that can be picked up by grippers"
+icon: "hand"
+---
+
+By default, MuJoCo contact parameters are tuned for collision, not grasping. Objects will slide out of grippers when lifted unless you increase friction and tighten the contact solver.
+
+## Required Contact Parameters
+
+Add these to your `SceneObject` definitions:
+
+```tsx
+const config: SceneConfig = {
+  robotId: 'franka_emika_panda',
+  sceneFile: 'scene.xml',
+  sceneObjects: [{
+    name: 'cube',
+    type: 'box',
+    size: [0.025, 0.025, 0.025],
+    position: [0.4, 0, 0.025],
+    rgba: [0.9, 0.2, 0.15, 1],
+    mass: 0.05,
+    freejoint: true,
+    friction: '1.5 0.3 0.1',
+    solref: '0.01 1',
+    solimp: '0.95 0.99 0.001 0.5 2',
+    condim: 4,
+  }],
+};
+```
+
+## What Each Parameter Does
+
+### `friction: '1.5 0.3 0.1'`
+
+MuJoCo friction has three components: `[sliding, torsional, rolling]`. High sliding friction (1.5+) prevents the object from slipping through the gripper fingers.
+
+### `condim: 4`
+
+Contact dimensionality. The default (3) uses a friction pyramid, but `condim: 4` enables full elliptic friction cone with torsional friction — critical for maintaining grip when the object is rotated or lifted.
+
+### `solref: '0.01 1'`
+
+Solver reference parameters `[timeconst, dampratio]`. A short time constant (0.01) makes contacts stiff — the object doesn't slowly push through the gripper.
+
+### `solimp: '0.95 0.99 0.001 0.5 2'`
+
+Solver impedance `[dmin, dmax, width, midpoint, power]`. Tight values (0.95–0.99) mean the constraint is enforced aggressively with minimal penetration.
+
+### `mass: 0.05`
+
+Keep mass low. Heavy objects need proportionally stronger grip forces, which may exceed what position-controlled grippers can provide.
+
+### `freejoint: true`
+
+Required for the object to move freely in the scene. Without this, the object is welded to the world body.
+
+## Without These Parameters
+
+If you omit `condim: 4` and friction settings:
+
+- The gripper can close around the object
+- Lifting causes the object to slide out immediately
+- The object may tunnel through the gripper fingers
+
+## Full Example
+
+```tsx
+const graspableObjects: SceneObject[] = [
+  {
+    name: 'red_cube',
+    type: 'box',
+    size: [0.025, 0.025, 0.025],
+    position: [0.4, 0.0, 0.025],
+    rgba: [0.9, 0.2, 0.15, 1],
+    mass: 0.05,
+    freejoint: true,
+    friction: '1.5 0.3 0.1',
+    solref: '0.01 1',
+    solimp: '0.95 0.99 0.001 0.5 2',
+    condim: 4,
+  },
+  {
+    name: 'green_cube',
+    type: 'box',
+    size: [0.025, 0.025, 0.025],
+    position: [0.35, 0.1, 0.025],
+    rgba: [0.15, 0.8, 0.3, 1],
+    mass: 0.05,
+    freejoint: true,
+    friction: '1.5 0.3 0.1',
+    solref: '0.01 1',
+    solimp: '0.95 0.99 0.001 0.5 2',
+    condim: 4,
+  },
+];
+
+const config: SceneConfig = {
+  robotId: 'franka_emika_panda',
+  sceneFile: 'scene.xml',
+  gripperActuatorName: 'gripper',
+  sceneObjects: graspableObjects,
+};
+```
+
+## Tips
+
+- **Smaller objects** are easier to grasp — they fit better between gripper fingers
+- **Lower mass** reduces the force needed to hold the object
+- **Spheres** are harder to grasp than cubes — cubes have flat faces that create better contact patches
+- Use `<ContactMarkers />` or `<Debug showContacts />` to visualize contacts and verify the gripper is making good contact

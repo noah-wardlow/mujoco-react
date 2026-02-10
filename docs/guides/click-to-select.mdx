@@ -1,0 +1,100 @@
+---
+title: "Click-to-Select"
+description: "Implement body selection with raycasting and highlights"
+icon: "mouse-pointer"
+---
+
+A common interaction pattern: double-click a body to select it, highlight the selected body, and use the selection for further actions. This combines R3F raycasting with the library's `<SelectionHighlight />` component.
+
+## The Pattern
+
+1. A hook listens for double-clicks and raycasts to find the clicked body
+2. A component passes the selected body ID to `<SelectionHighlight />`
+
+```tsx
+import { useState, useCallback } from 'react';
+import { useThree } from '@react-three/fiber';
+import { SelectionHighlight } from 'mujoco-react';
+
+function useClickSelect(): number | null {
+  const [selectedBodyId, setSelectedBodyId] = useState<number | null>(null);
+  const { scene, camera, gl } = useThree();
+
+  const handleDoubleClick = useCallback((event: MouseEvent) => {
+    const rect = gl.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1
+    );
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(scene.children, true);
+
+    for (const hit of intersects) {
+      let obj = hit.object;
+      while (obj) {
+        if (obj.userData?.bodyID != null) {
+          setSelectedBodyId(obj.userData.bodyID);
+          return;
+        }
+        obj = obj.parent!;
+      }
+    }
+    setSelectedBodyId(null);
+  }, [scene, camera, gl]);
+
+  useEffect(() => {
+    gl.domElement.addEventListener('dblclick', handleDoubleClick);
+    return () => gl.domElement.removeEventListener('dblclick', handleDoubleClick);
+  }, [gl, handleDoubleClick]);
+
+  return selectedBodyId;
+}
+```
+
+## Composing with SelectionHighlight
+
+```tsx
+function ClickSelectOverlay() {
+  const selectedBodyId = useClickSelect();
+  return <SelectionHighlight bodyId={selectedBodyId} />;
+}
+```
+
+Then drop it into your scene:
+
+```tsx
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <ClickSelectOverlay />
+</MujocoCanvas>
+```
+
+## Using the onSelection Callback
+
+`<MujocoCanvas>` also has a built-in `onSelection` callback that fires on double-click:
+
+```tsx
+<MujocoCanvas
+  config={config}
+  onSelection={(bodyId, name) => {
+    console.log(`Selected body ${name} (id: ${bodyId})`);
+  }}
+>
+  <SceneRenderer />
+  <SelectionHighlight bodyId={selectedBodyId} />
+</MujocoCanvas>
+```
+
+## How SceneRenderer Stores Body IDs
+
+`<SceneRenderer />` sets `userData.bodyID` on every mesh it creates. When raycasting, walk up the object tree with `obj.parent` until you find a node with `userData.bodyID` — child meshes (e.g. geom sub-meshes) don't have it directly, but their parent body group does.
+
+## SelectionHighlight Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `bodyId` | `number \| null` | — | Body to highlight, or `null` to clear |
+| `color` | `string` | `'#ff4444'` | Emissive highlight color |
+| `emissiveIntensity` | `number` | `0.3` | Strength of the emissive glow |

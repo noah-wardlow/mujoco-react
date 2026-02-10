@@ -45,6 +45,22 @@ Renders debug overlays for MuJoCo simulation elements — geom wireframes, site 
   Show tendon paths.
 </ParamField>
 
+<ParamField body="geomColor" type="string" default="#00ff00">
+  Color for wireframe geoms.
+</ParamField>
+
+<ParamField body="siteColor" type="string" default="#ff00ff">
+  Color for site markers.
+</ParamField>
+
+<ParamField body="contactColor" type="string" default="#ff4444">
+  Color for contact force arrows.
+</ParamField>
+
+<ParamField body="comColor" type="string" default="#ff0000">
+  Color for center of mass markers.
+</ParamField>
+
 ## How It Works
 
 - **Static geometry** (geoms, sites, joints) is created once when the model loads
@@ -70,4 +86,17 @@ function App() {
     </MujocoCanvas>
   );
 }
+```
+
+## Example: Custom Colors
+
+```tsx
+<Debug
+  showSites
+  showContacts
+  showCOM
+  siteColor="#00ffff"
+  contactColor="#ff8800"
+  comColor="#ffff00"
+/>
 ```

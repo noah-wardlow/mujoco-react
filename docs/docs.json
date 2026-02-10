@@ -23,6 +23,14 @@
         ]
       },
       {
+        "group": "Guides",
+        "pages": [
+          "guides/building-controllers",
+          "guides/graspable-objects",
+          "guides/click-to-select"
+        ]
+      },
+      {
         "group": "More",
         "pages": [
           "roadmap"

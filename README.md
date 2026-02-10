@@ -197,8 +197,9 @@ InstancedMesh showing MuJoCo contact points for debugging.
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `maxContacts` | `number?` | `100` | Max contacts to display |
-| `size` | `number?` | `0.005` | Marker sphere radius |
-| `color` | `string?` | `'red'` | Marker color |
+| `radius` | `number?` | `0.005` | Marker sphere radius |
+| `color` | `string?` | `'#4f46e5'` | Marker color |
+| `visible` | `boolean?` | `true` | Toggle visibility |
 
 ### `<SceneLights />`
 
@@ -215,6 +216,12 @@ Visualization overlays:
 | `showJoints` | `boolean?` | `false` | Joint axes |
 | `showContacts` | `boolean?` | `false` | Contact force vectors |
 | `showCOM` | `boolean?` | `false` | Center of mass markers |
+| `showInertia` | `boolean?` | `false` | Inertia ellipsoids |
+| `showTendons` | `boolean?` | `false` | Tendon paths |
+| `geomColor` | `string?` | `'#00ff00'` | Color for wireframe geoms |
+| `siteColor` | `string?` | `'#ff00ff'` | Color for site markers |
+| `contactColor` | `string?` | `'#ff4444'` | Color for contact force arrows |
+| `comColor` | `string?` | `'#ff0000'` | Color for COM markers |
 
 ### `<TendonRenderer />`
 
@@ -476,6 +483,72 @@ The full API object available via `ref` or `useMujocoSim().api`:
 |--------|-------------|
 | `loadScene(newConfig)` | Runtime model swap |
 | `getCanvasSnapshot(w?, h?, mime?)` | Base64 screenshot |
+
+## Guides
+
+### Building Controllers
+
+Controllers are thin components that compose library hooks. The simplest is a `useKeyboardTeleop` call:
+
+```tsx
+function FrankaController() {
+  useKeyboardTeleop({
+    bindings: { v: { actuator: 'gripper', toggle: [0, 255] } },
+  });
+  return null;
+}
+```
+
+For custom control (IK solvers, velocity control), use `useBeforePhysicsStep`:
+
+```tsx
+function MyController() {
+  const keys = useRef<Record<string, boolean>>({});
+  // ... keyboard listeners ...
+
+  useBeforePhysicsStep((_model, data) => {
+    if (keys.current['KeyW']) data.ctrl[0] += 0.01;
+  });
+  return null;
+}
+```
+
+See [Building Controllers](https://mujoco-react.mintlify.app/guides/building-controllers) for config-driven patterns, IK gizmo coexistence, and multi-arm support.
+
+### Graspable Objects
+
+Objects need specific MuJoCo contact parameters to be picked up by grippers:
+
+```tsx
+sceneObjects: [{
+  name: 'cube',
+  type: 'box',
+  size: [0.025, 0.025, 0.025],
+  position: [0.4, 0, 0.025],
+  rgba: [0.9, 0.2, 0.15, 1],
+  mass: 0.05,
+  freejoint: true,
+  friction: '1.5 0.3 0.1',            // high sliding friction
+  solref: '0.01 1',                    // stiff contact solver
+  solimp: '0.95 0.99 0.001 0.5 2',    // tight impedance
+  condim: 4,                           // elliptic friction cone
+}]
+```
+
+Without `condim: 4` and high friction, objects slide out of the gripper when lifted. See [Graspable Objects](https://mujoco-react.mintlify.app/guides/graspable-objects) for details.
+
+### Click-to-Select
+
+Combine R3F raycasting with `<SelectionHighlight />` for body selection:
+
+```tsx
+function ClickSelectOverlay() {
+  const selectedBodyId = useClickSelect(); // your raycasting hook
+  return <SelectionHighlight bodyId={selectedBodyId} />;
+}
+```
+
+See [Click-to-Select](https://mujoco-react.mintlify.app/guides/click-to-select) for the full implementation.
 
 ## useFrame Priority
 

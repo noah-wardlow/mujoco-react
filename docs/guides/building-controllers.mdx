@@ -1,0 +1,181 @@
+---
+title: "Building Controllers"
+description: "Compose library hooks into robot-specific controllers"
+icon: "gamepad"
+---
+
+Controllers are thin React components that compose library hooks to drive a specific robot. They render `null` — all they do is read input and write to `data.ctrl` each frame.
+
+## Pattern: Simple Keyboard Bindings
+
+For robots where arm control comes from `<IkGizmo />`, the controller only adds extra bindings (gripper, etc.):
+
+```tsx
+import { useKeyboardTeleop } from 'mujoco-react';
+
+export function FrankaController() {
+  useKeyboardTeleop({
+    bindings: {
+      v: { actuator: 'gripper', toggle: [0, 255] },
+    },
+  });
+  return null;
+}
+```
+
+Drop it into your scene as a child of `<MujocoCanvas>`:
+
+```tsx
+<MujocoCanvas config={frankaConfig}>
+  <SceneRenderer />
+  <IkGizmo />
+  <FrankaController />
+</MujocoCanvas>
+```
+
+## Pattern: Custom Physics-Step Control
+
+For more complex control (IK solvers, velocity control, state machines), use `useBeforePhysicsStep` to write directly to `data.ctrl` each frame.
+
+### Keyboard State
+
+Read keyboard input via window event listeners and a ref:
+
+```tsx
+import { useEffect, useRef } from 'react';
+import { useBeforePhysicsStep } from 'mujoco-react';
+
+function MyController() {
+  const keys = useRef<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => { keys.current[e.code] = true; };
+    const up = (e: KeyboardEvent) => { keys.current[e.code] = false; };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, []);
+
+  useBeforePhysicsStep((_model, data) => {
+    const k = keys.current;
+    if (k['KeyW']) data.ctrl[0] += 0.01;
+    if (k['KeyS']) data.ctrl[0] -= 0.01;
+  });
+
+  return null;
+}
+```
+
+### Config-Driven Arm Controller
+
+A generic hook that accepts a static config object makes it easy to support multiple robots. Each robot is just a different config — no per-robot logic:
+
+```tsx
+interface ArmConfig {
+  indices: number[];        // Actuator indices for this arm
+  keys: string[];           // Key codes for movement
+  initialJoints?: number[]; // Starting joint positions
+}
+
+interface ArmControllerConfig {
+  numActuators: number;
+  arms: ArmConfig[];
+  base?: { forwardKey: string; backKey: string; leftKey: string; rightKey: string; actuatorIndex: number };
+  head?: { panKey: string; tiltKey: string; panIndex: number; tiltIndex: number };
+}
+```
+
+The hook reads keyboard state and writes to the correct actuator indices each frame:
+
+```tsx
+function useArmController(config: ArmControllerConfig) {
+  const keys = useRef<Record<string, boolean>>({});
+  const { api } = useMujocoSim();
+
+  // ... keyboard listeners ...
+
+  useBeforePhysicsStep((_model, data) => {
+    for (const arm of config.arms) {
+      // Read keys, solve IK, write to data.ctrl[arm.indices[i]]
+    }
+  });
+}
+```
+
+Then each robot controller is just a config:
+
+```tsx
+const SO101_CONFIG: ArmControllerConfig = {
+  numActuators: 6,
+  arms: [{
+    indices: [0, 1, 2, 3, 4, 5],
+    keys: ['KeyD', 'KeyA', 'KeyW', 'KeyS', 'KeyQ', 'KeyE',
+           'KeyR', 'KeyF', 'KeyZ', 'KeyC', 'KeyV'],
+    initialJoints: [0.0158, 2.052, 2.1307, -0.0845, 1.5857, -0.3745],
+  }],
+};
+
+export function SO101Controller() {
+  useArmController(SO101_CONFIG);
+  return null;
+}
+```
+
+## Coexisting with IK Gizmo
+
+When a robot supports both gizmo drag and keyboard control, the controller needs to:
+
+1. **Detect when IK is active** via `ikEnabledRef` from `useMujocoSim()`
+2. **Sync state on transition** — when the user switches from gizmo to keyboard, read `data.ctrl` to avoid a position jump
+3. **Disable IK** via `api.setIkEnabled(false)` when taking over
+
+```tsx
+const { api, ikEnabledRef } = useMujocoSim();
+
+useBeforePhysicsStep((_model, data) => {
+  const anyKeyPressed = /* check keyboard state */;
+
+  if (anyKeyPressed && ikEnabledRef.current) {
+    // Sync from current gizmo position
+    for (let i = 0; i < arm.indices.length; i++) {
+      targetJoints[i] = data.ctrl[arm.indices[i]];
+    }
+    api.setIkEnabled(false);
+  }
+
+  if (!ikEnabledRef.current) {
+    // Keyboard is in control — solve IK and write ctrl
+    for (let i = 0; i < arm.indices.length; i++) {
+      data.ctrl[arm.indices[i]] = targetJoints[i];
+    }
+  }
+});
+```
+
+The gizmo re-enables IK automatically when dragged.
+
+## Composing Controllers in Your Scene
+
+Controllers are just React children. Swap them based on state:
+
+```tsx
+<MujocoCanvas config={entry.config}>
+  <SceneRenderer />
+  {entry.hasIk && showGizmo && <IkGizmo scale={entry.gizmoScale} />}
+  <DragInteraction />
+
+  {robotKey === 'franka' && <FrankaController />}
+  {robotKey === 'so101' && <SO101Controller />}
+  {robotKey === 'xlerobot' && <XLeRobotController />}
+</MujocoCanvas>
+```
+
+## Performance Tips
+
+- Use `for` loops instead of `.forEach` / `.map` in `useBeforePhysicsStep` — it runs every physics tick
+- Store keyboard state in a `useRef`, not `useState` — avoids re-renders at 60fps
+- Cache actuator IDs once (not every frame) using `findActuatorByName`
+- Keep the callback closure stable — avoid creating new functions each render
