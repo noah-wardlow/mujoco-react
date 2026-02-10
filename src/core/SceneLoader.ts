@@ -244,8 +244,9 @@ function scanDependencies(
   const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
 
   const compiler = xmlDoc.querySelector('compiler');
-  const meshDir = compiler?.getAttribute('meshdir') || '';
-  const textureDir = compiler?.getAttribute('texturedir') || '';
+  const assetDir = compiler?.getAttribute('assetdir') || '';
+  const meshDir = compiler?.getAttribute('meshdir') || assetDir;
+  const textureDir = compiler?.getAttribute('texturedir') || assetDir;
   const currentDir = currentFile.includes('/')
     ? currentFile.substring(0, currentFile.lastIndexOf('/') + 1)
     : '';

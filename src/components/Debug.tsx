@@ -78,27 +78,92 @@ export function Debug({
       }
     }
 
-    // Site markers
+    // Site markers — scale based on site_size if available, else use geom_size of parent body
     if (showSites) {
+      const siteSize = (model as Record<string, unknown>).site_size as Float64Array | undefined;
       for (let i = 0; i < model.nsite; i++) {
-        const geometry = new THREE.OctahedronGeometry(0.01);
-        const mat = new THREE.MeshBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 0.7 });
+        // Determine marker radius: use site_size[3*i] if available, else estimate from parent body's geoms
+        let radius = 0.008;
+        if (siteSize) {
+          radius = Math.max(siteSize[3 * i] * 0.5, 0.004);
+        } else {
+          // Estimate from parent body's geom sizes
+          const bodyId = model.site_bodyid[i];
+          let maxGeomSize = 0;
+          for (let g = 0; g < model.ngeom; g++) {
+            if (model.geom_bodyid[g] === bodyId) {
+              maxGeomSize = Math.max(maxGeomSize, model.geom_size[3 * g]);
+            }
+          }
+          if (maxGeomSize > 0) radius = maxGeomSize * 0.15;
+        }
+
+        const geometry = new THREE.OctahedronGeometry(radius);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xff00ff, depthTest: false });
         const mesh = new THREE.Mesh(geometry, mat);
+        mesh.renderOrder = 999;
+        mesh.frustumCulled = false;
         mesh.userData.siteId = i;
+
+        // Label
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = '#ff00ff';
+        ctx.font = 'bold 36px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(getName(model, model.name_siteadr[i]), 128, 42);
+        const tex = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
+        const sprite = new THREE.Sprite(spriteMat);
+        const labelScale = radius * 15;
+        sprite.scale.set(labelScale, labelScale * 0.25, 1);
+        sprite.position.y = radius * 2;
+        sprite.renderOrder = 999;
+        mesh.add(sprite);
+
         sites.push(mesh);
       }
     }
 
-    // Joint axes
+    // Joint axes — scale arrow length based on parent body's geom sizes
     if (showJoints) {
+      // Safely check for jnt_pos/jnt_axis on the WASM model
+      const jntPos = (model as Record<string, unknown>).jnt_pos as Float64Array | undefined;
+      const jntAxis = (model as Record<string, unknown>).jnt_axis as Float64Array | undefined;
+
       for (let i = 0; i < model.njnt; i++) {
         const type = model.jnt_type[i];
         const color = JOINT_COLORS[type] ?? 0xffffff;
+
+        // Scale based on parent body geom size
+        const bodyId = model.jnt_bodyid[i];
+        let maxGeomSize = 0;
+        for (let g = 0; g < model.ngeom; g++) {
+          if (model.geom_bodyid[g] === bodyId) {
+            maxGeomSize = Math.max(maxGeomSize, model.geom_size[3 * g]);
+          }
+        }
+        const arrowLen = Math.max(maxGeomSize * 0.8, 0.05);
+
         const arrow = new THREE.ArrowHelper(
           new THREE.Vector3(0, 0, 1), new THREE.Vector3(),
-          0.05, color, 0.01, 0.005
+          arrowLen, color, arrowLen * 0.25, arrowLen * 0.12
         );
+        // Render on top so arrows show through geometry
+        arrow.renderOrder = 999;
+        arrow.frustumCulled = false;
+        arrow.line.material = new THREE.LineBasicMaterial({ color, depthTest: false });
+        (arrow.cone.material as THREE.MeshBasicMaterial).depthTest = false;
+        arrow.line.renderOrder = 999;
+        arrow.line.frustumCulled = false;
+        arrow.cone.renderOrder = 999;
+        arrow.cone.frustumCulled = false;
         arrow.userData.jointId = i;
+        arrow.userData.bodyId = bodyId;
+        arrow.userData.hasJntPos = !!jntPos;
+        arrow.userData.hasJntAxis = !!jntAxis;
         joints.push(arrow);
       }
     }
@@ -144,6 +209,10 @@ export function Debug({
     const data = mjDataRef.current;
     if (!model || !data || !debugGeometry) return;
 
+    // Safely grab optional arrays once
+    const jntPos = (model as Record<string, unknown>).jnt_pos as Float64Array | undefined;
+    const jntAxis = (model as Record<string, unknown>).jnt_axis as Float64Array | undefined;
+
     // Update geom wireframes
     for (const mesh of debugGeometry.geoms) {
       const bid = mesh.userData.bodyId;
@@ -169,6 +238,37 @@ export function Debug({
         data.site_xpos[3 * sid + 1],
         data.site_xpos[3 * sid + 2],
       );
+    }
+
+    // Update joint axes
+    for (const obj of debugGeometry.joints) {
+      const arrow = obj as THREE.ArrowHelper;
+      const jid = arrow.userData.jointId;
+      const bid = arrow.userData.bodyId;
+      const i3 = bid * 3;
+      const i4 = bid * 4;
+
+      const bodyQuat = new THREE.Quaternion(
+        data.xquat[i4 + 1], data.xquat[i4 + 2],
+        data.xquat[i4 + 3], data.xquat[i4]
+      );
+
+      // Position: body origin + local joint anchor (if available)
+      arrow.position.set(data.xpos[i3], data.xpos[i3 + 1], data.xpos[i3 + 2]);
+      if (jntPos) {
+        const anchor = new THREE.Vector3(
+          jntPos[3 * jid], jntPos[3 * jid + 1], jntPos[3 * jid + 2]
+        ).applyQuaternion(bodyQuat);
+        arrow.position.add(anchor);
+      }
+
+      // Orient along joint axis in world frame (if available)
+      if (jntAxis) {
+        const axis = new THREE.Vector3(
+          jntAxis[3 * jid], jntAxis[3 * jid + 1], jntAxis[3 * jid + 2]
+        ).applyQuaternion(bodyQuat).normalize();
+        arrow.setDirection(axis);
+      }
     }
 
     // Update COM markers

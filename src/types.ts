@@ -57,6 +57,8 @@ export interface MujocoModel {
   jnt_type: Int32Array;
   jnt_range: Float64Array;
   jnt_bodyid: Int32Array;
+  jnt_pos: Float64Array;
+  jnt_axis: Float64Array;
   jnt_limited: Uint8Array;
 
   // Geom

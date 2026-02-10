@@ -18,9 +18,9 @@ const _dummy = new THREE.Object3D();
 interface ContactMarkersProps {
   /** Maximum contacts to render. Default: 100. */
   maxContacts?: number;
-  /** Sphere radius. Default: 0.005. */
+  /** Sphere radius. Default: 0.008. */
   radius?: number;
-  /** Color. Default: '#4f46e5'. */
+  /** Color. Default: '#22d3ee'. */
   color?: string;
   /** Show markers. Default: true. */
   visible?: boolean;
@@ -28,8 +28,8 @@ interface ContactMarkersProps {
 
 export function ContactMarkers({
   maxContacts = 100,
-  radius = 0.005,
-  color = '#4f46e5',
+  radius = 0.008,
+  color = '#22d3ee',
   visible = true,
 }: ContactMarkersProps = {}) {
   const { mjDataRef, status } = useMujocoSim();
@@ -68,14 +68,9 @@ export function ContactMarkers({
   if (status !== 'ready') return null;
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, maxContacts]}>
+    <instancedMesh ref={meshRef} args={[undefined, undefined, maxContacts]} frustumCulled={false} renderOrder={999}>
       <sphereGeometry args={[radius, 8, 8]} />
-      <meshStandardMaterial
-        color={color}
-        emissive={color}
-        emissiveIntensity={0.3}
-        roughness={0.5}
-      />
+      <meshBasicMaterial color={color} depthTest={false} />
     </instancedMesh>
   );
 }
