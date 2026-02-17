@@ -108,48 +108,38 @@ const jpeg = api.getCanvasSnapshot(640, 480, 'image/jpeg');
 
 **Returns:** `string` — base64 data URL.
 
-## getCameraState()
+## Camera Animation
 
-Get the current camera position and target.
+Camera state and animation are available via the standalone `useCameraAnimation()` hook:
 
 ```tsx
-const cam = api.getCameraState();
+import { useCameraAnimation } from 'mujoco-react';
+
+const { getCameraState, moveCameraTo } = useCameraAnimation();
+
+// Get current camera state
+const cam = getCameraState();
 console.log('Camera at:', cam.position);
 console.log('Looking at:', cam.target);
-```
 
-**Returns:** `{ position: THREE.Vector3, target: THREE.Vector3 }`
-
-## moveCameraTo(position, target, durationMs)
-
-Smoothly animate the camera to a new position.
-
-```tsx
-await api.moveCameraTo(
-  new THREE.Vector3(3, 0, 2),    // New position
-  new THREE.Vector3(0, 0, 0.5),  // New look-at
-  1000                            // 1 second animation
+// Animate camera
+await moveCameraTo(
+  new THREE.Vector3(3, 0, 2),
+  new THREE.Vector3(0, 0, 0.5),
+  1000
 );
 ```
 
-<ParamField body="position" type="THREE.Vector3" required>
-  Target camera position.
-</ParamField>
-
-<ParamField body="target" type="THREE.Vector3" required>
-  Target look-at point.
-</ParamField>
-
-<ParamField body="durationMs" type="number" required>
-  Animation duration in milliseconds.
-</ParamField>
-
-**Returns:** `Promise<void>` — resolves when animation completes.
+See [useCameraAnimation](/hooks/use-camera-animation) for full documentation.
 
 ## Example: Vision Pipeline
 
 ```tsx
+import { useCameraAnimation } from 'mujoco-react';
+
 async function detectObjects(api: MujocoSimAPI) {
+  const { getCameraState } = useCameraAnimation();
+
   // 1. Capture scene
   const image = api.getCanvasSnapshot(1024, 1024);
 
@@ -157,7 +147,7 @@ async function detectObjects(api: MujocoSimAPI) {
   const detections = await callVisionAPI(image);
 
   // 3. Project 2D detections to 3D
-  const cam = api.getCameraState();
+  const cam = getCameraState();
   const worldPoints = detections.map(det => {
     const hit = api.project2DTo3D(
       det.x / 1000, det.y / 1000,

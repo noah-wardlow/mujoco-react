@@ -9,7 +9,26 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useMujocoSim, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import { findBodyByName, getName } from '../core/SceneLoader';
-import type { ContactInfo } from '../types';
+import { getContact } from '../types';
+import type { ContactInfo, MujocoModel } from '../types';
+
+// Cache geom names per model to avoid cross-model id collisions.
+const geomNameCacheByModel = new WeakMap<MujocoModel, Map<number, string>>();
+
+function getGeomNameCached(model: MujocoModel, geomId: number): string {
+  let perModel = geomNameCacheByModel.get(model);
+  if (!perModel) {
+    perModel = new Map<number, string>();
+    geomNameCacheByModel.set(model, perModel);
+  }
+
+  let name = perModel.get(geomId);
+  if (name === undefined) {
+    name = getName(model, model.name_geomadr[geomId]);
+    perModel.set(geomId, name);
+  }
+  return name;
+}
 
 /**
  * Track contacts for a specific body (or all contacts if no body specified).
@@ -20,20 +39,34 @@ export function useContacts(
   bodyName?: string,
   callback?: (contacts: ContactInfo[]) => void,
 ): React.RefObject<ContactInfo[]> {
-  const { mjModelRef } = useMujocoSim();
+  const { mjModelRef, status } = useMujocoSim();
   const contactsRef = useRef<ContactInfo[]>([]);
   const bodyIdRef = useRef(-1);
+  const bodyResolvedRef = useRef(false);
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
 
   useEffect(() => {
-    if (!bodyName) { bodyIdRef.current = -1; return; }
+    if (!bodyName) {
+      bodyIdRef.current = -1;
+      bodyResolvedRef.current = true;
+      return;
+    }
+    bodyResolvedRef.current = false;
+    if (status !== 'ready') return;
     const model = mjModelRef.current;
     if (!model) return;
     bodyIdRef.current = findBodyByName(model, bodyName);
-  }, [bodyName, mjModelRef]);
+    bodyResolvedRef.current = true;
+  }, [bodyName, status, mjModelRef]);
 
   useAfterPhysicsStep((model, data) => {
+    // Resolve body id lazily once model exists, to avoid missing the first ready frame.
+    if (bodyName && !bodyResolvedRef.current) {
+      bodyIdRef.current = findBodyByName(model, bodyName);
+      bodyResolvedRef.current = true;
+    }
+
     const ncon = data.ncon;
     if (ncon === 0) {
       if (contactsRef.current.length > 0) contactsRef.current = [];
@@ -45,25 +78,22 @@ export function useContacts(
     const filterBody = bodyIdRef.current;
 
     for (let i = 0; i < ncon; i++) {
-      try {
-        const c = (data.contact as { get(i: number): { geom1: number; geom2: number; pos: Float64Array; dist: number } }).get(i);
-        // Filter by body if specified
-        if (filterBody >= 0) {
-          const b1 = model.geom_bodyid[c.geom1];
-          const b2 = model.geom_bodyid[c.geom2];
-          if (b1 !== filterBody && b2 !== filterBody) continue;
-        }
-        contacts.push({
-          geom1: c.geom1,
-          geom1Name: getName(model, model.name_geomadr[c.geom1]),
-          geom2: c.geom2,
-          geom2Name: getName(model, model.name_geomadr[c.geom2]),
-          pos: [c.pos[0], c.pos[1], c.pos[2]],
-          depth: c.dist,
-        });
-      } catch {
-        break;
+      const c = getContact(data, i);
+      if (!c) break;
+      // Filter by body if specified
+      if (filterBody >= 0) {
+        const b1 = model.geom_bodyid[c.geom1];
+        const b2 = model.geom_bodyid[c.geom2];
+        if (b1 !== filterBody && b2 !== filterBody) continue;
       }
+      contacts.push({
+        geom1: c.geom1,
+        geom1Name: getGeomNameCached(model, c.geom1),
+        geom2: c.geom2,
+        geom2Name: getGeomNameCached(model, c.geom2),
+        pos: [c.pos[0], c.pos[1], c.pos[2]],
+        depth: c.dist,
+      });
     }
     contactsRef.current = contacts;
     callbackRef.current?.(contacts);

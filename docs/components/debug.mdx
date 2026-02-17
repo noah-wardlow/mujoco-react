@@ -64,8 +64,8 @@ Renders debug overlays for MuJoCo simulation elements — geom wireframes, site 
 ## How It Works
 
 - **Static geometry** (geoms, sites, joints) is created once when the model loads
-- **Positions** are updated every frame to track body motion
-- **Contact arrows** are recreated every frame (limited to 50 for performance)
+- **Positions** are updated every frame using preallocated temp vectors to minimize GC pressure
+- **Contact arrows** use a pre-created pool of 50 `ArrowHelper` objects — they are shown/hidden and repositioned each frame rather than created and disposed
 
 ## Example: Debug Panel Toggle
 

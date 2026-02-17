@@ -12,6 +12,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMujocoSim } from '../core/MujocoSimProvider';
+import { getContact } from '../types';
 
 const _dummy = new THREE.Object3D();
 
@@ -47,18 +48,15 @@ export function ContactMarkers({
     const count = Math.min(ncon, maxContacts);
 
     for (let i = 0; i < count; i++) {
-      try {
-        const c = (data.contact as { get(i: number): { pos: Float64Array } | undefined }).get(i);
-        if (!c) break;
-        _dummy.position.set(c.pos[0], c.pos[1], c.pos[2]);
-        _dummy.updateMatrix();
-        mesh.setMatrixAt(i, _dummy.matrix);
-      } catch {
-        // Contact access failed — stop here
+      const c = getContact(data, i);
+      if (!c) {
         mesh.count = i;
         mesh.instanceMatrix.needsUpdate = true;
         return;
       }
+      _dummy.position.set(c.pos[0], c.pos[1], c.pos[2]);
+      _dummy.updateMatrix();
+      mesh.setMatrixAt(i, _dummy.matrix);
     }
 
     mesh.count = count;

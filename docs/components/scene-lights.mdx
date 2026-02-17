@@ -43,6 +43,20 @@ The component reads from the MuJoCo model:
 - `light_attenuation` — attenuation coefficients
 - `light_cutoff` — spotlight cone angle
 
+## Hook Alternative
+
+For imperative usage inside your own components, use [`useSceneLights`](/hooks/use-scene-lights):
+
+```tsx
+import { useSceneLights } from 'mujoco-react';
+
+function MyScene() {
+  useSceneLights(1.5);
+  // ... your other scene setup
+  return <mesh />;
+}
+```
+
 ## Alternative
 
 You can also enable MJCF lights via the `mjcfLights` prop on `MujocoCanvas`:
@@ -64,3 +78,4 @@ Or skip both and define your own Three.js lights:
 
 - Lights are created once when the model loads and cleaned up on unmount
 - If your MJCF has no `<light>` elements, this component does nothing
+- The component delegates to `useSceneLights` internally

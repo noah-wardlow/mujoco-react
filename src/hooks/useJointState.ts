@@ -27,6 +27,9 @@ export function useJointState(name: string): JointStateResult {
   const dofDimRef = useRef(1);
   const positionRef = useRef<number | Float64Array>(0);
   const velocityRef = useRef<number | Float64Array>(0);
+  // Preallocated typed arrays for multi-DOF joints
+  const posBufferRef = useRef<Float64Array | null>(null);
+  const velBufferRef = useRef<Float64Array | null>(null);
 
   useEffect(() => {
     const model = mjModelRef.current;
@@ -41,6 +44,15 @@ export function useJointState(name: string): JointStateResult {
         if (type === 0) { qposDimRef.current = 7; dofDimRef.current = 6; }
         else if (type === 1) { qposDimRef.current = 4; dofDimRef.current = 3; }
         else { qposDimRef.current = 1; dofDimRef.current = 1; }
+
+        // Preallocate buffers for multi-DOF joints
+        if (qposDimRef.current > 1) {
+          posBufferRef.current = new Float64Array(qposDimRef.current);
+          velBufferRef.current = new Float64Array(dofDimRef.current);
+        } else {
+          posBufferRef.current = null;
+          velBufferRef.current = null;
+        }
         return;
       }
     }
@@ -55,8 +67,12 @@ export function useJointState(name: string): JointStateResult {
       positionRef.current = data.qpos[qa];
       velocityRef.current = data.qvel[da];
     } else {
-      positionRef.current = new Float64Array(data.qpos.subarray(qa, qa + qposDimRef.current));
-      velocityRef.current = new Float64Array(data.qvel.subarray(da, da + dofDimRef.current));
+      const posBuf = posBufferRef.current!;
+      const velBuf = velBufferRef.current!;
+      posBuf.set(data.qpos.subarray(qa, qa + qposDimRef.current));
+      velBuf.set(data.qvel.subarray(da, da + dofDimRef.current));
+      positionRef.current = posBuf;
+      velocityRef.current = velBuf;
     }
   });
 

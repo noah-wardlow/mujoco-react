@@ -22,6 +22,8 @@ export function useMujoco(): MujocoContextValue {
 
 interface MujocoProviderProps {
   wasmUrl?: string;
+  /** Timeout in ms for WASM module load. Default: 30000. */
+  timeout?: number;
   children: React.ReactNode;
   onError?: (error: Error) => void;
 }
@@ -30,7 +32,7 @@ interface MujocoProviderProps {
  * MujocoProvider — WASM / module lifecycle.
  * Loads the MuJoCo WASM module on mount and provides it to children via context.
  */
-export function MujocoProvider({ wasmUrl, children, onError }: MujocoProviderProps) {
+export function MujocoProvider({ wasmUrl, timeout = 30000, children, onError }: MujocoProviderProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const moduleRef = useRef<MujocoModule | null>(null);
@@ -39,7 +41,7 @@ export function MujocoProvider({ wasmUrl, children, onError }: MujocoProviderPro
   useEffect(() => {
     isMounted.current = true;
 
-    loadMujoco({
+    const wasmPromise = loadMujoco({
       ...(wasmUrl ? { locateFile: (path: string) => path.endsWith('.wasm') ? wasmUrl : path } : {}),
       printErr: (text: string) => {
         if (text.includes('Aborted') && isMounted.current) {
@@ -47,7 +49,13 @@ export function MujocoProvider({ wasmUrl, children, onError }: MujocoProviderPro
           setStatus('error');
         }
       },
-    })
+    });
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`WASM module load timed out after ${timeout}ms`)), timeout)
+    );
+
+    Promise.race([wasmPromise, timeoutPromise])
       .then((inst: unknown) => {
         if (isMounted.current) {
           moduleRef.current = inst as MujocoModule;
@@ -66,7 +74,7 @@ export function MujocoProvider({ wasmUrl, children, onError }: MujocoProviderPro
     return () => {
       isMounted.current = false;
     };
-  }, [wasmUrl]);
+  }, [wasmUrl, timeout]);
 
   return (
     <MujocoContext.Provider

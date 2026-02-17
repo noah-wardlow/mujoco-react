@@ -5,7 +5,8 @@
  * TrajectoryPlayer — component form of trajectory playback (spec 13.2)
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { useTrajectoryPlayer } from '../hooks/useTrajectoryPlayer';
 import type { TrajectoryPlayerProps } from '../types';
 
@@ -21,6 +22,9 @@ export function TrajectoryPlayer({
   onFrame,
 }: TrajectoryPlayerProps) {
   const player = useTrajectoryPlayer(trajectory, { fps, loop });
+  const onFrameRef = useRef(onFrame);
+  onFrameRef.current = onFrame;
+  const lastReportedFrameRef = useRef(-1);
 
   useEffect(() => {
     if (playing) {
@@ -28,17 +32,17 @@ export function TrajectoryPlayer({
     } else {
       player.pause();
     }
-  }, [playing]);
+  }, [playing, player]);
 
-  useEffect(() => {
-    if (onFrame) {
-      // Poll frame changes (lightweight, no extra useFrame needed)
-      const interval = setInterval(() => {
-        if (player.playing) onFrame(player.frame);
-      }, 1000 / fps);
-      return () => clearInterval(interval);
+  // Use useFrame instead of setInterval to sync with the render loop
+  useFrame(() => {
+    if (!onFrameRef.current) return;
+    const currentFrame = player.frame;
+    if (currentFrame !== lastReportedFrameRef.current && player.playing) {
+      lastReportedFrameRef.current = currentFrame;
+      onFrameRef.current(currentFrame);
     }
-  }, [onFrame, fps]);
+  });
 
   return null;
 }

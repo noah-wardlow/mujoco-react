@@ -44,6 +44,7 @@
           "components/mujoco-provider",
           "components/mujoco-canvas",
           "components/scene-renderer",
+          "components/ik-controller",
           "components/ik-gizmo",
           "components/drag-interaction",
           "components/contact-markers",
@@ -62,6 +63,8 @@
           "hooks/use-mujoco-sim",
           "hooks/use-before-physics-step",
           "hooks/use-after-physics-step",
+          "hooks/use-ik",
+          "hooks/use-camera-animation",
           "hooks/use-body-state",
           "hooks/use-joint-state",
           "hooks/use-site-position",
@@ -76,7 +79,9 @@
           "hooks/use-trajectory-player",
           "hooks/use-video-recorder",
           "hooks/use-ctrl-noise",
-          "hooks/use-gravity-compensation"
+          "hooks/use-gravity-compensation",
+          "hooks/use-selection-highlight",
+          "hooks/use-scene-lights"
         ]
       },
       {

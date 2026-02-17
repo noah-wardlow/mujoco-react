@@ -42,7 +42,7 @@ const trajectory = [[0, 0, 0, ...], [0.01, 0.02, ...], ...]; // Array of qpos ar
 </ParamField>
 
 <ParamField body="onFrame" type="(frameIdx: number) => void">
-  Called each time a new frame is displayed.
+  Called each time a new frame is displayed. Synced to the R3F render loop via `useFrame` for precise timing.
 </ParamField>
 
 ## How It Works
@@ -52,6 +52,7 @@ const trajectory = [[0, 0, 0, ...], [0.01, 0.02, ...], ...]; // Array of qpos ar
 3. The current frame's qpos values are written to `data.qpos`
 4. `mj_forward` is called to update positions without stepping physics
 5. When playback ends (or `playing` becomes `false`), simulation resumes
+6. The `onFrame` callback is synced to R3F's `useFrame` loop, ensuring it fires in lockstep with rendering
 
 ## Notes
 

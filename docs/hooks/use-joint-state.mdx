@@ -10,8 +10,8 @@ Returns refs tracking a joint's position and velocity values. Updated every phys
 
 ```tsx
 useJointState(name: string): {
-  position: React.RefObject<Float64Array>;
-  velocity: React.RefObject<Float64Array>;
+  position: React.RefObject<number | Float64Array>;
+  velocity: React.RefObject<number | Float64Array>;
 }
 ```
 
@@ -25,7 +25,7 @@ function JointDisplay() {
   const textRef = useRef<any>(null);
 
   useFrame(() => {
-    const angle = position.current[0]; // Radians for hinge joints
+    const angle = position.current as number; // Scalar for hinge joints
     if (textRef.current) {
       textRef.current.text = `${(angle * 180 / Math.PI).toFixed(1)}°`;
     }
@@ -39,20 +39,21 @@ function JointDisplay() {
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `position` | `RefObject<Float64Array>` | Joint position(s) from `data.qpos` |
-| `velocity` | `RefObject<Float64Array>` | Joint velocity/velocities from `data.qvel` |
+| `position` | `RefObject<number \| Float64Array>` | Joint position(s) from `data.qpos`. Scalar for hinge/slide, `Float64Array` for ball/free. |
+| `velocity` | `RefObject<number \| Float64Array>` | Joint velocity/velocities from `data.qvel`. Scalar for hinge/slide, `Float64Array` for ball/free. |
 
 ### Array Size by Joint Type
 
 | Joint Type | Position Size | Velocity Size |
 |------------|--------------|---------------|
-| `hinge` | 1 (angle) | 1 (angular vel) |
-| `slide` | 1 (displacement) | 1 (linear vel) |
+| `hinge` | 1 (scalar) | 1 (scalar) |
+| `slide` | 1 (scalar) | 1 (scalar) |
 | `ball` | 4 (quaternion) | 3 (angular vel) |
 | `free` | 7 (pos + quat) | 6 (lin vel + ang vel) |
 
 ## Notes
 
 - Returns refs for zero-overhead per-frame reads
-- For hinge joints, `position.current[0]` is the angle in radians
+- For hinge/slide joints, values are scalars (not arrays)
+- For ball/free joints, typed arrays are preallocated once and reused via `.set()` each physics frame — no per-frame allocation
 - For free joints, position is `[x, y, z, qw, qx, qy, qz]`

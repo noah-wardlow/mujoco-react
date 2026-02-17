@@ -44,7 +44,22 @@ function App() {
 2. Sets the mesh material's `emissive` color and `emissiveIntensity`
 3. Restores original emissive values when the selection changes or the component unmounts
 
+## Hook Alternative
+
+For imperative usage inside your own components, use [`useSelectionHighlight`](/hooks/use-selection-highlight):
+
+```tsx
+import { useSelectionHighlight } from 'mujoco-react';
+
+function MyCustomComponent({ bodyId }) {
+  useSelectionHighlight(bodyId, { color: '#00ff00', emissiveIntensity: 0.5 });
+  // ... your other logic
+  return <mesh />;
+}
+```
+
 ## Notes
 
 - Double-click a body in `SceneRenderer` to trigger the `onSelection` callback
 - The highlight applies to all geom meshes belonging to the body
+- The component delegates to `useSelectionHighlight` internally

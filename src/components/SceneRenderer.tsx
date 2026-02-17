@@ -22,12 +22,13 @@ export function SceneRenderer() {
   const prevModelRef = useRef<MujocoModel | null>(null);
 
   const geomBuilder = useMemo(() => {
+    if (status !== 'ready') return null;
     return new GeomBuilder(mujocoRef.current);
-  }, [mujocoRef.current]);
+  }, [status, mujocoRef]);
 
   // Build body groups when model loads
   useEffect(() => {
-    if (status !== 'ready') return;
+    if (status !== 'ready' || !geomBuilder) return;
     const model = mjModelRef.current;
     const group = groupRef.current;
     if (!model || !group) return;
@@ -91,11 +92,12 @@ export function SceneRenderer() {
         while (obj && obj.userData.bodyID === undefined && obj.parent) {
           obj = obj.parent;
         }
-        if (obj && obj.userData.bodyID !== undefined && obj.userData.bodyID > 0) {
+        const bodyID = obj?.userData.bodyID;
+        if (typeof bodyID === 'number' && bodyID > 0) {
           const model = mjModelRef.current;
-          if (model && onSelectionRef.current) {
-            const name = getName(model, model.name_bodyadr[obj.userData.bodyID]);
-            onSelectionRef.current(obj.userData.bodyID, name);
+          if (model && bodyID < model.nbody && onSelectionRef.current) {
+            const name = getName(model, model.name_bodyadr[bodyID]);
+            onSelectionRef.current(bodyID, name);
           }
         }
       }}

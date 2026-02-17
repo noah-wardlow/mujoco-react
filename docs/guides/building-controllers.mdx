@@ -28,7 +28,9 @@ Drop it into your scene as a child of `<MujocoCanvas>`:
 ```tsx
 <MujocoCanvas config={frankaConfig}>
   <SceneRenderer />
-  <IkGizmo />
+  <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
+    <IkGizmo />
+  </IkController>
   <FrankaController />
 </MujocoCanvas>
 ```
@@ -83,8 +85,8 @@ interface ArmConfig {
 interface ArmControllerConfig {
   numActuators: number;
   arms: ArmConfig[];
-  base?: { forwardKey: string; backKey: string; leftKey: string; rightKey: string; actuatorIndex: number };
-  head?: { panKey: string; tiltKey: string; panIndex: number; tiltIndex: number };
+  base?: { ... };  // Mobile base drive
+  head?: { ... };  // Pan/tilt head
 }
 ```
 
@@ -93,7 +95,6 @@ The hook reads keyboard state and writes to the correct actuator indices each fr
 ```tsx
 function useArmController(config: ArmControllerConfig) {
   const keys = useRef<Record<string, boolean>>({});
-  const { api } = useMujocoSim();
 
   // ... keyboard listeners ...
 
@@ -124,36 +125,118 @@ export function SO101Controller() {
 }
 ```
 
+## Pattern: Reusable Plugins with `createController`
+
+For reusable controllers with typed config and default merging, use the `createController` factory. It handles config merging, display names, and metadata — you focus on the control logic.
+
+```tsx
+import { createController, useBeforePhysicsStep } from 'mujoco-react';
+
+// 1. Define your config type
+interface MyConfig {
+  gain: number;
+  actuatorIndex: number;
+  frequency?: number;
+}
+
+// 2. Write the implementation component
+function MyControllerImpl({ config, children }: { config: MyConfig; children?: React.ReactNode }) {
+  useBeforePhysicsStep((_model, data) => {
+    const freq = config.frequency ?? 1.0;
+    data.ctrl[config.actuatorIndex] = config.gain * Math.sin(data.time * freq);
+  });
+  return <>{children}</>;
+}
+
+// 3. Create the controller with the factory
+export const MyController = createController<MyConfig>(
+  { name: 'MyController', defaultConfig: { gain: 1.0, frequency: 1.0 } },
+  MyControllerImpl,
+);
+
+// Usage: <MyController config={{ gain: 2.0, actuatorIndex: 0 }} />
+```
+
+### `createController` API
+
+```ts
+function createController<TConfig>(
+  options: { name: string; defaultConfig?: Partial<TConfig> },
+  Impl: React.FC<{ config: TConfig; children?: React.ReactNode }>,
+): ControllerComponent<TConfig>;
+```
+
+The returned component accepts `config` (merged with defaults) and optional `children`. It also exposes static metadata: `MyController.controllerName` and `MyController.defaultConfig`.
+
+### Providing Context to Children
+
+Controllers can provide state to descendants via React context (this is how `IkController` works):
+
+```tsx
+const MyContext = createContext<MyContextValue | null>(null);
+
+function MyControllerImpl({ config, children }) {
+  const value = useMemo(() => ({ /* state + methods */ }), []);
+  return <MyContext.Provider value={value}>{children}</MyContext.Provider>;
+}
+```
+
+### Listening for Resets
+
+Register a callback to reset your controller state when the simulation resets:
+
+```tsx
+function MyControllerImpl({ config, children }) {
+  const { resetCallbacks } = useMujocoSim();
+
+  useEffect(() => {
+    const cb = () => { /* reset your state */ };
+    resetCallbacks.current.add(cb);
+    return () => { resetCallbacks.current.delete(cb); };
+  }, [resetCallbacks]);
+
+  return <>{children}</>;
+}
+```
+
+The library's `IkController` is itself built with `createController`, demonstrating all these patterns: context provision, reset handling, `useBeforePhysicsStep` for solving, and `useFrame` for gizmo animation.
+
 ## Coexisting with IK Gizmo
 
 When a robot supports both gizmo drag and keyboard control, the controller needs to:
 
-1. **Detect when IK is active** via `ikEnabledRef` from `useMujocoSim()`
+1. **Detect when IK is active** via `useIk({ optional: true })`
 2. **Sync state on transition** — when the user switches from gizmo to keyboard, read `data.ctrl` to avoid a position jump
-3. **Disable IK** via `api.setIkEnabled(false)` when taking over
+3. **Disable IK** via `ikCtx.setIkEnabled(false)` when taking over
 
 ```tsx
-const { api, ikEnabledRef } = useMujocoSim();
+import { useIk, useBeforePhysicsStep } from 'mujoco-react';
 
-useBeforePhysicsStep((_model, data) => {
-  const anyKeyPressed = /* check keyboard state */;
+function MyArmController() {
+  const ikCtx = useIk({ optional: true });
 
-  if (anyKeyPressed && ikEnabledRef.current) {
-    // Sync from current gizmo position
-    for (let i = 0; i < arm.indices.length; i++) {
-      targetJoints[i] = data.ctrl[arm.indices[i]];
+  useBeforePhysicsStep((_model, data) => {
+    const anyKeyPressed = /* check keyboard state */;
+
+    if (anyKeyPressed && ikCtx?.ikEnabledRef.current) {
+      // Sync from current gizmo position
+      for (let i = 0; i < arm.indices.length; i++) {
+        targetJoints[i] = data.ctrl[arm.indices[i]];
+      }
+      ikCtx.setIkEnabled(false);
     }
-    api.setIkEnabled(false);
-  }
 
-  if (!ikEnabledRef.current) {
-    // Keyboard is in control — solve IK and write ctrl
-    for (let i = 0; i < arm.indices.length; i++) {
-      data.ctrl[arm.indices[i]] = targetJoints[i];
+    if (!ikCtx?.ikEnabledRef.current) {
+      // Keyboard is in control — solve IK and write ctrl
+      for (let i = 0; i < arm.indices.length; i++) {
+        data.ctrl[arm.indices[i]] = targetJoints[i];
+      }
     }
-  }
-});
+  });
+}
 ```
+
+The `{ optional: true }` parameter means the hook returns `null` if no `<IkController>` exists in the tree — so the controller works with or without IK.
 
 The gizmo re-enables IK automatically when dragged.
 
@@ -164,7 +247,11 @@ Controllers are just React children. Swap them based on state:
 ```tsx
 <MujocoCanvas config={entry.config}>
   <SceneRenderer />
-  {entry.hasIk && showGizmo && <IkGizmo scale={entry.gizmoScale} />}
+  {entry.hasIk && showGizmo && (
+    <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
+      <IkGizmo scale={entry.gizmoScale} />
+    </IkController>
+  )}
   <DragInteraction />
 
   {robotKey === 'franka' && <FrankaController />}

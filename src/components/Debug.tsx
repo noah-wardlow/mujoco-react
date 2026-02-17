@@ -10,6 +10,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMujocoSim } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
+import { getContact } from '../types';
 import type { DebugProps } from '../types';
 
 const JOINT_COLORS: Record<number, number> = {
@@ -18,6 +19,14 @@ const JOINT_COLORS: Record<number, number> = {
   2: 0x0000ff, // slide - blue
   3: 0xffff00, // hinge - yellow
 };
+
+// Preallocated temps to avoid per-frame GC pressure
+const _v3a = new THREE.Vector3();
+const _v3b = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
+const _contactPos = new THREE.Vector3();
+const _contactNormal = new THREE.Vector3();
+const MAX_CONTACT_ARROWS = 50;
 
 /**
  * Declarative debug visualization component.
@@ -226,8 +235,9 @@ export function Debug({
       // Apply local geom offset
       const gid = mesh.userData.geomId;
       const gp = model.geom_pos;
-      mesh.position.add(new THREE.Vector3(gp[3 * gid], gp[3 * gid + 1], gp[3 * gid + 2])
-        .applyQuaternion(mesh.quaternion));
+      _v3a.set(gp[3 * gid], gp[3 * gid + 1], gp[3 * gid + 2])
+        .applyQuaternion(mesh.quaternion);
+      mesh.position.add(_v3a);
     }
 
     // Update site markers
@@ -248,7 +258,7 @@ export function Debug({
       const i3 = bid * 3;
       const i4 = bid * 4;
 
-      const bodyQuat = new THREE.Quaternion(
+      _quat.set(
         data.xquat[i4 + 1], data.xquat[i4 + 2],
         data.xquat[i4 + 3], data.xquat[i4]
       );
@@ -256,18 +266,16 @@ export function Debug({
       // Position: body origin + local joint anchor (if available)
       arrow.position.set(data.xpos[i3], data.xpos[i3 + 1], data.xpos[i3 + 2]);
       if (jntPos) {
-        const anchor = new THREE.Vector3(
-          jntPos[3 * jid], jntPos[3 * jid + 1], jntPos[3 * jid + 2]
-        ).applyQuaternion(bodyQuat);
-        arrow.position.add(anchor);
+        _v3a.set(jntPos[3 * jid], jntPos[3 * jid + 1], jntPos[3 * jid + 2])
+          .applyQuaternion(_quat);
+        arrow.position.add(_v3a);
       }
 
       // Orient along joint axis in world frame (if available)
       if (jntAxis) {
-        const axis = new THREE.Vector3(
-          jntAxis[3 * jid], jntAxis[3 * jid + 1], jntAxis[3 * jid + 2]
-        ).applyQuaternion(bodyQuat).normalize();
-        arrow.setDirection(axis);
+        _v3a.set(jntAxis[3 * jid], jntAxis[3 * jid + 1], jntAxis[3 * jid + 2])
+          .applyQuaternion(_quat).normalize();
+        arrow.setDirection(_v3a);
       }
     }
 
@@ -279,40 +287,67 @@ export function Debug({
     }
   });
 
-  // Contact force vectors
+  // Contact force vectors — pre-created pool to avoid per-frame allocation
   const contactGroupRef = useRef<THREE.Group>(null);
-  const contactArrowsRef = useRef<THREE.ArrowHelper[]>([]);
+  const contactPoolRef = useRef<THREE.ArrowHelper[]>([]);
+  const contactPoolInitRef = useRef(false);
+
+  // Initialize arrow pool once
+  useEffect(() => {
+    const group = contactGroupRef.current;
+    if (!group || contactPoolInitRef.current) return;
+    contactPoolInitRef.current = true;
+
+    const pool: THREE.ArrowHelper[] = [];
+    for (let i = 0; i < MAX_CONTACT_ARROWS; i++) {
+      const arrow = new THREE.ArrowHelper(
+        new THREE.Vector3(0, 1, 0), new THREE.Vector3(), 0.1, 0xff4444, 0.03, 0.015
+      );
+      arrow.visible = false;
+      group.add(arrow);
+      pool.push(arrow);
+    }
+    contactPoolRef.current = pool;
+
+    return () => {
+      for (const arrow of pool) {
+        group.remove(arrow);
+        arrow.dispose();
+      }
+      contactPoolRef.current = [];
+      contactPoolInitRef.current = false;
+    };
+  }, [showContacts]);
 
   useFrame(() => {
     if (!showContacts) return;
-    const model = mjModelRef.current;
     const data = mjDataRef.current;
-    const group = contactGroupRef.current;
-    if (!model || !data || !group) return;
-
-    // Remove old arrows
-    for (const arrow of contactArrowsRef.current) {
-      group.remove(arrow);
-      arrow.dispose();
-    }
-    contactArrowsRef.current = [];
+    const pool = contactPoolRef.current;
+    if (!data || pool.length === 0) return;
 
     const ncon = data.ncon;
-    for (let i = 0; i < Math.min(ncon, 50); i++) {
-      try {
-        const c = (data.contact as { get(i: number): { pos: Float64Array; frame: Float64Array; dist: number } }).get(i);
-        const pos = new THREE.Vector3(c.pos[0], c.pos[1], c.pos[2]);
-        const normal = new THREE.Vector3(c.frame[0], c.frame[1], c.frame[2]);
-        const force = Math.abs(c.dist) * 100;
-        const length = Math.min(force * 0.01, 0.1);
-        if (length > 0.001) {
-          const arrow = new THREE.ArrowHelper(normal, pos, length, 0xff4444, length * 0.3, length * 0.15);
-          group.add(arrow);
-          contactArrowsRef.current.push(arrow);
-        }
-      } catch {
-        break;
+    let arrowIdx = 0;
+
+    for (let i = 0; i < Math.min(ncon, MAX_CONTACT_ARROWS); i++) {
+      const c = getContact(data, i);
+      if (!c) break;
+      _contactPos.set(c.pos[0], c.pos[1], c.pos[2]);
+      _contactNormal.set(c.frame[0], c.frame[1], c.frame[2]);
+      const force = Math.abs(c.dist) * 100;
+      const length = Math.min(force * 0.01, 0.1);
+      if (length > 0.001 && arrowIdx < pool.length) {
+        const arrow = pool[arrowIdx];
+        arrow.position.copy(_contactPos);
+        arrow.setDirection(_contactNormal);
+        arrow.setLength(length, length * 0.3, length * 0.15);
+        arrow.visible = true;
+        arrowIdx++;
       }
+    }
+
+    // Hide unused arrows
+    for (let i = arrowIdx; i < pool.length; i++) {
+      pool[i].visible = false;
     }
   });
 

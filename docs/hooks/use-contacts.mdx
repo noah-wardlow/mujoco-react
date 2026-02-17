@@ -105,6 +105,7 @@ interface ContactInfo {
 ## Notes
 
 - Contact data is read from `data.contact` every physics frame
+- Geom names are cached to avoid repeated WASM string lookups — the cache clears on model change
 - `useContactEvents` diffs the contact list between frames to detect transitions
 - Contact reads are wrapped in try/catch (can fail with large `ncon`)
 - For a component-based API, see [`<ContactListener>`](/components/contact-listener)

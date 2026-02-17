@@ -20,6 +20,15 @@ export {
   findTendonByName,
 } from './core/SceneLoader';
 
+// Controller factory
+export { createController } from './core/createController';
+export type { ControllerOptions, ControllerComponent } from './core/createController';
+
+// IK controller plugin
+export { IkController } from './components/IkController';
+export { useIk } from './core/IkContext';
+export type { IkContextValue } from './core/IkContext';
+
 // Components
 export { SceneRenderer } from './components/SceneRenderer';
 export { IkGizmo } from './components/IkGizmo';
@@ -49,6 +58,10 @@ export { useTrajectoryRecorder } from './hooks/useTrajectoryRecorder';
 export { useGamepad } from './hooks/useGamepad';
 export { useVideoRecorder } from './hooks/useVideoRecorder';
 export { useCtrlNoise } from './hooks/useCtrlNoise';
+export { useSelectionHighlight } from './hooks/useSelectionHighlight';
+export { useSceneLights } from './hooks/useSceneLights';
+export { useCameraAnimation } from './hooks/useCameraAnimation';
+export type { CameraAnimationAPI } from './hooks/useCameraAnimation';
 
 // Types
 export type {
@@ -59,6 +72,7 @@ export type {
   SceneMarker,
   PhysicsConfig,
   // IK
+  IkConfig,
   IKSolveFn,
   // Callbacks
   PhysicsStepCallback,
@@ -105,4 +119,5 @@ export type {
 } from './types';
 
 // Re-export MuJoCo types for convenience
-export type { MujocoModule, MujocoModel, MujocoData } from './types';
+export type { MujocoModule, MujocoModel, MujocoData, MujocoContact, MujocoContactArray } from './types';
+export { getContact } from './types';

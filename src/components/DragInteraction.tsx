@@ -208,7 +208,7 @@ export function DragInteraction({
 
     if (draggingRef.current && bodyIdRef.current > 0) {
       arrow.visible = true;
-      const dir = mouseWorldRef.current.clone().sub(grabWorldRef.current);
+      const dir = _bodyPos.copy(mouseWorldRef.current).sub(grabWorldRef.current);
       const len = dir.length();
       if (len > 0.001) {
         dir.normalize();

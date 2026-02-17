@@ -9,6 +9,37 @@ import * as THREE from 'three';
 // ---- MuJoCo WASM Types ----
 
 /**
+ * A single MuJoCo contact from the WASM module.
+ * Accessed via `data.contact.get(i)`.
+ */
+export interface MujocoContact {
+  geom1: number;
+  geom2: number;
+  pos: Float64Array;
+  frame: Float64Array;
+  dist: number;
+}
+
+/**
+ * WASM contact array — supports indexed access via `.get(i)`.
+ */
+export interface MujocoContactArray {
+  get(i: number): MujocoContact | undefined;
+}
+
+/**
+ * Read a single contact from the WASM contact array.
+ * Returns undefined if the access fails (WASM heap issue, bad index, etc.).
+ */
+export function getContact(data: MujocoData, i: number): MujocoContact | undefined {
+  try {
+    return data.contact.get(i);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Minimal interface for MuJoCo Model to avoid 'any'.
  */
 export interface MujocoModel {
@@ -50,6 +81,9 @@ export interface MujocoModel {
   body_geomnum: Int32Array;
   body_geomadr: Int32Array;
   body_inertia: Float64Array;
+
+  // Default configuration
+  qpos0: Float64Array;
 
   // Joint
   jnt_qposadr: Int32Array;
@@ -168,7 +202,7 @@ export interface MujocoData {
   site_xmat: Float64Array;
   sensordata: Float64Array;
   ncon: number;
-  contact: unknown;
+  contact: MujocoContactArray;
   cvel: Float64Array;
   cfrc_ext: Float64Array;
   ten_length: Float64Array;
@@ -254,12 +288,30 @@ export interface SceneConfig {
   sceneFile: string;
   baseUrl?: string;
   sceneObjects?: SceneObject[];
-  tcpSiteName?: string;
-  gripperActuatorName?: string;
-  numArmJoints?: number;
   homeJoints?: number[];
   xmlPatches?: XmlPatch[];
   onReset?: (model: MujocoModel, data: MujocoData) => void;
+  /** @deprecated Use IkController config.siteName instead. */
+  tcpSiteName?: string;
+  /** @deprecated Use your own gripper control logic instead. */
+  gripperActuatorName?: string;
+  /** @deprecated Use IkController config.numJoints instead. */
+  numArmJoints?: number;
+}
+
+// ---- IK Controller Config ----
+
+export interface IkConfig {
+  /** MuJoCo site name for IK target. */
+  siteName: string;
+  /** Number of joints to solve for. */
+  numJoints: number;
+  /** Custom IK solver. When omitted, uses built-in Damped Least-Squares solver. */
+  ikSolveFn?: IKSolveFn;
+  /** DLS damping. Default: 0.01. */
+  damping?: number;
+  /** Max solver iterations. Default: 50. */
+  maxIterations?: number;
 }
 
 export interface SceneMarker {
@@ -535,18 +587,7 @@ export interface MujocoSimAPI {
   // Model loading (spec 9.1)
   loadScene(newConfig: SceneConfig): Promise<void>;
 
-  // IK control
-  setIkEnabled(enabled: boolean): void;
-  moveTarget(pos: THREE.Vector3, duration?: number): void;
-  syncTargetToSite(): void;
-  solveIK(
-    pos: THREE.Vector3,
-    quat: THREE.Quaternion,
-    currentQ: number[]
-  ): number[] | null;
-  getGizmoStats(): { pos: THREE.Vector3; rot: THREE.Euler } | null;
-
-  // Canvas / camera
+  // Canvas
   getCanvasSnapshot(width?: number, height?: number, mimeType?: string): string;
   project2DTo3D(
     x: number,
@@ -559,12 +600,6 @@ export interface MujocoSimAPI {
   setBodyMass(name: string, mass: number): void;
   setGeomFriction(name: string, friction: [number, number, number]): void;
   setGeomSize(name: string, size: [number, number, number]): void;
-  getCameraState(): { position: THREE.Vector3; target: THREE.Vector3 };
-  moveCameraTo(
-    position: THREE.Vector3,
-    target: THREE.Vector3,
-    durationMs: number
-  ): Promise<void>;
 
   // Internal refs for advanced use
   readonly mjModelRef: React.RefObject<MujocoModel | null>;

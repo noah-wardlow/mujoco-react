@@ -21,22 +21,22 @@ Renders MuJoCo tendons as smooth tube geometry. Useful for visualizing tendon-dr
 
 ## How It Works
 
-1. Reads wrap path data from `model.ten_wrapadr`, `model.ten_wrapnum`
-2. Gets wrap point positions from `data.wrap_xpos`
-3. Creates a `CatmullRomCurve3` through the wrap points
-4. Renders as `TubeGeometry` with radius `0.002`
-5. Updates positions every frame
+1. On model load, creates one `Mesh` per tendon with a shared `MeshStandardMaterial` and initial `TubeGeometry`
+2. Each frame, updates the `CatmullRomCurve3` control points from `data.wrap_xpos`
+3. Rebuilds only the `TubeGeometry` from the updated curve — the material and mesh objects are reused
+4. Tendons with fewer than 2 valid wrap points are hidden automatically
 
 ## Defaults
 
 | Property | Value |
 |----------|-------|
-| Color | `#4d4d80` |
+| Color | `rgb(0.3, 0.3, 0.8)` |
 | Tube radius | `0.002` |
-| Tube segments | `32` |
+| Radial segments | `6` |
 
 ## Notes
 
 - Requires tendons defined in the MJCF model
 - `ten_rgba` and `ten_width` are not available in mujoco-js 0.0.7 — defaults are used instead
 - If the model has no tendons, this component renders nothing
+- Meshes and material are created once and reused — only geometry is rebuilt per frame

@@ -8,6 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useMujocoSim } from '../core/MujocoSimProvider';
+import { useIk } from '../core/IkContext';
 import { findSiteByName } from '../core/SceneLoader';
 import type { IkGizmoProps } from '../types';
 
@@ -20,25 +21,18 @@ const _scale = new THREE.Vector3(1, 1, 1);
 /**
  * IkGizmo — drei PivotControls that tracks a MuJoCo site.
  *
+ * Must be rendered inside an `<IkController>`.
+ *
  * Props:
- * - `siteName` — MuJoCo site to track. Defaults to `SceneConfig.tcpSiteName`.
+ * - `siteName` — MuJoCo site to track. Defaults to the IkController's configured site.
  * - `scale` — Gizmo handle scale. Default: 0.18.
  * - `onDrag` — Custom drag callback `(pos, quat) => void`.
- *   When omitted, dragging enables IK and writes to the provider's IK target.
+ *   When omitted, dragging enables IK and writes to the IK target.
  *   When provided, the consumer handles what happens during drag.
- *
- * Multiple gizmos can be rendered — each tracks its own site.
- * Zero gizmos is fine — programmatic IK control works via the provider API.
- *
- * Uses a tiny invisible mesh as child instead of axesHelper — PivotControls
- * computes an anchor offset from children's bounding box, and axesHelper's
- * (0→0.15) bounds would shift the handles away from the TCP origin.
  */
 export function IkGizmo({ siteName, scale = 0.18, onDrag }: IkGizmoProps) {
-  const {
-    ikTargetRef, mjModelRef, mjDataRef, siteIdRef,
-    api, ikEnabledRef, status,
-  } = useMujocoSim();
+  const { mjModelRef, mjDataRef, status } = useMujocoSim();
+  const { ikTargetRef, siteIdRef, ikEnabledRef, setIkEnabled } = useIk();
 
   const wrapperRef = useRef<THREE.Group>(null);
   const pivotRef = useRef<THREE.Group>(null);
@@ -46,25 +40,23 @@ export function IkGizmo({ siteName, scale = 0.18, onDrag }: IkGizmoProps) {
   const localSiteIdRef = useRef(-1);
   const { controls } = useThree();
 
-  // Resolve the site ID from siteName (or fall back to provider's tcpSiteName)
+  // Resolve the site ID from siteName (only when an explicit siteName override is given)
   useEffect(() => {
     const model = mjModelRef.current;
-    if (!model || status !== 'ready') {
+    if (!model || status !== 'ready' || !siteName) {
       localSiteIdRef.current = -1;
       return;
     }
-    if (siteName) {
-      localSiteIdRef.current = findSiteByName(model, siteName);
-    } else {
-      // Default: use the provider's siteIdRef (from SceneConfig.tcpSiteName)
-      localSiteIdRef.current = siteIdRef.current;
-    }
-  }, [siteName, status, mjModelRef, siteIdRef]);
+    localSiteIdRef.current = findSiteByName(model, siteName);
+  }, [siteName, status, mjModelRef]);
 
   // Every frame: sync the visual wrapper to the tracked site (when not dragging)
   useFrame(() => {
     const data = mjDataRef.current;
-    const sid = localSiteIdRef.current;
+    // Read IkController's siteIdRef directly in useFrame — avoids useEffect timing
+    // issues (React runs child effects before parent effects, so reading siteIdRef
+    // in a useEffect would see -1 before IkController resolves it).
+    const sid = siteName ? localSiteIdRef.current : siteIdRef.current;
     if (!data || sid < 0 || !wrapperRef.current) return;
 
     if (!draggingRef.current) {
@@ -107,7 +99,7 @@ export function IkGizmo({ siteName, scale = 0.18, onDrag }: IkGizmoProps) {
           draggingRef.current = true;
           if (!onDrag) {
             // Default: enable IK so the robot follows
-            if (!ikEnabledRef.current) api.setIkEnabled(true);
+            if (!ikEnabledRef.current) setIkEnabled(true);
           }
           if (controls) (controls as unknown as { enabled: boolean }).enabled = false;
         }}
@@ -126,7 +118,7 @@ export function IkGizmo({ siteName, scale = 0.18, onDrag }: IkGizmoProps) {
             // Custom: consumer handles the drag
             onDrag(_pos.clone(), _quat.clone());
           } else {
-            // Default: write to provider's IK target
+            // Default: write to IK target
             const target = ikTargetRef.current;
             if (target) {
               target.position.copy(_pos);

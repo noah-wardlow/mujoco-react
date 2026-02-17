@@ -1,25 +1,25 @@
 ---
 title: "Introduction"
-description: "Composable React Three Fiber components for MuJoCo physics simulations"
+description: "A thin, unopinionated wrapper around mujoco-js — composable and extensible via React"
 icon: "rocket"
 ---
 
 # mujoco-react
 
-**mujoco-react** brings the [MuJoCo](https://mujoco.org/) physics engine to React via WebAssembly. It provides composable [React Three Fiber](https://r3f.docs.pmnd.rs/) components for loading models, stepping physics, rendering bodies, and interacting with simulations — all with a familiar React API.
+**mujoco-react** is a thin, unopinionated wrapper around [mujoco-js](https://github.com/nicepkg/mujoco-js) — composable and extensible via React. It provides [React Three Fiber](https://r3f.docs.pmnd.rs/) components for loading models, stepping physics, and rendering bodies. Controllers like IK are opt-in plugins, not baked-in opinions.
 
 <CardGroup cols={2}>
   <Card title="Composable" icon="puzzle-piece">
     Drop `<SceneRenderer />`, `<IkGizmo />`, `<Debug />` and more into your R3F scene as children. No monolithic wrapper.
   </Card>
-  <Card title="Declarative" icon="code">
-    Configure physics via props — `paused`, `speed`, `gravity`, `timestep`. React state drives the simulation.
+  <Card title="Unopinionated" icon="scale-balanced">
+    The core provides physics + rendering. Controllers (IK, teleoperation, RL policies) are composable plugins you opt into — or bring your own.
   </Card>
   <Card title="Extensible" icon="plug">
-    `useBeforePhysicsStep` and `useAfterPhysicsStep` let you inject control logic, RL policies, or teleoperation at 60fps.
+    `createController<TConfig>()` factory for typed controller plugins. `useBeforePhysicsStep` and `useAfterPhysicsStep` for raw physics access.
   </Card>
   <Card title="Full MuJoCo" icon="atom">
-    Contacts, sensors, tendons, flex bodies, IK, raycasting, domain randomization — the full MuJoCo API, React-ified.
+    Contacts, sensors, tendons, flex bodies, raycasting, domain randomization — the full MuJoCo API, React-ified.
   </Card>
 </CardGroup>
 
@@ -30,7 +30,9 @@ npm install mujoco-react mujoco-js @react-three/fiber @react-three/drei three
 ```
 
 ```tsx
-import { MujocoProvider, MujocoCanvas, SceneRenderer, IkGizmo } from 'mujoco-react';
+import {
+  MujocoProvider, MujocoCanvas, SceneRenderer, IkController, IkGizmo,
+} from 'mujoco-react';
 import { OrbitControls } from '@react-three/drei';
 
 function App() {
@@ -40,7 +42,6 @@ function App() {
         config={{
           robotId: 'franka_emika_panda',
           sceneFile: 'scene.xml',
-          tcpSiteName: 'tcp',
           homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
         }}
         camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
@@ -49,7 +50,9 @@ function App() {
       >
         <OrbitControls makeDefault />
         <SceneRenderer />
-        <IkGizmo />
+        <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
+          <IkGizmo />
+        </IkController>
         <ambientLight intensity={0.7} />
         <directionalLight position={[1, 2, 5]} castShadow />
       </MujocoCanvas>
@@ -64,16 +67,21 @@ This loads the Franka Panda from [DeepMind Menagerie](https://github.com/google-
 
 mujoco-react follows the same pattern as [react-three-rapier](https://github.com/pmndrs/react-three-rapier):
 
-- **Library handles MuJoCo concerns only** — WASM lifecycle, physics stepping, body rendering, IK solving
+- **Library handles MuJoCo engine concerns only** — WASM lifecycle, physics stepping, body rendering
+- **Controllers are opt-in plugins** — IK, teleoperation, and custom controllers are composable components, not baked into the core
 - **Consumers compose everything else** — lights, grid, camera controls, UI, game logic
 - **All scene elements are R3F children** — no config objects for visual-only things
 
 ```tsx
 <MujocoCanvas config={config}>
-  {/* Library components */}
+  {/* Library: physics visualization */}
   <SceneRenderer />
-  <IkGizmo />
   <ContactMarkers />
+
+  {/* Opt-in controller plugin */}
+  <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
+    <IkGizmo />
+  </IkController>
 
   {/* Your components — standard R3F */}
   <OrbitControls />

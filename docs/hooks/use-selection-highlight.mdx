@@ -1,0 +1,74 @@
+---
+title: "useSelectionHighlight"
+description: "Hook for applying emissive highlights to body meshes"
+icon: "highlighter"
+---
+
+Applies an emissive glow to the meshes of a selected body. Hook form of [`<SelectionHighlight>`](/components/selection-highlight) for imperative usage inside your own components.
+
+## Signature
+
+```tsx
+useSelectionHighlight(
+  bodyId: number | null,
+  options?: {
+    color?: string;
+    emissiveIntensity?: number;
+  }
+): void
+```
+
+## Usage
+
+```tsx
+import { useSelectionHighlight } from 'mujoco-react';
+
+function MyInteractiveScene() {
+  const [selectedBody, setSelectedBody] = useState<number | null>(null);
+
+  useSelectionHighlight(selectedBody, {
+    color: '#00ff00',
+    emissiveIntensity: 0.5,
+  });
+
+  // ... your click handling logic to set selectedBody
+  return <mesh />;
+}
+```
+
+### Composing with Other Logic
+
+The hook form is useful when you want to combine highlighting with other behavior in a single component:
+
+```tsx
+function BodyInspector({ bodyId }: { bodyId: number }) {
+  useSelectionHighlight(bodyId);
+  const { position, quaternion } = useBodyState(bodyName);
+
+  useFrame(() => {
+    // Log position of highlighted body
+    console.log(position.current);
+  });
+
+  return null;
+}
+```
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `bodyId` | `number \| null` | — | ID of the body to highlight. Pass `null` to clear. |
+| `options.color` | `string` | `'#ff4444'` | Emissive highlight color. |
+| `options.emissiveIntensity` | `number` | `0.3` | Intensity of the emissive glow. |
+
+## How It Works
+
+1. Traverses the scene graph for meshes with matching `userData.bodyID`
+2. Sets the mesh material's `emissive` color and `emissiveIntensity`
+3. Restores original emissive values when `bodyId` changes or the component unmounts
+
+## Notes
+
+- For a declarative JSX API, use [`<SelectionHighlight>`](/components/selection-highlight) instead
+- The component form is a thin wrapper around this hook

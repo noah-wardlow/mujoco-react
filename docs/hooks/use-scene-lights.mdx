@@ -1,0 +1,66 @@
+---
+title: "useSceneLights"
+description: "Hook for creating Three.js lights from MJCF definitions"
+icon: "lightbulb"
+---
+
+Creates Three.js lights from MJCF `<light>` elements in the loaded model. Hook form of [`<SceneLights>`](/components/scene-lights) for imperative usage inside your own components.
+
+## Signature
+
+```tsx
+useSceneLights(intensity?: number): void
+```
+
+## Usage
+
+```tsx
+import { useSceneLights } from 'mujoco-react';
+
+function MyScene() {
+  useSceneLights(1.5);
+  return <mesh />;
+}
+```
+
+### Composing with Custom Lighting
+
+```tsx
+function SceneSetup() {
+  useSceneLights(0.8); // MJCF lights at 80% intensity
+
+  return (
+    <>
+      {/* Add your own supplementary lights */}
+      <ambientLight intensity={0.2} />
+      <pointLight position={[5, 5, 5]} intensity={0.5} />
+    </>
+  );
+}
+```
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `intensity` | `number` | `1.0` | Multiplier applied to all MJCF light intensities. |
+
+## Light Mapping
+
+| MJCF `light_type` | Three.js Light |
+|----|------|
+| `0` (directional) | `DirectionalLight` |
+| `1` (spot) | `SpotLight` |
+
+## How It Works
+
+1. On model load, reads `model.nlight` and iterates all MJCF light definitions
+2. Creates `DirectionalLight` or `SpotLight` instances based on `light_type`
+3. Applies position, direction, color, shadow, and attenuation from model data
+4. Lights are added to the R3F scene and cleaned up on unmount or model change
+
+## Notes
+
+- For a declarative JSX API, use [`<SceneLights>`](/components/scene-lights) instead
+- The component form is a thin wrapper around this hook
+- If the MJCF model has no `<light>` elements, this hook does nothing

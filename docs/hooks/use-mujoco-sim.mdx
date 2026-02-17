@@ -52,8 +52,11 @@ The `api` object provides methods grouped into categories:
 - **[Model Introspection](/api/model-introspection)** — `getBodies()`, `getJoints()`, `getSensors()`
 - **[Model Mutation](/api/model-mutation)** — `setGravity()`, `setBodyMass()`, `setGeomFriction()`
 - **[Spatial Queries](/api/spatial-queries)** — `raycast()`, `project2DTo3D()`, `getCanvasSnapshot()`
-- **[IK Control](/api/ik-control)** — `setIkEnabled()`, `moveTarget()`, `solveIK()`
-- **[Scene Management](/api/scene-management)** — `loadScene()`, `setCtrl()`
+- **[Scene Management](/api/scene-management)** — `loadScene()`
+
+IK control is provided by the opt-in `<IkController>` plugin — see [useIk](/hooks/use-ik) and [IK Control](/api/ik-control).
+
+Camera animation is provided by the standalone `useCameraAnimation()` hook — see [useCameraAnimation](/hooks/use-camera-animation).
 
 ## Direct Model/Data Access
 

@@ -1,6 +1,6 @@
 # mujoco-react
 
-Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) building blocks for [MuJoCo](https://mujoco.org/) WASM simulations. Works with **any robot, any scene** — you provide the MJCF model, the library handles physics, rendering, and IK.
+A thin, unopinionated wrapper around [mujoco-js](https://github.com/nicepkg/mujoco-js) — composable and extensible via React. Built on [React Three Fiber](https://docs.pmnd.rs/react-three-fiber). Works with **any robot, any scene**.
 
 
 ## Install
@@ -16,6 +16,7 @@ import {
   MujocoProvider,
   MujocoCanvas,
   SceneRenderer,
+  IkController,
   IkGizmo,
 } from 'mujoco-react';
 import type { SceneConfig, MujocoSimAPI } from 'mujoco-react';
@@ -24,9 +25,6 @@ import { OrbitControls } from '@react-three/drei';
 const config: SceneConfig = {
   robotId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
-  numArmJoints: 7,
-  tcpSiteName: 'tcp',
-  gripperActuatorName: 'gripper',
   homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
 };
 
@@ -44,7 +42,9 @@ function App() {
       >
         <OrbitControls enableDamping makeDefault />
         <SceneRenderer />
-        <IkGizmo />
+        <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
+          <IkGizmo />
+        </IkController>
         <ambientLight intensity={0.7} />
         <directionalLight position={[1, 2, 5]} intensity={1.2} castShadow />
       </MujocoCanvas>
@@ -56,19 +56,87 @@ function App() {
 ## Architecture
 
 ```
-<MujocoProvider>              ← WASM module lifecycle
-  <MujocoCanvas config={...}> ← Thin R3F Canvas wrapper + physics context
-    <OrbitControls />          ← You add your own controls
-    <SceneRenderer />          ← Syncs MuJoCo bodies to Three.js meshes
-    <IkGizmo />                ← PivotControls-based IK handle
-    <YourLights />             ← You compose your own scene
+<MujocoProvider>              <- WASM module lifecycle
+  <MujocoCanvas config={...}> <- Thin R3F Canvas wrapper + physics context
+    <OrbitControls />          <- You add your own controls
+    <SceneRenderer />          <- Syncs MuJoCo bodies to Three.js meshes
+    <IkController config={..}> <- Opt-in controller plugin
+      <IkGizmo />              <- PivotControls-based IK handle
+    </IkController>
+    <YourController />         <- Bring your own controller
+    <YourLights />             <- You compose your own scene
     <YourGrid />
-    <YourCustomLogic />        ← Your hooks + components
   </MujocoCanvas>
 </MujocoProvider>
 ```
 
-The library provides **only MuJoCo engine concerns**: WASM lifecycle, physics stepping, body rendering, IK solving. Everything else (lighting, grid, markers, game logic) is composed by the consumer as R3F children.
+The library provides **only MuJoCo engine concerns**: WASM lifecycle, physics stepping, and body rendering. Controllers (IK, teleoperation, RL policies) are composable plugins you opt into — or bring your own.
+
+## Controller Plugins
+
+Controllers are opt-in plugins that compose library hooks. The library ships `IkController` built with the `createController` factory, but the real power is building your own.
+
+### `<IkController>`
+
+The built-in IK controller. Wraps children with IK context — `<IkGizmo>` must be a descendant.
+
+```tsx
+<IkController config={{ siteName: 'tcp', numJoints: 7 }}>
+  <IkGizmo />
+</IkController>
+```
+
+| Config | Type | Default | Description |
+|--------|------|---------|-------------|
+| `siteName` | `string` | **required** | MuJoCo site to track |
+| `numJoints` | `number` | **required** | Number of joints for IK |
+| `ikSolveFn` | `IKSolveFn` | built-in DLS | Custom solver function |
+| `damping` | `number` | `0.01` | DLS damping |
+| `maxIterations` | `number` | `50` | Max solver iterations |
+
+### `useIk()`
+
+Access IK state from inside `<IkController>`:
+
+```tsx
+const { setIkEnabled, moveTarget, solveIK } = useIk();
+```
+
+Pass `{ optional: true }` for components that may or may not be inside an `<IkController>`:
+
+```tsx
+const ikCtx = useIk({ optional: true });
+if (ikCtx?.ikEnabledRef.current) {
+  ikCtx.setIkEnabled(false);
+}
+```
+
+### `createController<TConfig>(options, Impl)`
+
+Build your own controller plugin with the typed factory:
+
+```tsx
+import { createController, useBeforePhysicsStep, useMujocoSim } from 'mujoco-react';
+
+interface MyConfig {
+  gain: number;
+  targetJoint: string;
+}
+
+function MyControllerImpl({ config }: { config: MyConfig; children?: React.ReactNode }) {
+  useBeforePhysicsStep((_model, data) => {
+    data.ctrl[0] = config.gain * Math.sin(data.time);
+  });
+  return null;
+}
+
+export const MyController = createController<MyConfig>(
+  { name: 'MyController', defaultConfig: { gain: 1.0 } },
+  MyControllerImpl,
+);
+
+// Usage: <MyController config={{ gain: 2.0, targetJoint: 'shoulder' }} />
+```
 
 ## Loading Models
 
@@ -85,7 +153,7 @@ const franka: SceneConfig = {
 const so101: SceneConfig = {
   robotId: 'so101',
   sceneFile: 'SO101.xml',
-  baseUrl: 'https://raw.githubusercontent.com/Vector-Wangel/MuJoCo-GS-Web/main/assets/robots/xlerobot/',
+  baseUrl: 'https://raw.githubusercontent.com/your-org/your-repo/main/models/',
 };
 
 // Self-hosted
@@ -106,9 +174,6 @@ interface SceneConfig {
   sceneFile: string;                // Entry XML file, e.g. 'scene.xml'
   baseUrl?: string;                 // Base URL for fetching model files
   sceneObjects?: SceneObject[];     // Objects injected into scene XML at load time
-  tcpSiteName?: string;             // MuJoCo site for IK. Default: 'tcp'
-  gripperActuatorName?: string;     // Gripper actuator name. Default: 'gripper'
-  numArmJoints?: number;            // Number of arm joints for IK. Default: 7
   homeJoints?: number[];            // Initial joint positions
   xmlPatches?: XmlPatch[];          // Patches applied to XML files during loading
   onReset?: (model, data) => void;  // Called during reset after mj_resetData
@@ -178,13 +243,13 @@ Syncs MuJoCo bodies to Three.js meshes every frame. Must be inside `<MujocoCanva
 
 ### `<IkGizmo />`
 
-drei PivotControls gizmo that tracks a MuJoCo site and drives IK on drag.
+drei PivotControls gizmo that tracks a MuJoCo site and drives IK on drag. Must be inside `<IkController>`.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `siteName` | `string?` | config.tcpSiteName | MuJoCo site to track |
+| `siteName` | `string?` | IkController's site | MuJoCo site to track |
 | `scale` | `number?` | `0.18` | Gizmo handle scale |
-| `onDrag` | `(pos, quat) => void` | — | Custom drag handler (disables auto-IK) |
+| `onDrag` | `(pos, quat) => void` | -- | Custom drag handler (disables auto-IK) |
 
 ### `<DragInteraction />`
 
@@ -203,7 +268,7 @@ InstancedMesh showing MuJoCo contact points for debugging.
 
 ### `<SceneLights />`
 
-Auto-creates Three.js lights from MJCF `<light>` elements.
+Auto-creates Three.js lights from MJCF `<light>` elements. Also available as `useSceneLights(intensity?)` hook.
 
 ### `<Debug />`
 
@@ -245,7 +310,7 @@ Component wrapper for contact events:
 
 ### `<SelectionHighlight />`
 
-Emissive highlight on selected body meshes.
+Emissive highlight on selected body meshes. Also available as `useSelectionHighlight(bodyId, options?)` hook.
 
 ### `<TrajectoryPlayer />`
 
@@ -274,6 +339,25 @@ useBeforePhysicsStep((model, data) => {
 ### `useAfterPhysicsStep(callback)`
 
 Run logic **after** `mj_step` each frame. Read results, compute rewards, log telemetry.
+
+### `useIk()` / `useIk({ optional: true })`
+
+Access IK controller state. `useIk()` throws if not inside `<IkController>`. Pass `{ optional: true }` to get `null` instead.
+
+### `useCameraAnimation()`
+
+Standalone camera animation hook:
+
+```tsx
+const { getCameraState, moveCameraTo } = useCameraAnimation();
+
+// Animate camera over 1 second
+await moveCameraTo(
+  new THREE.Vector3(3, 0, 2),
+  new THREE.Vector3(0, 0, 0.5),
+  1000
+);
+```
 
 ### `useSensor(name)` / `useSensors()`
 
@@ -374,7 +458,7 @@ Record the canvas as video:
 
 ```tsx
 const video = useVideoRecorder({ fps: 30, mimeType: 'video/webm' });
-// video.start(), video.stop() → returns Blob
+// video.start(), video.stop() -> returns Blob
 ```
 
 ### `useCtrlNoise(config)`
@@ -396,6 +480,22 @@ Returns actuator metadata for building control UIs.
 ### `useSitePosition(siteName)`
 
 Ref-based site position/quaternion tracking.
+
+### `useSelectionHighlight(bodyId, options?)`
+
+Hook form of `<SelectionHighlight>`. Apply emissive highlights imperatively:
+
+```tsx
+useSelectionHighlight(selectedBodyId, { color: '#00ff00', emissiveIntensity: 0.5 });
+```
+
+### `useSceneLights(intensity?)`
+
+Hook form of `<SceneLights>`. Create Three.js lights from MJCF definitions imperatively:
+
+```tsx
+useSceneLights(1.5);
+```
 
 ## MujocoSimAPI
 
@@ -465,24 +565,13 @@ The full API object available via `ref` or `useMujocoSim().api`:
 |--------|-------------|
 | `raycast(origin, direction, maxDist?)` | Physics raycast via `mj_ray` |
 | `project2DTo3D(x, y, camPos, lookAt)` | Screen-to-world raycast (returns bodyId + geomId) |
-| `getCameraState()` | Camera position and orbit target |
-| `moveCameraTo(pos, target, ms)` | Smooth camera animation |
-
-### IK Control
-
-| Method | Description |
-|--------|-------------|
-| `setIkEnabled(enabled)` | Enable/disable IK tracking |
-| `moveTarget(pos, duration?)` | Move IK target with optional animation |
-| `syncTargetToSite()` | Snap IK target to current TCP position |
-| `solveIK(pos, quat, currentQ)` | Solve IK for a target pose |
+| `getCanvasSnapshot(w?, h?, mime?)` | Base64 screenshot |
 
 ### Scene Management
 
 | Method | Description |
 |--------|-------------|
 | `loadScene(newConfig)` | Runtime model swap |
-| `getCanvasSnapshot(w?, h?, mime?)` | Base64 screenshot |
 
 ## Guides
 
@@ -512,6 +601,8 @@ function MyController() {
   return null;
 }
 ```
+
+For reusable controller plugins, use `createController<TConfig>()` to build typed components with config merging and metadata.
 
 See [Building Controllers](https://mujoco-react.mintlify.app/guides/building-controllers) for config-driven patterns, IK gizmo coexistence, and multi-arm support.
 
@@ -554,8 +645,8 @@ See [Click-to-Select](https://mujoco-react.mintlify.app/guides/click-to-select) 
 
 | Priority | Owner | Purpose |
 |----------|-------|---------|
-| -1 | MujocoSimProvider | beforeStep, IK, mj_step, afterStep |
-| 0 (default) | SceneRenderer, your code | Body mesh sync, rendering |
+| -1 | MujocoSimProvider | beforeStep, mj_step, afterStep |
+| 0 (default) | SceneRenderer, IkController, your code | Body mesh sync, IK, rendering |
 
 ## Roadmap
 
@@ -563,7 +654,7 @@ Features planned but not yet implemented:
 
 | Feature | Priority | Description |
 |---------|----------|-------------|
-| **User-uploaded model loading** | P2 | `loadFromFiles(FileList)` — detect meshdir, write to VFS |
+| **User-uploaded model loading** | P2 | `loadFromFiles(FileList)` -- detect meshdir, write to VFS |
 | **URDF loading** | P2 | Load URDF models via MuJoCo's built-in URDF compiler |
 | **XML mutation / recompile** | P1 | `addBody()`, `removeBody()`, `recompile()` for runtime XML editing |
 | **Observation builder utilities** | P2 | Helpers for projected gravity, joint positions/velocities for RL |
@@ -575,8 +666,8 @@ Features planned but not yet implemented:
 
 These MuJoCo features are not yet exposed in the WASM binding:
 
-- `flex_faceadr` / `flex_facenum` / `flex_face` — FlexRenderer renders vertices without face indices
-- `ten_rgba` / `ten_width` — TendonRenderer uses default color/width
+- `flex_faceadr` / `flex_facenum` / `flex_face` -- FlexRenderer renders vertices without face indices
+- `ten_rgba` / `ten_width` -- TendonRenderer uses default color/width
 
 ## License
 

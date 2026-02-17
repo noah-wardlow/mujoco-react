@@ -1,0 +1,131 @@
+---
+title: "useIk"
+description: "Access IK controller state and methods"
+icon: "robot"
+---
+
+Hook for accessing the IK controller context from any component inside `<IkController>`.
+
+## Usage
+
+### Required (inside IkController)
+
+```tsx
+import { useIk } from 'mujoco-react';
+
+function MyIkComponent() {
+  const { setIkEnabled, moveTarget, solveIK, getGizmoStats } = useIk();
+
+  // Throws if not inside <IkController>
+}
+```
+
+### Optional (may or may not be inside IkController)
+
+```tsx
+import { useIk } from 'mujoco-react';
+
+function MyController() {
+  const ikCtx = useIk({ optional: true });
+
+  // Returns null if no <IkController> ancestor
+  if (ikCtx?.ikEnabledRef.current) {
+    ikCtx.setIkEnabled(false);
+  }
+}
+```
+
+## Return Value
+
+```ts
+interface IkContextValue {
+  ikEnabledRef: React.RefObject<boolean>;
+  ikCalculatingRef: React.RefObject<boolean>;
+  ikTargetRef: React.RefObject<THREE.Group>;
+  siteIdRef: React.RefObject<number>;
+  setIkEnabled(enabled: boolean): void;
+  moveTarget(pos: THREE.Vector3, duration?: number): void;
+  syncTargetToSite(): void;
+  solveIK(pos: THREE.Vector3, quat: THREE.Quaternion, currentQ: number[]): number[] | null;
+  getGizmoStats(): { pos: THREE.Vector3; rot: THREE.Euler } | null;
+}
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `setIkEnabled(enabled)` | Enable/disable IK solving |
+| `moveTarget(pos, duration?)` | Move IK target with optional animation |
+| `syncTargetToSite()` | Snap IK target to current site position |
+| `solveIK(pos, quat, currentQ)` | Solve IK manually, returns joint angles or null |
+| `getGizmoStats()` | Get current gizmo position and rotation |
+
+### Refs
+
+| Ref | Description |
+|-----|-------------|
+| `ikEnabledRef` | Whether IK is currently enabled |
+| `ikCalculatingRef` | Whether IK is actively computing |
+| `ikTargetRef` | THREE.Group representing the IK target |
+| `siteIdRef` | Resolved MuJoCo site ID |
+
+## Example: Keyboard/Gizmo Coexistence
+
+A common pattern is disabling IK when keyboard control takes over:
+
+```tsx
+function MyArmController() {
+  const ikCtx = useIk({ optional: true });
+
+  useBeforePhysicsStep((_model, data) => {
+    const anyKeyPressed = checkKeys();
+
+    // On transition from gizmo to keyboard: sync and disable IK
+    if (anyKeyPressed && ikCtx?.ikEnabledRef.current) {
+      syncFromCurrentCtrl(data);
+      ikCtx.setIkEnabled(false);
+    }
+
+    // Write keyboard-driven control
+    if (!ikCtx?.ikEnabledRef.current) {
+      writeKeyboardControl(data);
+    }
+  });
+
+  return null;
+}
+```
+
+The gizmo re-enables IK automatically when dragged.
+
+## Example: Waypoint Following
+
+```tsx
+function WaypointFollower({ waypoints }: { waypoints: THREE.Vector3[] }) {
+  const { setIkEnabled, moveTarget, getGizmoStats } = useIk();
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    setIkEnabled(true);
+    moveTarget(waypoints[0]);
+  }, []);
+
+  useAfterPhysicsStep(() => {
+    const stats = getGizmoStats();
+    if (!stats) return;
+    const dist = stats.pos.distanceTo(waypoints[index]);
+    if (dist < 0.01 && index < waypoints.length - 1) {
+      const next = index + 1;
+      setIndex(next);
+      moveTarget(waypoints[next], 300);
+    }
+  });
+
+  return null;
+}
+```
+
+<Warning>
+  When IK is enabled, it overwrites `data.ctrl` for the arm joints inside `useBeforePhysicsStep`. Disable IK when running your own control (policies, teleoperation, etc.).
+</Warning>

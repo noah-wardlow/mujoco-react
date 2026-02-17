@@ -101,6 +101,26 @@ export function findTendonByName(mjModel: MujocoModel, name: string): number {
 }
 
 /**
+ * Return qpos address for actuators that directly target a scalar joint.
+ * Returns -1 for non-joint transmissions and multi-DOF joints.
+ */
+export function getActuatedScalarQposAdr(mjModel: MujocoModel, actuatorId: number): number {
+  if (actuatorId < 0 || actuatorId >= mjModel.nu) return -1;
+
+  // mjTRN_JOINT=0, mjTRN_JOINTINPARENT=1. Other transmission types don't map ctrl to a single qpos.
+  const trnType = mjModel.actuator_trntype?.[actuatorId];
+  if (trnType !== undefined && trnType !== 0 && trnType !== 1) return -1;
+
+  const jointId = mjModel.actuator_trnid[2 * actuatorId];
+  if (jointId < 0 || jointId >= mjModel.njnt) return -1;
+
+  const jntType = mjModel.jnt_type[jointId];
+  if (jntType !== 2 && jntType !== 3) return -1; // slide=2, hinge=3
+
+  return mjModel.jnt_qposadr[jointId];
+}
+
+/**
  * Convert a SceneObject config to MuJoCo XML.
  */
 function sceneObjectToXml(obj: SceneObject): string {
@@ -174,7 +194,13 @@ export async function loadScene(
       for (const patch of config.xmlPatches ?? []) {
         if (fname.endsWith(patch.target) || fname === patch.target) {
           if (patch.replace) {
-            text = text.replace(patch.replace[0], patch.replace[1]);
+            const [from, to] = patch.replace;
+            if (text.includes(from)) {
+              text = text.replace(from, to);
+            } else {
+              const preview = from.length > 80 ? `${from.slice(0, 80)}...` : from;
+              console.warn(`XML patch replace pattern not found in ${fname}: "${preview}"`);
+            }
           }
           if (patch.inject && patch.injectAfter) {
             const idx = text.indexOf(patch.injectAfter);
@@ -183,7 +209,14 @@ export async function loadScene(
               const tagEnd = text.indexOf('>', idx + patch.injectAfter.length);
               if (tagEnd !== -1) {
                 text = text.slice(0, tagEnd + 1) + patch.inject + text.slice(tagEnd + 1);
+              } else {
+                console.warn(`XML patch inject failed in ${fname}: could not find tag end after "${patch.injectAfter}"`);
               }
+            } else {
+              const preview = patch.injectAfter.length > 80
+                ? `${patch.injectAfter.slice(0, 80)}...`
+                : patch.injectAfter;
+              console.warn(`XML patch inject anchor not found in ${fname}: "${preview}"`);
             }
           }
         }
@@ -212,16 +245,15 @@ export async function loadScene(
   const siteId = findSiteByName(mjModel, config.tcpSiteName ?? 'tcp');
   const gripperId = findActuatorByName(mjModel, config.gripperActuatorName ?? 'gripper');
 
-  // 7. Set initial pose
+  // 7. Set initial pose — set both ctrl and qpos so robot starts at home.
+  //    If homeJoints is not provided, keep raw MuJoCo defaults.
   if (config.homeJoints) {
-    for (let i = 0; i < config.homeJoints.length; i++) {
+    const homeCount = Math.min(config.homeJoints.length, mjModel.nu);
+    for (let i = 0; i < homeCount; i++) {
       mjData.ctrl[i] = config.homeJoints[i];
-      if (mjModel.actuator_trnid[2 * i + 1] === 1) {
-        const jointId = mjModel.actuator_trnid[2 * i];
-        if (jointId >= 0 && jointId < mjModel.njnt) {
-          const qposAdr = mjModel.jnt_qposadr[jointId];
-          mjData.qpos[qposAdr] = config.homeJoints[i];
-        }
+      const qposAdr = getActuatedScalarQposAdr(mjModel, i);
+      if (qposAdr !== -1) {
+        mjData.qpos[qposAdr] = config.homeJoints[i];
       }
     }
   }

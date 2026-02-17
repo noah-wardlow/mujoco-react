@@ -1,0 +1,98 @@
+---
+title: "useCameraAnimation"
+description: "Smooth camera animation hook"
+icon: "video"
+---
+
+Standalone hook for smooth camera animation. Works with OrbitControls or any camera setup.
+
+## Usage
+
+```tsx
+import { useCameraAnimation } from 'mujoco-react';
+
+function CameraController() {
+  const { getCameraState, moveCameraTo } = useCameraAnimation();
+
+  const handleClick = async () => {
+    await moveCameraTo(
+      new THREE.Vector3(3, 0, 2),     // Target position
+      new THREE.Vector3(0, 0, 0.5),   // Target look-at
+      1000                             // Duration (ms)
+    );
+    console.log('Camera animation complete');
+  };
+
+  return <button onClick={handleClick}>Move Camera</button>;
+}
+```
+
+## Return Value
+
+```ts
+interface CameraAnimationAPI {
+  getCameraState(): { position: THREE.Vector3; target: THREE.Vector3 };
+  moveCameraTo(position: THREE.Vector3, target: THREE.Vector3, durationMs: number): Promise<void>;
+}
+```
+
+### `getCameraState()`
+
+Returns the current camera position and orbit target.
+
+```tsx
+const { position, target } = getCameraState();
+console.log('Camera at:', position);
+console.log('Looking at:', target);
+```
+
+### `moveCameraTo(position, target, durationMs)`
+
+Smoothly animate the camera to a new position and look-at target.
+
+<ParamField body="position" type="THREE.Vector3" required>
+  Target camera position.
+</ParamField>
+
+<ParamField body="target" type="THREE.Vector3" required>
+  Target look-at point.
+</ParamField>
+
+<ParamField body="durationMs" type="number" required>
+  Animation duration in milliseconds.
+</ParamField>
+
+**Returns:** `Promise<void>` — resolves when animation completes.
+
+## Example: Vision Pipeline
+
+```tsx
+async function captureFromAngle(api: MujocoSimAPI) {
+  const { moveCameraTo, getCameraState } = useCameraAnimation();
+
+  // Save current position
+  const original = getCameraState();
+
+  // Move to capture angle
+  await moveCameraTo(
+    new THREE.Vector3(0, 0, 3),
+    new THREE.Vector3(0, 0, 0),
+    500
+  );
+
+  // Capture
+  const image = api.getCanvasSnapshot(1024, 1024);
+
+  // Return to original
+  await moveCameraTo(original.position, original.target, 500);
+
+  return image;
+}
+```
+
+## Notes
+
+- Must be called inside `<MujocoCanvas>` (needs R3F's `useThree`)
+- Uses cubic ease-out for smooth interpolation
+- Animates both camera position and OrbitControls target
+- Only one animation runs at a time — starting a new one cancels the previous

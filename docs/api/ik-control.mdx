@@ -1,67 +1,74 @@
 ---
 title: "IK Control"
-description: "Inverse kinematics solver and gizmo control"
+description: "Inverse kinematics via the IkController plugin"
 icon: "robot"
 ---
 
-Methods for controlling the built-in inverse kinematics solver and IK gizmo.
+IK is provided by the `<IkController>` plugin — it is not part of the core `MujocoSimAPI`. Access IK methods via the `useIk()` hook from any component inside `<IkController>`.
 
-## setIkEnabled(enabled)
+## Setup
+
+```tsx
+import { IkController, IkGizmo, useIk } from 'mujoco-react';
+
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
+    <IkGizmo />
+    <MyIkConsumer />
+  </IkController>
+</MujocoCanvas>
+```
+
+## useIk() Methods
+
+### setIkEnabled(enabled)
 
 Enable or disable the IK solver.
 
 ```tsx
-api.setIkEnabled(true);   // IK writes to ctrl each frame
-api.setIkEnabled(false);  // IK disabled — you control ctrl
+const { setIkEnabled } = useIk();
+setIkEnabled(true);   // IK writes to ctrl each frame
+setIkEnabled(false);  // IK disabled — you control ctrl
 ```
 
-<ParamField body="enabled" type="boolean" required>
-  Whether IK should run each physics frame.
-</ParamField>
-
 <Warning>
-  When IK is enabled, it overwrites `data.ctrl` for the arm joints after your `useBeforePhysicsStep` callbacks. Disable IK when running your own control (policies, teleoperation, etc.).
+  When IK is enabled, it overwrites `data.ctrl` for the arm joints inside `useBeforePhysicsStep`. Disable IK when running your own control (policies, teleoperation, etc.).
 </Warning>
 
-## moveTarget(pos, duration?)
+### moveTarget(pos, duration?)
 
 Animate the IK target (gizmo) to a new position.
 
 ```tsx
-api.moveTarget(new THREE.Vector3(0.5, 0, 0.3));       // Instant
-api.moveTarget(new THREE.Vector3(0.5, 0, 0.3), 500);  // 500ms animation
+const { moveTarget } = useIk();
+moveTarget(new THREE.Vector3(0.5, 0, 0.3));       // Instant
+moveTarget(new THREE.Vector3(0.5, 0, 0.3), 500);  // 500ms animation
 ```
 
-<ParamField body="pos" type="THREE.Vector3" required>
-  Target position in world coordinates.
-</ParamField>
+### syncTargetToSite()
 
-<ParamField body="duration" type="number">
-  Animation duration in milliseconds. If omitted, the target moves instantly.
-</ParamField>
-
-## syncTargetToSite()
-
-Snap the IK gizmo to the current TCP site position.
+Snap the IK gizmo to the current site position.
 
 ```tsx
-api.syncTargetToSite();
+const { syncTargetToSite } = useIk();
+syncTargetToSite();
 ```
 
 Useful after programmatic joint changes to re-align the gizmo with the actual end-effector.
 
-## solveIK(pos, quat, currentQ)
+### solveIK(pos, quat, currentQ)
 
 Run IK solving manually (without the gizmo).
 
 ```tsx
+const { solveIK } = useIk();
 const targetPos = new THREE.Vector3(0.5, 0, 0.3);
 const targetQuat = new THREE.Quaternion();
 const currentJoints = Array.from(api.getQpos()).slice(0, 7);
 
-const solution = api.solveIK(targetPos, targetQuat, currentJoints);
+const solution = solveIK(targetPos, targetQuat, currentJoints);
 if (solution) {
-  // Apply the solution
   const qpos = api.getQpos();
   for (let i = 0; i < solution.length; i++) {
     qpos[i] = solution[i];
@@ -70,70 +77,67 @@ if (solution) {
 }
 ```
 
-<ParamField body="pos" type="THREE.Vector3" required>
-  Desired end-effector position.
-</ParamField>
-
-<ParamField body="quat" type="THREE.Quaternion" required>
-  Desired end-effector orientation.
-</ParamField>
-
-<ParamField body="currentQ" type="number[]" required>
-  Current joint positions (seed for the solver).
-</ParamField>
-
 **Returns:** `number[] | null` — joint positions, or null if solver failed.
 
-## getGizmoStats()
+### getGizmoStats()
 
 Get the current IK gizmo position and orientation.
 
 ```tsx
-const stats = api.getGizmoStats();
+const { getGizmoStats } = useIk();
+const stats = getGizmoStats();
 if (stats) {
   console.log('Gizmo position:', stats.pos);
   console.log('Gizmo rotation:', stats.rot);
 }
 ```
 
-**Returns:** `{ pos: THREE.Vector3, rot: THREE.Quaternion } | null`
+**Returns:** `{ pos: THREE.Vector3, rot: THREE.Euler } | null`
 
-## IK Solver Details
+## Optional Access
 
-The built-in solver uses **Damped Least-Squares** (DLS) with finite-difference Jacobian:
+For components that may or may not be inside an `<IkController>`, use `{ optional: true }`:
 
-- **Max iterations**: 50 per frame
-- **Damping**: 0.01
+```tsx
+const ikCtx = useIk({ optional: true });
+// Returns null if no IkController ancestor
+
+if (ikCtx?.ikEnabledRef.current) {
+  ikCtx.setIkEnabled(false);
+}
+```
+
+## Custom IK Solver
+
+Pass `ikSolveFn` to `<IkController>` to replace the built-in solver:
+
+```tsx
+import type { IKSolveFn } from 'mujoco-react';
+
+const myIK: IKSolveFn = (pos, quat, currentQ) => {
+  const solution = myAnalyticalSolver(pos, currentQ);
+  return solution;
+};
+
+<IkController config={{ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK }}>
+  <IkGizmo />
+</IkController>
+```
+
+**When to use a custom solver:**
+
+- **Analytical IK** — faster and more reliable for specific robot geometries
+- **Learned IK** — neural network solvers trained on your robot
+- **External solvers** — calling into WASM-compiled libraries (e.g. KDL, TRAC-IK)
+- **Constrained IK** — solvers that enforce joint limits, collision avoidance, or task-space constraints
+
+## Built-in Solver Details
+
+The default solver uses **Damped Least-Squares** (DLS) with finite-difference Jacobian:
+
+- **Max iterations**: 50 per frame (configurable)
+- **Damping**: 0.01 (configurable)
 - **Position weight**: 1.0
 - **Rotation weight**: 0.3
 - **Tolerance**: 1e-3
 - **Method**: Finite-difference Jacobian + pseudoinverse
-
-The solver tracks the best solution across iterations and returns it even if tolerance isn't reached.
-
-## Example: Waypoint Following
-
-```tsx
-function WaypointFollower({ waypoints }: { waypoints: THREE.Vector3[] }) {
-  const { api } = useMujocoSim();
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    api.setIkEnabled(true);
-    api.moveTarget(waypoints[0]);
-  }, []);
-
-  useAfterPhysicsStep(() => {
-    const stats = api.getGizmoStats();
-    if (!stats) return;
-    const dist = stats.pos.distanceTo(waypoints[index]);
-    if (dist < 0.01 && index < waypoints.length - 1) {
-      const next = index + 1;
-      setIndex(next);
-      api.moveTarget(waypoints[next], 300);
-    }
-  });
-
-  return null;
-}
-```
