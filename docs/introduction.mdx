@@ -6,17 +6,17 @@ icon: "rocket"
 
 # mujoco-react
 
-**mujoco-react** is a composable [React Three Fiber](https://r3f.docs.pmnd.rs/) wrapper around [mujoco-js](https://github.com/nicepkg/mujoco-js). It provides components for loading models, stepping physics, and rendering bodies. Controllers like IK are opt-in plugins.
+**mujoco-react** is a composable [React Three Fiber](https://r3f.docs.pmnd.rs/) wrapper around [mujoco-js](https://www.npmjs.com/package/mujoco-js). It provides components for loading models, stepping physics, and rendering bodies. Controllers like IK are opt-in plugins.
 
 <CardGroup cols={2}>
   <Card title="Composable" icon="puzzle-piece">
     `<SceneRenderer />`, `<IkGizmo />`, `<Debug />` etc. are R3F children you add to your scene.
   </Card>
-  <Card title="Bring Your Own Controller" icon="scale-balanced">
+  <Card title="Controller Pattern" icon="scale-balanced">
     Controllers are React components that call `useBeforePhysicsStep`. Write your own or use the built-in ones.
   </Card>
-  <Card title="Bring Your Own IK" icon="plug">
-    Plug in any IK solver via `ikSolveFn`, or skip `IkController` entirely and solve IK yourself in `useBeforePhysicsStep`.
+  <Card title="Pluggable IK" icon="plug">
+    Swap in any IK solver via `ikSolveFn`, or skip `IkController` entirely and solve IK yourself in `useBeforePhysicsStep`.
   </Card>
   <Card title="Full MuJoCo" icon="atom">
     Contacts, sensors, tendons, flex bodies, raycasting, domain randomization. The full MuJoCo API via React hooks.
@@ -63,7 +63,7 @@ function App() {
 
 This loads the Franka Panda from [DeepMind Menagerie](https://github.com/google-deepmind/mujoco_menagerie), renders all bodies, and adds an interactive IK gizmo on the end-effector.
 
-## Bring Your Own Controller
+## Controllers
 
 A controller is a React component that calls `useBeforePhysicsStep` to write `data.ctrl` each frame:
 
@@ -103,27 +103,23 @@ mujoco-react follows the same pattern as [react-three-rapier](https://github.com
 - **Consumers compose everything else**: lights, grid, camera controls, UI, game logic
 - **All scene elements are R3F children**: no config objects for visual-only things
 
-Two ways to set up your scene:
+`<MujocoCanvas>` wraps R3F `<Canvas>` and forwards all Canvas props. For full control over the Canvas (gl settings, post-processing, etc.), use `<MujocoPhysics>` inside your own:
 
 <Tabs>
-  <Tab title="MujocoCanvas (quick start)">
-    Wraps R3F `<Canvas>` for you:
+  <Tab title="MujocoCanvas">
     ```tsx
-    <MujocoCanvas config={config}>
+    <MujocoCanvas config={config} shadows camera={...}>
       <SceneRenderer />
-      <ContactMarkers />
       <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
         <IkGizmo />
       </IkController>
       <OrbitControls />
-      <ambientLight />
     </MujocoCanvas>
     ```
   </Tab>
-  <Tab title="MujocoPhysics (bring your own Canvas)">
-    Use inside your own `<Canvas>` for full control over gl settings, post-processing, and R3F context:
+  <Tab title="MujocoPhysics">
     ```tsx
-    <Canvas shadows camera={{ position: [2, 2, 2] }} gl={{ antialias: true }}>
+    <Canvas shadows camera={...} gl={{ antialias: true }}>
       <MujocoPhysics config={config}>
         <SceneRenderer />
         <MyController />
@@ -139,7 +135,7 @@ Two ways to set up your scene:
 
 <CardGroup cols={2}>
   <Card title="Building Controllers" icon="gamepad" href="/guides/building-controllers">
-    Write your own controller, bring your own IK, use the `createController` factory
+    Custom controllers, IK solvers, and the `createController` factory
   </Card>
   <Card title="Installation" icon="download" href="/installation">
     Peer dependencies, bundler setup, and WASM notes

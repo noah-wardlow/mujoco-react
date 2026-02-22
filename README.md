@@ -58,49 +58,28 @@ function App() {
 }
 ```
 
-## Architecture
+## Direct WASM Access
 
-Two ways to set up your scene:
+`useMujoco()` gives you the full typed MuJoCo WASM binary — `mj_step`, `mj_forward`, `MjModel`, `MjData`, and everything else:
 
-### `<MujocoCanvas>`
+```tsx
+import { useMujoco } from 'mujoco-react';
 
-Wraps R3F `<Canvas>` for you:
+const { mujoco, status } = useMujoco();
 
-```
-<MujocoProvider>              <- WASM module lifecycle
-  <MujocoCanvas config={...}> <- R3F Canvas + physics context
-    <SceneRenderer />          <- Syncs MuJoCo bodies to Three.js meshes
-    <IkController config={..}> <- Opt-in controller plugin
-      <IkGizmo />
-    </IkController>
-    <YourController />         <- Bring your own controller
-    <YourLights />             <- You compose your own scene
-  </MujocoCanvas>
-</MujocoProvider>
+if (mujoco) {
+  const model = mujoco.MjModel.loadFromXML('/path/to/scene.xml');
+  const data = new mujoco.MjData(model);
+  mujoco.mj_step(model, data);
+  console.log(data.qpos);  // joint positions after one step
+}
 ```
 
-### `<MujocoPhysics>`
+Most users won't need this — `<MujocoCanvas>` and hooks like `useBeforePhysicsStep` handle the model/data lifecycle for you. But the raw module is always available when you need it.
 
-Use inside your own `<Canvas>` for control over gl settings, post-processing, etc:
+## Writing a Controller
 
-```
-<MujocoProvider>
-  <Canvas shadows camera={...} gl={...}>   <- Your Canvas, your settings
-    <MujocoPhysics config={config}>         <- Physics context only
-      <SceneRenderer />
-      <YourController />
-    </MujocoPhysics>
-    <OrbitControls />
-    <EffectComposer>...</EffectComposer>    <- Post-processing, etc.
-  </Canvas>
-</MujocoProvider>
-```
-
-The library handles WASM lifecycle, physics stepping, and body rendering. Controllers (IK, teleoperation, RL policies) are composable plugins you opt into or write yourself.
-
-## Bring Your Own Controller
-
-A controller is a React component that calls `useBeforePhysicsStep` to write `data.ctrl` each frame and returns `null`.
+A controller is a React component that calls `useBeforePhysicsStep` to write `data.ctrl` each frame:
 
 ```tsx
 import { useBeforePhysicsStep } from 'mujoco-react';
@@ -112,19 +91,54 @@ function MyController() {
   });
   return null;
 }
+```
 
-// Drop it in:
+Drop it into the tree alongside `<SceneRenderer />`:
+
+```tsx
 <MujocoCanvas config={config}>
   <SceneRenderer />
   <MyController />
 </MujocoCanvas>
 ```
 
-IK, teleoperation, RL policies, state machines all follow this same pattern.
+The `createController<TConfig>()` factory adds typed config and default merging for reusable plugins:
 
-### Bring Your Own IK
+```tsx
+import { createController, useBeforePhysicsStep } from 'mujoco-react';
 
-The built-in `<IkController>` uses a Damped Least-Squares solver. You can replace it with your own (analytical, learned, etc.):
+export const MyController = createController<{ gain: number }>(
+  { name: 'MyController', defaultConfig: { gain: 1.0 } },
+  ({ config }) => {
+    useBeforePhysicsStep((_model, data) => {
+      data.ctrl[0] = config.gain * Math.sin(data.time);
+    });
+    return null;
+  },
+);
+
+// <MyController config={{ gain: 2.0 }} />
+```
+
+## Architecture
+
+`<MujocoCanvas>` wraps R3F `<Canvas>` and forwards all Canvas props (`camera`, `shadows`, `gl`, etc.). For full control over the Canvas, use `<MujocoPhysics>` inside your own:
+
+```
+<MujocoProvider>                           <MujocoProvider>
+  <MujocoCanvas config={...}>               <Canvas shadows gl={...}>
+    <SceneRenderer />                         <MujocoPhysics config={...}>
+    <IkController config={..}>                  <SceneRenderer />
+      <IkGizmo />                             </MujocoPhysics>
+    </IkController>                           <EffectComposer>...</EffectComposer>
+    <MyController />                        </Canvas>
+  </MujocoCanvas>                         </MujocoProvider>
+</MujocoProvider>
+```
+
+### Custom IK Solvers
+
+The built-in `<IkController>` uses Damped Least-Squares. Pass `ikSolveFn` to swap in your own solver (analytical, learned, etc.):
 
 ```tsx
 import type { IKSolveFn } from 'mujoco-react';
@@ -138,48 +152,7 @@ const myIK: IKSolveFn = (pos, quat, currentQ) => {
 </IkController>
 ```
 
-Or skip `<IkController>` entirely and solve IK yourself inside `useBeforePhysicsStep`:
-
-```tsx
-function MyIKController() {
-  useBeforePhysicsStep((model, data) => {
-    const joints = myCustomIKSolve(model, data);
-    if (joints) {
-      for (let i = 0; i < joints.length; i++) data.ctrl[i] = joints[i];
-    }
-  });
-  return null;
-}
-```
-
-### `createController<TConfig>()` Factory
-
-For reusable controller plugins with typed config and default merging:
-
-```tsx
-import { createController, useBeforePhysicsStep } from 'mujoco-react';
-
-interface MyConfig {
-  gain: number;
-  targetJoint: string;
-}
-
-function MyControllerImpl({ config }: { config: MyConfig; children?: React.ReactNode }) {
-  useBeforePhysicsStep((_model, data) => {
-    data.ctrl[0] = config.gain * Math.sin(data.time);
-  });
-  return null;
-}
-
-export const MyController = createController<MyConfig>(
-  { name: 'MyController', defaultConfig: { gain: 1.0 } },
-  MyControllerImpl,
-);
-
-// Usage: <MyController config={{ gain: 2.0, targetJoint: 'shoulder' }} />
-```
-
-### Built-in `<IkController>`
+### `<IkController>`
 
 The library includes one controller for interactive end-effector control:
 
@@ -425,9 +398,23 @@ Plays back recorded qpos trajectories with scrubbing.
 
 ## Hooks
 
+### `useMujoco()`
+
+Access the WASM module lifecycle from any child of `<MujocoProvider>`:
+
+```tsx
+const { mujoco, status, error } = useMujoco();
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mujoco` | `MujocoModule \| null` | The raw WASM module, or `null` while loading |
+| `status` | `'pending' \| 'error'` | Lifecycle state (absent once loaded) |
+| `error` | `string \| null` | Error message if loading failed |
+
 ### `useMujocoSim()`
 
-Access the simulation API and internal refs:
+Access the simulation API and internal refs (must be inside `<MujocoCanvas>` or `<MujocoPhysics>`):
 
 ```tsx
 const { api, mjModelRef, mjDataRef } = useMujocoSim();

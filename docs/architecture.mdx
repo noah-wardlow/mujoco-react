@@ -8,25 +8,18 @@ icon: "sitemap"
 
 mujoco-react uses a layered provider pattern. Two setup options:
 
+`MujocoCanvas` wraps R3F `<Canvas>` and forwards all Canvas props. `MujocoPhysics` provides just the physics context inside your own Canvas.
+
 ```
-Option A: MujocoCanvas (quick start)
+MujocoCanvas                          MujocoPhysics
 
-MujocoProvider            <- WASM module lifecycle
-  └─ MujocoCanvas         <- R3F Canvas + scene config
-       └─ MujocoSimProvider    <- Physics loop + API
-            ├─ SceneRenderer   <- Body mesh sync
-            ├─ IkController    <- Opt-in IK plugin
-            │    └─ IkGizmo
+MujocoProvider                        MujocoProvider
+  └─ MujocoCanvas                       └─ Canvas
+       └─ MujocoSimProvider                  └─ MujocoPhysics
+            ├─ SceneRenderer                      └─ MujocoSimProvider
+            ├─ IkController                            ├─ SceneRenderer
+            │    └─ IkGizmo                            └─ YourComponents
             └─ YourComponents
-
-Option B: MujocoPhysics (bring your own Canvas)
-
-MujocoProvider            <- WASM module lifecycle
-  └─ Canvas               <- Your R3F Canvas, your gl settings
-       └─ MujocoPhysics   <- Physics context (no Canvas wrapper)
-            └─ MujocoSimProvider    <- Physics loop + API
-                 ├─ SceneRenderer
-                 └─ YourComponents
 ```
 
 ### MujocoProvider
@@ -61,9 +54,9 @@ You don't use this directly. `MujocoCanvas` and `MujocoPhysics` create it. It:
 - Exposes the `MujocoSimAPI` via React context
 - Provides callback registration for `useBeforePhysicsStep`, `useAfterPhysicsStep`, and `resetCallbacks`
 
-### Controller Plugins (Bring Your Own)
+### Controller Plugins
 
-The core library has no built-in control logic. Controllers are React components that call `useBeforePhysicsStep` to write `data.ctrl`. The library ships `<IkController>` as one example, but the intended pattern is to write your own.
+Controllers are React components that call `useBeforePhysicsStep` to write `data.ctrl`. The library ships `<IkController>` as one example; the same pattern works for any control logic.
 
 ```tsx
 // This is a complete controller:
