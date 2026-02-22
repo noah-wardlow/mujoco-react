@@ -1,34 +1,37 @@
 ---
 title: "IK Control"
-description: "Inverse kinematics via the IkController plugin"
+description: "Inverse kinematics via useIkController"
 icon: "robot"
 ---
 
-IK is provided by the `<IkController>` plugin — it is not part of the core `MujocoSimAPI`. Access IK methods via the `useIk()` hook from any component inside `<IkController>`.
+IK is provided by the `useIkController()` hook — it is not part of the core `MujocoSimAPI`. The hook returns an `IkContextValue` that you pass to `<IkGizmo>` or use directly.
 
 ## Setup
 
 ```tsx
-import { IkController, IkGizmo, useIk } from 'mujoco-react';
+import { useIkController, IkGizmo } from 'mujoco-react';
 
-<MujocoCanvas config={config}>
-  <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-    <IkGizmo />
-    <MyIkConsumer />
-  </IkController>
-</MujocoCanvas>
+function MyScene() {
+  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+
+  return (
+    <>
+      {ik && <IkGizmo controller={ik} />}
+      <MyIkConsumer ik={ik} />
+    </>
+  );
+}
 ```
 
-## useIk() Methods
+## IkContextValue Methods
 
 ### setIkEnabled(enabled)
 
 Enable or disable the IK solver.
 
 ```tsx
-const { setIkEnabled } = useIk();
-setIkEnabled(true);   // IK writes to ctrl each frame
-setIkEnabled(false);  // IK disabled — you control ctrl
+ik?.setIkEnabled(true);   // IK writes to ctrl each frame
+ik?.setIkEnabled(false);  // IK disabled — you control ctrl
 ```
 
 <Warning>
@@ -40,9 +43,8 @@ setIkEnabled(false);  // IK disabled — you control ctrl
 Animate the IK target (gizmo) to a new position.
 
 ```tsx
-const { moveTarget } = useIk();
-moveTarget(new THREE.Vector3(0.5, 0, 0.3));       // Instant
-moveTarget(new THREE.Vector3(0.5, 0, 0.3), 500);  // 500ms animation
+ik?.moveTarget(new THREE.Vector3(0.5, 0, 0.3));       // Instant
+ik?.moveTarget(new THREE.Vector3(0.5, 0, 0.3), 500);  // 500ms animation
 ```
 
 ### syncTargetToSite()
@@ -50,8 +52,7 @@ moveTarget(new THREE.Vector3(0.5, 0, 0.3), 500);  // 500ms animation
 Snap the IK gizmo to the current site position.
 
 ```tsx
-const { syncTargetToSite } = useIk();
-syncTargetToSite();
+ik?.syncTargetToSite();
 ```
 
 Useful after programmatic joint changes to re-align the gizmo with the actual end-effector.
@@ -61,12 +62,11 @@ Useful after programmatic joint changes to re-align the gizmo with the actual en
 Run IK solving manually (without the gizmo).
 
 ```tsx
-const { solveIK } = useIk();
 const targetPos = new THREE.Vector3(0.5, 0, 0.3);
 const targetQuat = new THREE.Quaternion();
 const currentJoints = Array.from(api.getQpos()).slice(0, 7);
 
-const solution = solveIK(targetPos, targetQuat, currentJoints);
+const solution = ik?.solveIK(targetPos, targetQuat, currentJoints);
 if (solution) {
   const qpos = api.getQpos();
   for (let i = 0; i < solution.length; i++) {
@@ -83,8 +83,7 @@ if (solution) {
 Get the current IK gizmo position and orientation.
 
 ```tsx
-const { getGizmoStats } = useIk();
-const stats = getGizmoStats();
+const stats = ik?.getGizmoStats();
 if (stats) {
   console.log('Gizmo position:', stats.pos);
   console.log('Gizmo rotation:', stats.rot);
@@ -93,22 +92,18 @@ if (stats) {
 
 **Returns:** `{ pos: THREE.Vector3, rot: THREE.Euler } | null`
 
-## Optional Access
+## Disabling IK
 
-For components that may or may not be inside an `<IkController>`, use `{ optional: true }`:
+Pass `null` to `useIkController()` to disable IK entirely. This is safe to call unconditionally (React hook rules):
 
 ```tsx
-const ikCtx = useIk({ optional: true });
-// Returns null if no IkController ancestor
-
-if (ikCtx?.ikEnabledRef.current) {
-  ikCtx.setIkEnabled(false);
-}
+const ik = useIkController(hasIk ? ikConfig : null);
+// ik is null when hasIk is false
 ```
 
 ## Custom IK Solver
 
-Pass `ikSolveFn` to `<IkController>` to replace the built-in solver:
+Pass `ikSolveFn` to the config to replace the built-in solver:
 
 ```tsx
 import type { IKSolveFn } from 'mujoco-react';
@@ -118,9 +113,7 @@ const myIK: IKSolveFn = (pos, quat, currentQ) => {
   return solution;
 };
 
-<IkController config={{ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK }}>
-  <IkGizmo />
-</IkController>
+const ik = useIkController({ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK });
 ```
 
 **When to use a custom solver:**

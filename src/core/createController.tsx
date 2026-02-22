@@ -1,8 +1,6 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
- *
- * createController — typed factory for BYOC (Bring Your Own Controller) plugins.
  */
 
 import { useMemo, useRef } from 'react';
@@ -88,4 +86,58 @@ export function createController<TConfig>(
   Controller.defaultConfig = options.defaultConfig ?? ({} as Partial<TConfig>);
 
   return Controller as ControllerComponent<TConfig>;
+}
+
+/**
+ * Factory that produces a typed controller hook.
+ *
+ * Same config stabilization and default merging as `createController`,
+ * but returns a hook instead of a component. Pass `null` to disable.
+ *
+ * @example
+ * ```tsx
+ * const useMyController = createControllerHook<MyConfig, MyValue>(
+ *   { name: 'useMyController', defaultConfig: { gain: 1.0 } },
+ *   function useMyControllerImpl(config) {
+ *     // config is MyConfig | null — hooks must be called unconditionally
+ *     useBeforePhysicsStep((_model, data) => {
+ *       if (!config) return;
+ *       data.ctrl[0] = config.gain * Math.sin(data.time);
+ *     });
+ *     if (!config) return null;
+ *     return { /* value *\/ };
+ *   },
+ * );
+ *
+ * // Usage:
+ * const value = useMyController({ gain: 2.0 });
+ * const disabled = useMyController(null); // returns null
+ * ```
+ */
+export function createControllerHook<TConfig, TValue>(
+  options: ControllerOptions<TConfig>,
+  useImpl: (config: TConfig | null) => TValue | null,
+): (config: TConfig | null) => TValue | null {
+  const useController = (config: TConfig | null): TValue | null => {
+    const configObj = config as Record<string, unknown> | null;
+    const stableRef = useRef(configObj);
+    if (configObj && stableRef.current) {
+      if (!shallowEqual(stableRef.current, configObj)) {
+        stableRef.current = configObj;
+      }
+    } else {
+      stableRef.current = configObj;
+    }
+
+    const mergedConfig = useMemo(
+      () => stableRef.current
+        ? ({ ...options.defaultConfig, ...stableRef.current } as TConfig)
+        : null,
+      [stableRef.current],
+    );
+
+    return useImpl(mergedConfig);
+  };
+
+  return useController;
 }

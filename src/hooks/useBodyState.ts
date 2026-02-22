@@ -7,7 +7,7 @@
 
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { useMujoco, useAfterPhysicsStep } from '../core/MujocoSimProvider';
+import { useMujocoContext, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import { findBodyByName } from '../core/SceneLoader';
 import type { BodyStateResult } from '../types';
 
@@ -16,7 +16,7 @@ import type { BodyStateResult } from '../types';
  * All values are ref-based — updated every physics frame without re-renders.
  */
 export function useBodyState(name: string): BodyStateResult {
-  const { mjModelRef, status } = useMujoco();
+  const { mjModelRef, status } = useMujocoContext();
   const bodyIdRef = useRef(-1);
   const position = useRef(new THREE.Vector3());
   const quaternion = useRef(new THREE.Quaternion());

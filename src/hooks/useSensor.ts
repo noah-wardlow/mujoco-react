@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useMemo } from 'react';
-import { useMujoco, useAfterPhysicsStep } from '../core/MujocoSimProvider';
+import { useMujocoContext, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
 import type { SensorInfo, SensorResult } from '../types';
 
@@ -15,7 +15,7 @@ import type { SensorInfo, SensorResult } from '../types';
  * updated every physics frame without causing React re-renders.
  */
 export function useSensor(name: string): SensorResult {
-  const { mjModelRef, mjDataRef, status } = useMujoco();
+  const { mjModelRef, mjDataRef, status } = useMujocoContext();
   const sensorIdRef = useRef(-1);
   const sensorAdrRef = useRef(0);
   const sensorDimRef = useRef(0);
@@ -55,7 +55,7 @@ export function useSensor(name: string): SensorResult {
  * Returns a stable array recomputed only when the model changes.
  */
 export function useSensors(): SensorInfo[] {
-  const { mjModelRef, status } = useMujoco();
+  const { mjModelRef, status } = useMujocoContext();
 
   return useMemo(() => {
     const model = mjModelRef.current;

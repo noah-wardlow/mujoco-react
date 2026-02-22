@@ -6,7 +6,7 @@ icon: "gamepad"
 
 A controller is a React component that calls `useBeforePhysicsStep` to write `data.ctrl` each frame and renders `null`.
 
-The built-in `<IkController>` follows this same pattern. You can use it, swap in your own IK solver, or write your own controller from scratch.
+The `useIkController()` hook follows this same pattern. You can use it, swap in your own IK solver, or write your own controller from scratch.
 
 ## Pattern: Simple Keyboard Bindings
 
@@ -28,11 +28,18 @@ export function FrankaController() {
 Drop it into your scene as a child of `<MujocoCanvas>`:
 
 ```tsx
+function FrankaScene() {
+  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  return (
+    <>
+      {ik && <IkGizmo controller={ik} />}
+      <FrankaController />
+    </>
+  );
+}
+
 <MujocoCanvas config={frankaConfig}>
-  <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-    <IkGizmo />
-  </IkController>
-  <FrankaController />
+  <FrankaScene />
 </MujocoCanvas>
 ```
 
@@ -132,12 +139,11 @@ Three options for IK:
 
 ### 1. Use the built-in solver
 
-The default `<IkController>` uses Damped Least-Squares:
+The default `useIkController()` uses Damped Least-Squares:
 
 ```tsx
-<IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-  <IkGizmo />
-</IkController>
+const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+return ik ? <IkGizmo controller={ik} /> : null;
 ```
 
 ### 2. Plug in your own solver
@@ -151,12 +157,11 @@ const myIK: IKSolveFn = (pos, quat, currentQ) => {
   return myAnalyticalSolver(pos, currentQ); // return joint angles or null
 };
 
-<IkController config={{ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK }}>
-  <IkGizmo />
-</IkController>
+const ik = useIkController({ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK });
+return ik ? <IkGizmo controller={ik} /> : null;
 ```
 
-### 3. Skip IkController entirely
+### 3. Skip useIkController entirely
 
 Solve IK yourself inside `useBeforePhysicsStep` with full access to the model and data:
 
@@ -222,7 +227,7 @@ The returned component accepts `config` (merged with defaults) and optional `chi
 
 ### Providing Context to Children
 
-Controllers can provide state to descendants via React context (this is how `IkController` works):
+Controllers can provide state to descendants via React context:
 
 ```tsx
 const MyContext = createContext<MyContextValue | null>(null);
@@ -251,34 +256,33 @@ function MyControllerImpl({ config, children }) {
 }
 ```
 
-The library's `IkController` is itself built with `createController`, demonstrating all these patterns: context provision, reset handling, `useBeforePhysicsStep` for solving, and `useFrame` for gizmo animation.
+The library's `useIkController()` hook demonstrates all these patterns: reset handling, `useBeforePhysicsStep` for solving, and `useFrame` for gizmo animation.
 
 ## Coexisting with IK Gizmo
 
 When a robot supports both gizmo drag and keyboard control, the controller needs to:
 
-1. **Detect when IK is active** via `useIk({ optional: true })`
+1. **Accept `ik` as a prop** (the `IkContextValue` from `useIkController()`)
 2. **Sync state on transition**: when the user switches from gizmo to keyboard, read `data.ctrl` to avoid a position jump
-3. **Disable IK** via `ikCtx.setIkEnabled(false)` when taking over
+3. **Disable IK** via `ik.setIkEnabled(false)` when taking over
 
 ```tsx
-import { useIk, useBeforePhysicsStep } from 'mujoco-react';
+import { useBeforePhysicsStep } from 'mujoco-react';
+import type { IkContextValue } from 'mujoco-react';
 
-function MyArmController() {
-  const ikCtx = useIk({ optional: true });
-
+function MyArmController({ ik }: { ik?: IkContextValue | null }) {
   useBeforePhysicsStep((_model, data) => {
     const anyKeyPressed = /* check keyboard state */;
 
-    if (anyKeyPressed && ikCtx?.ikEnabledRef.current) {
+    if (anyKeyPressed && ik?.ikEnabledRef.current) {
       // Sync from current gizmo position
       for (let i = 0; i < arm.indices.length; i++) {
         targetJoints[i] = data.ctrl[arm.indices[i]];
       }
-      ikCtx.setIkEnabled(false);
+      ik.setIkEnabled(false);
     }
 
-    if (!ikCtx?.ikEnabledRef.current) {
+    if (!ik?.ikEnabledRef.current) {
       // Keyboard is in control, solve IK and write ctrl
       for (let i = 0; i < arm.indices.length; i++) {
         data.ctrl[arm.indices[i]] = targetJoints[i];
@@ -288,7 +292,7 @@ function MyArmController() {
 }
 ```
 
-The `{ optional: true }` parameter means the hook returns `null` if no `<IkController>` exists in the tree, so the controller works with or without IK.
+Pass the `ik` value from `useIkController()` to the controller as a prop.
 
 The gizmo re-enables IK automatically when dragged.
 
@@ -297,17 +301,23 @@ The gizmo re-enables IK automatically when dragged.
 Controllers are React children. Swap them based on state:
 
 ```tsx
-<MujocoCanvas config={entry.config}>
-  {entry.hasIk && showGizmo && (
-    <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-      <IkGizmo scale={entry.gizmoScale} />
-    </IkController>
-  )}
-  <DragInteraction />
+function SceneChildren({ robotKey, ikConfig, showGizmo }) {
+  const ik = useIkController(ikConfig);
 
-  {robotKey === 'franka' && <FrankaController />}
-  {robotKey === 'so101' && <SO101Controller />}
-  {robotKey === 'xlerobot' && <XLeRobotController />}
+  return (
+    <>
+      {ik && showGizmo && <IkGizmo controller={ik} />}
+      <DragInteraction />
+
+      {robotKey === 'franka' && <FrankaController />}
+      {robotKey === 'so101' && <SO101Controller ik={ik} />}
+      {robotKey === 'xlerobot' && <XLeRobotController ik={ik} />}
+    </>
+  );
+}
+
+<MujocoCanvas config={entry.config}>
+  <SceneChildren robotKey={robotKey} ikConfig={ikConfig} showGizmo={showGizmo} />
 </MujocoCanvas>
 ```
 

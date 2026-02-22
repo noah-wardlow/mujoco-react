@@ -16,7 +16,7 @@ icon: "rocket"
     Controllers are React components that call `useBeforePhysicsStep`. Write your own or use the built-in ones.
   </Card>
   <Card title="Pluggable IK" icon="plug">
-    Swap in any IK solver via `ikSolveFn`, or skip `IkController` entirely and solve IK yourself in `useBeforePhysicsStep`.
+    Swap in any IK solver via `ikSolveFn`, or skip `useIkController` entirely and solve IK yourself in `useBeforePhysicsStep`.
   </Card>
   <Card title="Full MuJoCo" icon="atom">
     Contacts, sensors, tendons, flex bodies, raycasting, domain randomization. The full MuJoCo API via React hooks.
@@ -31,9 +31,21 @@ npm install mujoco-react mujoco-js @react-three/fiber @react-three/drei three
 
 ```tsx
 import {
-  MujocoProvider, MujocoCanvas, IkController, IkGizmo,
+  MujocoProvider, MujocoCanvas, useIkController, IkGizmo,
 } from 'mujoco-react';
 import { OrbitControls } from '@react-three/drei';
+
+function Scene() {
+  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  return (
+    <>
+      <OrbitControls makeDefault />
+      {ik && <IkGizmo controller={ik} />}
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[1, 2, 5]} castShadow />
+    </>
+  );
+}
 
 function App() {
   return (
@@ -48,12 +60,7 @@ function App() {
         shadows
         style={{ width: '100%', height: '100vh' }}
       >
-        <OrbitControls makeDefault />
-        <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-          <IkGizmo />
-        </IkController>
-        <ambientLight intensity={0.7} />
-        <directionalLight position={[1, 2, 5]} castShadow />
+        <Scene />
       </MujocoCanvas>
     </MujocoProvider>
   );
@@ -86,7 +93,7 @@ Add it as a child of `<MujocoCanvas>`:
 </MujocoCanvas>
 ```
 
-IK, teleoperation, RL policies, state machines all follow this pattern. The built-in `<IkController>` is itself built this way. You can also [plug in your own IK solver](/components/ik-controller#with-custom-solver) or skip it entirely.
+IK, teleoperation, RL policies, state machines all follow this pattern. The `useIkController()` hook follows this same pattern. You can also [plug in your own IK solver](/hooks/use-ik-controller#with-custom-solver) or skip it entirely.
 
 <Tip>
   See the [Building Controllers](/guides/building-controllers) guide for config-driven patterns, `createController` factory, IK gizmo coexistence, and multi-arm support.
@@ -107,9 +114,7 @@ mujoco-react follows the same pattern as [react-three-rapier](https://github.com
   <Tab title="MujocoCanvas">
     ```tsx
     <MujocoCanvas config={config} shadows camera={...}>
-      <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-        <IkGizmo />
-      </IkController>
+      <Scene />
       <OrbitControls />
     </MujocoCanvas>
     ```

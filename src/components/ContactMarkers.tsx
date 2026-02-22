@@ -12,7 +12,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useMujoco } from '../core/MujocoSimProvider';
+import { useMujocoContext } from '../core/MujocoSimProvider';
 import { getContact } from '../types';
 
 const _dummy = new THREE.Object3D();
@@ -35,7 +35,7 @@ export function ContactMarkers({
   visible = true,
   ...groupProps
 }: ContactMarkersProps & Omit<ThreeElements['group'], 'ref' | 'visible'> = {}) {
-  const { mjDataRef, status } = useMujoco();
+  const { mjDataRef, status } = useMujocoContext();
   const meshRef = useRef<THREE.InstancedMesh>(null);
 
   useFrame(() => {

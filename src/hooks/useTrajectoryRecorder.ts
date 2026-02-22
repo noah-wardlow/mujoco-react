@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useRef } from 'react';
-import { useMujoco, useAfterPhysicsStep } from '../core/MujocoSimProvider';
+import { useMujocoContext, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import type { TrajectoryFrame } from '../types';
 
 interface RecorderOptions {
@@ -17,7 +17,7 @@ interface RecorderOptions {
  * Record simulation trajectories for analysis, replay, or training data.
  */
 export function useTrajectoryRecorder(options: RecorderOptions = {}) {
-  const { mjModelRef } = useMujoco();
+  const { mjModelRef } = useMujocoContext();
   const recordingRef = useRef(false);
   const framesRef = useRef<TrajectoryFrame[]>([]);
   const fields = options.fields ?? ['qpos'];

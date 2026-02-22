@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type React from 'react';
+import type { ReactNode } from 'react';
 import type { CanvasProps } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -309,6 +311,18 @@ export interface IkConfig {
   maxIterations?: number;
 }
 
+export interface IkContextValue {
+  ikEnabledRef: React.RefObject<boolean>;
+  ikCalculatingRef: React.RefObject<boolean>;
+  ikTargetRef: React.RefObject<THREE.Group>;
+  siteIdRef: React.RefObject<number>;
+  setIkEnabled: (enabled: boolean) => void;
+  moveTarget: (pos: THREE.Vector3, duration?: number) => void;
+  syncTargetToSite: () => void;
+  solveIK: (pos: THREE.Vector3, quat: THREE.Quaternion, currentQ: number[]) => number[] | null;
+  getGizmoStats: () => { pos: THREE.Vector3; rot: THREE.Euler } | null;
+}
+
 export interface SceneMarker {
   id: number;
   position: THREE.Vector3;
@@ -482,6 +496,7 @@ export interface DebugProps {
 // ---- Component Props ----
 
 export interface IkGizmoProps {
+  controller: IkContextValue;
   siteName?: string;
   scale?: number;
   onDrag?: (position: THREE.Vector3, quaternion: THREE.Quaternion) => void;
@@ -515,6 +530,21 @@ export interface ContactListenerProps {
   body: string;
   onContactEnter?: (info: ContactInfo) => void;
   onContactExit?: (info: ContactInfo) => void;
+}
+
+export interface BodyProps {
+  name: string;
+  type: 'box' | 'sphere' | 'cylinder';
+  size: [number, number, number];
+  position?: [number, number, number];
+  rgba?: [number, number, number, number];
+  mass?: number;
+  freejoint?: boolean;
+  friction?: string;
+  solref?: string;
+  solimp?: string;
+  condim?: number;
+  children?: ReactNode;
 }
 
 // ---- Public API (spec: full surface) ----

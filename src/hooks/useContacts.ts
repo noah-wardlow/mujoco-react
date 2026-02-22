@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import { useMujoco, useAfterPhysicsStep } from '../core/MujocoSimProvider';
+import { useMujocoContext, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import { findBodyByName, getName } from '../core/SceneLoader';
 import { getContact } from '../types';
 import type { ContactInfo, MujocoModel } from '../types';
@@ -39,7 +39,7 @@ export function useContacts(
   bodyName?: string,
   callback?: (contacts: ContactInfo[]) => void,
 ): React.RefObject<ContactInfo[]> {
-  const { mjModelRef, status } = useMujoco();
+  const { mjModelRef, status } = useMujocoContext();
   const contactsRef = useRef<ContactInfo[]>([]);
   const bodyIdRef = useRef(-1);
   const bodyResolvedRef = useRef(false);

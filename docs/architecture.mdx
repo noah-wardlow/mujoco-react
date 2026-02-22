@@ -17,9 +17,9 @@ MujocoProvider                        MujocoProvider
   └─ MujocoCanvas                       └─ Canvas
        └─ MujocoSimProvider                  └─ MujocoPhysics
             ├─ (SceneRenderer — auto)             └─ MujocoSimProvider
-            ├─ IkController                            ├─ (SceneRenderer — auto)
-            │    └─ IkGizmo                            └─ YourComponents
-            └─ YourComponents
+            └─ YourComponents                          ├─ (SceneRenderer — auto)
+                 ├─ IkGizmo                            └─ YourComponents
+                 └─ Controllers
 ```
 
 ### MujocoProvider
@@ -55,7 +55,7 @@ You don't use this directly. `MujocoCanvas` and `MujocoPhysics` create it. It:
 
 ### Controller Plugins
 
-Controllers are React components that call `useBeforePhysicsStep` to write `data.ctrl`. The library ships `<IkController>` as one example; the same pattern works for any control logic.
+Controllers are React components that call `useBeforePhysicsStep` to write `data.ctrl`. The library ships `useIkController()` as one example; the same pattern works for any control logic.
 
 ```tsx
 // This is a complete controller:
@@ -89,7 +89,7 @@ The physics loop runs inside `useFrame` at **priority -1**, ensuring it executes
 │  Priority 0 (default)                               │
 │                                                      │
 │  - SceneRenderer (internal): sync body meshes       │
-│  - IkController: gizmo animation                    │
+│  - useIkController: gizmo animation                  │
 │  - ContactMarkers: update contact positions          │
 │  - Your useFrame callbacks                           │
 └─────────────────────────────────────────────────────┘
@@ -98,7 +98,7 @@ The physics loop runs inside `useFrame` at **priority -1**, ensuring it executes
         Render
 ```
 
-Note that IK solving happens inside `useBeforePhysicsStep` (registered by `IkController`), while gizmo animation runs at default priority via `useFrame`.
+Note that IK solving happens inside `useBeforePhysicsStep` (registered by `useIkController`), while gizmo animation runs at default priority via `useFrame`.
 
 ### Timing
 
@@ -141,24 +141,32 @@ useFrame(() => {
 Everything inside `<MujocoCanvas>` (or `<MujocoPhysics>`) is a standard R3F child. You mix library components with your own:
 
 ```tsx
+function Scene() {
+  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+
+  return (
+    <>
+      {/* Library: opt-in IK gizmo */}
+      {ik && <IkGizmo controller={ik} />}
+
+      {/* Library: debugging */}
+      <Debug showSites showJoints />
+      <ContactMarkers />
+
+      {/* Yours: scene decoration */}
+      <OrbitControls makeDefault />
+      <ambientLight intensity={0.7} />
+      <Grid args={[10, 10]} />
+
+      {/* Yours: game logic */}
+      <MyRobotController ik={ik} />
+      <RewardVisualizer />
+    </>
+  );
+}
+
 <MujocoCanvas config={config}>
-  {/* Library: opt-in controller plugin */}
-  <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-    <IkGizmo />
-  </IkController>
-
-  {/* Library: debugging */}
-  <Debug showSites showJoints />
-  <ContactMarkers />
-
-  {/* Yours: scene decoration */}
-  <OrbitControls makeDefault />
-  <ambientLight intensity={0.7} />
-  <Grid args={[10, 10]} />
-
-  {/* Yours: game logic */}
-  <MyRobotController />
-  <RewardVisualizer />
+  <Scene />
 </MujocoCanvas>
 ```
 
@@ -188,11 +196,11 @@ function App() {
 
 ```tsx
 function MyComponent() {
-  const { api } = useMujoco();
+  const sim = useMujoco();
 
   useEffect(() => {
-    api.setSpeed(2.0);
-  }, []);
+    if (sim.isReady) sim.api.setSpeed(2.0);
+  }, [sim]);
 
   return null;
 }

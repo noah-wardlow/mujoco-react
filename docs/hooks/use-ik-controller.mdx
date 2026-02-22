@@ -1,0 +1,167 @@
+---
+title: "useIkController"
+description: "Set up inverse kinematics for a MuJoCo site"
+icon: "robot"
+---
+
+Hook that sets up IK control for a MuJoCo site. Pass `null` to disable IK (safe to call unconditionally per React hook rules).
+
+## Usage
+
+```tsx
+import { useIkController, IkGizmo } from 'mujoco-react';
+
+function MyScene({ hasIk }: { hasIk: boolean }) {
+  const ik = useIkController(hasIk ? { siteName: 'tcp', numJoints: 7 } : null);
+
+  return ik ? <IkGizmo controller={ik} /> : null;
+}
+```
+
+### With Custom Solver
+
+```tsx
+import type { IKSolveFn } from 'mujoco-react';
+
+const myIK: IKSolveFn = (pos, quat, currentQ) => {
+  return myAnalyticalSolver(pos, currentQ);
+};
+
+const ik = useIkController({ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK });
+```
+
+## Config
+
+Pass an `IkConfig` object or `null`:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `siteName` | `string` | **required** | MuJoCo site to track |
+| `numJoints` | `number` | **required** | Number of joints for IK |
+| `ikSolveFn` | `IKSolveFn` | built-in DLS | Custom solver function |
+| `damping` | `number` | `0.01` | DLS damping |
+| `maxIterations` | `number` | `50` | Max solver iterations |
+
+## Return Value
+
+Returns `IkContextValue | null`. Returns `null` when config is `null`.
+
+```ts
+interface IkContextValue {
+  ikEnabledRef: React.RefObject<boolean>;
+  ikCalculatingRef: React.RefObject<boolean>;
+  ikTargetRef: React.RefObject<THREE.Group>;
+  siteIdRef: React.RefObject<number>;
+  setIkEnabled(enabled: boolean): void;
+  moveTarget(pos: THREE.Vector3, duration?: number): void;
+  syncTargetToSite(): void;
+  solveIK(pos: THREE.Vector3, quat: THREE.Quaternion, currentQ: number[]): number[] | null;
+  getGizmoStats(): { pos: THREE.Vector3; rot: THREE.Euler } | null;
+}
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `setIkEnabled(enabled)` | Enable/disable IK solving |
+| `moveTarget(pos, duration?)` | Move IK target with optional animation |
+| `syncTargetToSite()` | Snap IK target to current site position |
+| `solveIK(pos, quat, currentQ)` | Solve IK manually, returns joint angles or null |
+| `getGizmoStats()` | Get current gizmo position and rotation |
+
+### Refs
+
+| Ref | Description |
+|-----|-------------|
+| `ikEnabledRef` | Whether IK is currently enabled |
+| `ikCalculatingRef` | Whether IK is actively computing |
+| `ikTargetRef` | THREE.Group representing the IK target |
+| `siteIdRef` | Resolved MuJoCo site ID |
+
+## Example: Keyboard/Gizmo Coexistence
+
+A common pattern is disabling IK when keyboard control takes over. Pass the `ik` value to your controller:
+
+```tsx
+function MyScene() {
+  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+
+  return (
+    <>
+      {ik && <IkGizmo controller={ik} />}
+      <MyArmController ik={ik} />
+    </>
+  );
+}
+
+function MyArmController({ ik }: { ik: IkContextValue | null }) {
+  useBeforePhysicsStep((_model, data) => {
+    const anyKeyPressed = checkKeys();
+
+    if (anyKeyPressed && ik?.ikEnabledRef.current) {
+      syncFromCurrentCtrl(data);
+      ik.setIkEnabled(false);
+    }
+
+    if (!ik?.ikEnabledRef.current) {
+      writeKeyboardControl(data);
+    }
+  });
+
+  return null;
+}
+```
+
+The gizmo re-enables IK automatically when dragged.
+
+## Example: Waypoint Following
+
+```tsx
+function WaypointFollower({ waypoints }: { waypoints: THREE.Vector3[] }) {
+  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (!ik) return;
+    ik.setIkEnabled(true);
+    ik.moveTarget(waypoints[0]);
+  }, [ik]);
+
+  useAfterPhysicsStep(() => {
+    if (!ik) return;
+    const stats = ik.getGizmoStats();
+    if (!stats) return;
+    const dist = stats.pos.distanceTo(waypoints[index]);
+    if (dist < 0.01 && index < waypoints.length - 1) {
+      const next = index + 1;
+      setIndex(next);
+      ik.moveTarget(waypoints[next], 300);
+    }
+  });
+
+  return null;
+}
+```
+
+## Built-in Solver Details
+
+The default solver uses **Damped Least-Squares** (DLS) with finite-difference Jacobian:
+
+- **Position weight**: 1.0
+- **Rotation weight**: 0.3
+- **Tolerance**: 1e-3
+- **Method**: Finite-difference Jacobian + pseudoinverse
+
+The solver tracks the best solution across iterations and returns it even if tolerance isn't reached.
+
+## Reset Behavior
+
+When the simulation is reset (via `api.reset()`, `api.applyKeyframe()`, or `api.loadScene()`), useIkController automatically:
+- Syncs the gizmo to the current site position
+- Stops any in-progress gizmo animation
+- Disables IK solving
+
+<Warning>
+  When IK is enabled, it overwrites `data.ctrl` for the arm joints inside `useBeforePhysicsStep`. Disable IK when running your own control (policies, teleoperation, etc.).
+</Warning>

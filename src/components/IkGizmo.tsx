@@ -7,8 +7,7 @@ import { PivotControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { useMujoco } from '../core/MujocoSimProvider';
-import { useIk } from '../core/IkContext';
+import { useMujocoContext } from '../core/MujocoSimProvider';
 import { findSiteByName } from '../core/SceneLoader';
 import type { IkGizmoProps } from '../types';
 
@@ -21,18 +20,19 @@ const _scale = new THREE.Vector3(1, 1, 1);
 /**
  * IkGizmo — drei PivotControls that tracks a MuJoCo site.
  *
- * Must be rendered inside an `<IkController>`.
+ * Requires a `controller` from `useIkController()`.
  *
  * Props:
- * - `siteName` — MuJoCo site to track. Defaults to the IkController's configured site.
+ * - `controller` — IkContextValue from `useIkController()`.
+ * - `siteName` — MuJoCo site to track. Defaults to the controller's configured site.
  * - `scale` — Gizmo handle scale. Default: 0.18.
  * - `onDrag` — Custom drag callback `(pos, quat) => void`.
  *   When omitted, dragging enables IK and writes to the IK target.
  *   When provided, the consumer handles what happens during drag.
  */
-export function IkGizmo({ siteName, scale = 0.18, onDrag }: IkGizmoProps) {
-  const { mjModelRef, mjDataRef, status } = useMujoco();
-  const { ikTargetRef, siteIdRef, ikEnabledRef, setIkEnabled } = useIk();
+export function IkGizmo({ controller, siteName, scale = 0.18, onDrag }: IkGizmoProps) {
+  const { mjModelRef, mjDataRef, status } = useMujocoContext();
+  const { ikTargetRef, siteIdRef, ikEnabledRef, setIkEnabled } = controller;
 
   const wrapperRef = useRef<THREE.Group>(null);
   const pivotRef = useRef<THREE.Group>(null);
@@ -53,9 +53,6 @@ export function IkGizmo({ siteName, scale = 0.18, onDrag }: IkGizmoProps) {
   // Every frame: sync the visual wrapper to the tracked site (when not dragging)
   useFrame(() => {
     const data = mjDataRef.current;
-    // Read IkController's siteIdRef directly in useFrame — avoids useEffect timing
-    // issues (React runs child effects before parent effects, so reading siteIdRef
-    // in a useEffect would see -1 before IkController resolves it).
     const sid = siteName ? localSiteIdRef.current : siteIdRef.current;
     if (!data || sid < 0 || !wrapperRef.current) return;
 
@@ -67,7 +64,6 @@ export function IkGizmo({ siteName, scale = 0.18, onDrag }: IkGizmoProps) {
 
       // Position wrapper at the site
       wrapperRef.current.position.set(p[i3], p[i3 + 1], p[i3 + 2]);
-      // MuJoCo site_xmat is row-major 3x3; THREE.Matrix4.set() is row-major
       _mat4.set(
         m[i9],     m[i9 + 1], m[i9 + 2], 0,
         m[i9 + 3], m[i9 + 4], m[i9 + 5], 0,

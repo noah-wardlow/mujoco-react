@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from 'react';
-import { useMujoco } from '../core/MujocoSimProvider';
+import { useMujocoContext } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
 import type { ActuatorInfo } from '../types';
 
@@ -13,7 +13,7 @@ import type { ActuatorInfo } from '../types';
  * Computed once when the model loads. Consumer reads/writes data.ctrl[id] directly.
  */
 export function useActuators(): ActuatorInfo[] {
-  const { mjModelRef, status } = useMujoco();
+  const { mjModelRef, status } = useMujocoContext();
 
   return useMemo(() => {
     if (status !== 'ready') return [];

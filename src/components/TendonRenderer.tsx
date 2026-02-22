@@ -15,7 +15,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useMujoco } from '../core/MujocoSimProvider';
+import { useMujocoContext } from '../core/MujocoSimProvider';
 
 const DEFAULT_TENDON_COLOR = new THREE.Color(0.3, 0.3, 0.8);
 const DEFAULT_TENDON_WIDTH = 0.002;
@@ -24,7 +24,7 @@ const DEFAULT_TENDON_WIDTH = 0.002;
 const _tmpVec = new THREE.Vector3();
 
 export function TendonRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
-  const { mjModelRef, mjDataRef, status } = useMujoco();
+  const { mjModelRef, mjDataRef, status } = useMujocoContext();
   const groupRef = useRef<THREE.Group>(null);
   const meshesRef = useRef<THREE.Mesh[]>([]);
   const curvesRef = useRef<THREE.CatmullRomCurve3[]>([]);

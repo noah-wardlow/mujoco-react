@@ -10,14 +10,14 @@ import * as THREE from 'three';
 import { GeomBuilder } from '../rendering/GeomBuilder';
 import { MujocoModel } from '../types';
 import { getName } from '../core/SceneLoader';
-import { useMujoco } from '../core/MujocoSimProvider';
+import { useMujocoContext } from '../core/MujocoSimProvider';
 
 /**
  * SceneRenderer — creates and syncs MuJoCo body meshes every frame.
  * Accepts standard R3F group props (position, rotation, scale, visible, etc.).
  */
 export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
-  const { mjModelRef, mjDataRef, mujocoRef, onSelectionRef, status } = useMujoco();
+  const { mjModelRef, mjDataRef, mujocoRef, onSelectionRef, hiddenBodiesRef, status } = useMujocoContext();
   const groupRef = useRef<THREE.Group>(null);
   const bodyRefs = useRef<(THREE.Group | null)[]>([]);
   const prevModelRef = useRef<MujocoModel | null>(null);
@@ -48,11 +48,14 @@ export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
     for (let i = 0; i < model.nbody; i++) {
       const bodyGroup = new THREE.Group();
       bodyGroup.userData.bodyID = i;
+      const bodyName = getName(model, model.name_bodyadr[i]);
 
-      for (let g = 0; g < model.ngeom; g++) {
-        if (model.geom_bodyid[g] === i) {
-          const mesh = geomBuilder.create(model, g);
-          if (mesh) bodyGroup.add(mesh);
+      if (!hiddenBodiesRef.current.has(bodyName)) {
+        for (let g = 0; g < model.ngeom; g++) {
+          if (model.geom_bodyid[g] === i) {
+            const mesh = geomBuilder.create(model, g);
+            if (mesh) bodyGroup.add(mesh);
+          }
         }
       }
 

@@ -26,12 +26,11 @@ export {
 export { createController } from './core/createController';
 export type { ControllerOptions, ControllerComponent } from './core/createController';
 
-// IK controller plugin
-export { IkController } from './components/IkController';
-export { useIk } from './core/IkContext';
-export type { IkContextValue } from './core/IkContext';
+// IK controller hook
+export { useIkController } from './hooks/useIkController';
 
 // Components
+export { Body } from './components/Body';
 export { IkGizmo } from './components/IkGizmo';
 export { ContactMarkers } from './components/ContactMarkers';
 export { DragInteraction } from './components/DragInteraction';
@@ -74,6 +73,7 @@ export type {
   PhysicsConfig,
   // IK
   IkConfig,
+  IkContextValue,
   IKSolveFn,
   // Callbacks
   PhysicsStepCallback,
@@ -101,6 +101,7 @@ export type {
   // Policy
   PolicyConfig,
   // Component props
+  BodyProps,
   IkGizmoProps,
   DragInteractionProps,
   DebugProps,

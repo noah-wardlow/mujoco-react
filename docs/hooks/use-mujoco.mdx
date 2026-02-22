@@ -1,10 +1,12 @@
 ---
 title: "useMujoco"
-description: "Access the simulation API and internal state"
+description: "Access the simulation API and status"
 icon: "plug"
 ---
 
 The primary hook for accessing the MuJoCo simulation API from any component inside `<MujocoCanvas>`.
+
+Narrow on `isReady`, `isPending`, or `isError` to get type-safe access to the API and refs.
 
 ## Usage
 
@@ -12,39 +14,52 @@ The primary hook for accessing the MuJoCo simulation API from any component insi
 import { useMujoco } from 'mujoco-react';
 
 function MyComponent() {
-  const { api, status } = useMujoco();
+  const sim = useMujoco();
 
-  if (!api) return null;
+  if (sim.isPending) return <span>Loading...</span>;
+  if (sim.isError) return <span>Error: {sim.error}</span>;
 
+  // sim.api is fully typed here
   return (
-    <button onClick={() => api.reset()}>Reset</button>
+    <button onClick={() => sim.api.reset()}>Reset</button>
   );
 }
 ```
 
 ## Return Value
 
-```tsx
-interface MujocoSimContext {
+`useMujoco()` returns a `UseMujocoResult` with three variants:
+
+### Loading
+
+```ts
+{ status: 'loading'; isPending: true; isReady: false; isError: false; error: null; api: null }
+```
+
+### Error
+
+```ts
+{ status: 'error'; isPending: false; isReady: false; isError: true; error: string; api: null }
+```
+
+### Ready
+
+```ts
+{
+  status: 'ready';
+  isPending: false;
+  isReady: true;
+  isError: false;
+  error: null;
   api: MujocoSimAPI;
-  mjModelRef: React.RefObject<MujocoModel | null>;
-  mjDataRef: React.RefObject<MujocoData | null>;
-  mujocoRef: React.RefObject<MujocoModule>;
-  status: 'pending' | 'error';
+  mjModelRef: RefObject<MujocoModel | null>;
+  mjDataRef: RefObject<MujocoData | null>;
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `api` | `MujocoSimAPI` | Full simulation API (see [API Reference](/api/simulation-control)) |
-| `mjModelRef` | `RefObject` | Direct access to the MuJoCo model (advanced) |
-| `mjDataRef` | `RefObject` | Direct access to the MuJoCo data (advanced) |
-| `mujocoRef` | `RefObject` | Direct access to the WASM module (advanced) |
-| `status` | `string` | Current loading state |
-
 ## The API Object
 
-The `api` object provides methods grouped into categories:
+The `api` object (available when `isReady` is `true`) provides methods grouped into categories:
 
 - **[Simulation Control](/api/simulation-control)** — `reset()`, `setPaused()`, `setSpeed()`, `step()`, `getTime()`
 - **[State Management](/api/state-management)** — `saveState()`, `restoreState()`, `setQpos()`, `applyKeyframe()`
@@ -54,7 +69,7 @@ The `api` object provides methods grouped into categories:
 - **[Spatial Queries](/api/spatial-queries)** — `raycast()`, `project2DTo3D()`, `getCanvasSnapshot()`
 - **[Scene Management](/api/scene-management)** — `loadScene()`
 
-IK control is provided by the opt-in `<IkController>` plugin — see [useIk](/hooks/use-ik) and [IK Control](/api/ik-control).
+IK control is provided by the `useIkController()` hook — see [useIkController](/hooks/use-ik-controller) and [IK Control](/api/ik-control).
 
 Camera animation is provided by the standalone `useCameraAnimation()` hook — see [useCameraAnimation](/hooks/use-camera-animation).
 
@@ -64,11 +79,12 @@ For advanced use cases, access the raw MuJoCo model and data objects:
 
 ```tsx
 function AdvancedComponent() {
-  const { mjModelRef, mjDataRef } = useMujoco();
+  const sim = useMujoco();
 
   useFrame(() => {
-    const model = mjModelRef.current;
-    const data = mjDataRef.current;
+    if (!sim.isReady) return;
+    const model = sim.mjModelRef.current;
+    const data = sim.mjDataRef.current;
     if (!model || !data) return;
 
     // Read raw WASM arrays
@@ -86,6 +102,6 @@ function AdvancedComponent() {
 
 ## Notes
 
-- Must be called from a component inside `<MujocoCanvas>`
-- The `api` object is stable (same reference across renders)
-- Check that `api` is truthy before calling methods
+- Must be called from a component inside `<MujocoCanvas>` or `<MujocoPhysics>`
+- The `api` object is stable (same reference across renders when status doesn't change)
+- Use `isReady` / `isPending` / `isError` for type-safe narrowing instead of comparing `status` strings

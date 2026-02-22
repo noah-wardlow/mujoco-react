@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useMujoco } from '../core/MujocoSimProvider';
+import { useMujocoContext } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
 import { getContact } from '../types';
 import type { DebugProps } from '../types';
@@ -43,7 +43,7 @@ export function Debug({
   showTendons = false,
   ...groupProps
 }: DebugProps & Omit<ThreeElements['group'], 'ref'>) {
-  const { mjModelRef, mjDataRef, status } = useMujoco();
+  const { mjModelRef, mjDataRef, status } = useMujocoContext();
   const { scene } = useThree();
   const groupRef = useRef<THREE.Group>(null);
 

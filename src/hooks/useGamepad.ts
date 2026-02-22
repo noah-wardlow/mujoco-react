@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useMujoco, useBeforePhysicsStep } from '../core/MujocoSimProvider';
+import { useMujocoContext, useBeforePhysicsStep } from '../core/MujocoSimProvider';
 import { findActuatorByName } from '../core/SceneLoader';
 
 interface GamepadConfig {
@@ -29,7 +29,7 @@ interface GamepadConfig {
  * Buttons map their 0..1 pressed value to the actuator.
  */
 export function useGamepad(config: GamepadConfig) {
-  const { mjModelRef, status } = useMujoco();
+  const { mjModelRef, status } = useMujocoContext();
   const configRef = useRef(config);
   configRef.current = config;
 

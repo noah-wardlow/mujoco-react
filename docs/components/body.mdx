@@ -1,0 +1,87 @@
+---
+title: '<Body />'
+description: 'Declaratively add physics bodies to the MuJoCo simulation'
+---
+
+The `<Body>` component lets you add physical bodies (boxes, spheres, cylinders) to the simulation as JSX. Bodies are injected into the MJCF XML before model compilation, so they participate fully in physics — collisions, gravity, grasping, etc.
+
+## Usage
+
+```tsx
+import { Body } from 'mujoco-react';
+
+// Physics body with default visuals
+<Body name="cube" type="box" size={[0.05, 0.05, 0.05]}
+      position={[0.5, 0, 0.05]} rgba={[1, 0, 0, 1]}
+      mass={0.1} freejoint />
+
+// Physics body with custom Three.js visuals
+<Body name="ball" type="sphere" size={[0.03, 0, 0]}
+      position={[0, 0.3, 0.1]} mass={0.5} freejoint>
+  <mesh>
+    <sphereGeometry args={[0.03]} />
+    <meshPhysicalMaterial color="gold" metalness={0.8} />
+  </mesh>
+</Body>
+
+// Graspable object with contact tuning
+<Body name="block" type="box" size={[0.02, 0.02, 0.02]}
+      position={[0.4, 0, 0.02]} mass={0.05} freejoint
+      friction="1.5 0.3 0.1" condim={4} />
+```
+
+## How it works
+
+`<Body>` registers its definition in a provider-level registry. Bodies present at initial mount are included in the first `loadScene()` call with zero extra reloads. Bodies added or removed after the initial load trigger a debounced scene reload.
+
+When `children` are provided, the SceneRenderer skips default geom visuals for that body, and the `<Body>` component syncs a `<group>` wrapper to the body's physics pose each frame instead.
+
+## Props
+
+<ParamField body="name" type="string" required>
+  Unique body name. Used as the MuJoCo body name in the XML.
+</ParamField>
+
+<ParamField body="type" type="'box' | 'sphere' | 'cylinder'" required>
+  Geom type for the body.
+</ParamField>
+
+<ParamField body="size" type="[number, number, number]" required>
+  Geom size. Interpretation depends on type — see [MuJoCo geom size docs](https://mujoco.readthedocs.io/en/stable/XMLreference.html#body-geom).
+</ParamField>
+
+<ParamField body="position" type="[number, number, number]" default="[0, 0, 0]">
+  Initial world position of the body.
+</ParamField>
+
+<ParamField body="rgba" type="[number, number, number, number]" default="[0.5, 0.5, 0.5, 1]">
+  Color and alpha for the default geom visual. Ignored when children are provided.
+</ParamField>
+
+<ParamField body="mass" type="number">
+  Body mass in kg.
+</ParamField>
+
+<ParamField body="freejoint" type="boolean">
+  Whether to add a freejoint so the body can move freely.
+</ParamField>
+
+<ParamField body="friction" type="string">
+  MuJoCo friction parameters, e.g. `"1.5 0.3 0.1"`.
+</ParamField>
+
+<ParamField body="solref" type="string">
+  MuJoCo solver reference parameters.
+</ParamField>
+
+<ParamField body="solimp" type="string">
+  MuJoCo solver impedance parameters.
+</ParamField>
+
+<ParamField body="condim" type="number">
+  Contact dimensionality. Use `4` or `6` for grasping.
+</ParamField>
+
+<ParamField body="children" type="React.ReactNode">
+  Optional custom Three.js visuals. When provided, default geom rendering is skipped and the children are synced to the body's physics pose.
+</ParamField>

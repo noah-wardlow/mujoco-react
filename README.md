@@ -4,9 +4,11 @@
 
 # mujoco-react
 
+> **Beta** — This library is under active development. The API may change between minor versions until 1.0.
+
 Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper around [mujoco-js](https://www.npmjs.com/package/mujoco-js). Load any MuJoCo model, step physics, render bodies, and write controllers as React components.
 
-**[Demo](https://mujoco-react-example.pages.dev)** | **[Docs](https://dadd.mintlify.app)** | **[Example Source](https://github.com/noah-wardlow/mujoco-react-example)**
+**[Demo](https://mujoco-react-example.pages.dev)** | **[Docs](https://dadd.mintlify.app)** | **[Example Source](https://github.com/noah-wardlow/mujoco-react-example)** | **[llms.txt](https://dadd.mintlify.app/llms.txt)**
 
 ## Install
 
@@ -20,7 +22,7 @@ npm install mujoco-react three @react-three/fiber @react-three/drei
 import {
   MujocoProvider,
   MujocoCanvas,
-  IkController,
+  useIkController,
   IkGizmo,
 } from 'mujoco-react';
 import type { SceneConfig } from 'mujoco-react';
@@ -32,6 +34,18 @@ const config: SceneConfig = {
   homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
 };
 
+function Scene() {
+  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  return (
+    <>
+      <OrbitControls enableDamping makeDefault />
+      {ik && <IkGizmo controller={ik} />}
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[1, 2, 5]} intensity={1.2} castShadow />
+    </>
+  );
+}
+
 function App() {
   return (
     <MujocoProvider>
@@ -41,12 +55,7 @@ function App() {
         shadows
         style={{ width: '100%', height: '100vh' }}
       >
-        <OrbitControls enableDamping makeDefault />
-        <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-          <IkGizmo />
-        </IkController>
-        <ambientLight intensity={0.7} />
-        <directionalLight position={[1, 2, 5]} intensity={1.2} castShadow />
+        <Scene />
       </MujocoCanvas>
     </MujocoProvider>
   );
@@ -60,14 +69,18 @@ Inside `<MujocoCanvas>` or `<MujocoPhysics>`, `useMujoco()` gives you the simula
 ```tsx
 import { useMujoco } from 'mujoco-react';
 
-function StatusOverlay() {
-  const { status, api, mjModelRef, mjDataRef } = useMujoco();
+function MyComponent() {
+  const { api, status } = useMujoco();
+  const sim = useMujoco();
 
-  if (status !== 'ready') return <span>Loading...</span>;
+  if (!api) return null;
+  if (sim.isPending) return <span>Loading...</span>;
+  if (sim.isError) return <span>Error: {sim.error}</span>;
 
+  // sim.api is fully typed here
   return (
-    <button onClick={() => api?.reset()}>
-      Reset ({mjModelRef.current?.nq} joints)
+    <button onClick={() => sim.api.reset()}>
+      Reset ({sim.mjModelRef.current?.nq} joints)
     </button>
   );
 }
@@ -122,17 +135,17 @@ export const MyController = createController<{ gain: number }>(
 ```
 <MujocoProvider>                           <MujocoProvider>
   <MujocoCanvas config={...}>               <Canvas shadows gl={...}>
-    <IkController config={..}>                <MujocoPhysics config={...}>
-      <IkGizmo />                               <MyController />
-    </IkController>                           </MujocoPhysics>
-    <MyController />                          <EffectComposer>...</EffectComposer>
-  </MujocoCanvas>                           </Canvas>
-</MujocoProvider>                         </MujocoProvider>
+    <Scene />                                  <MujocoPhysics config={...}>
+    <MyController />                             <MyController />
+  </MujocoCanvas>                              </MujocoPhysics>
+</MujocoProvider>                              <EffectComposer>...</EffectComposer>
+                                             </Canvas>
+                                           </MujocoProvider>
 ```
 
 ### Custom IK Solvers
 
-The built-in `<IkController>` uses Damped Least-Squares. Pass `ikSolveFn` to swap in your own solver (analytical, learned, etc.):
+The built-in `useIkController()` uses Damped Least-Squares. Pass `ikSolveFn` to swap in your own solver (analytical, learned, etc.):
 
 ```tsx
 import type { IKSolveFn } from 'mujoco-react';
@@ -141,19 +154,16 @@ const myIK: IKSolveFn = (pos, quat, currentQ) => {
   return myAnalyticalSolver(pos, currentQ); // return joint angles or null
 };
 
-<IkController config={{ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK }}>
-  <IkGizmo />
-</IkController>
+const ik = useIkController({ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK });
 ```
 
-### `<IkController>`
+### `useIkController(config | null)`
 
-The library includes one controller for interactive end-effector control:
+Hook for interactive end-effector control. Pass `null` to disable IK (safe to call unconditionally):
 
 ```tsx
-<IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-  <IkGizmo />
-</IkController>
+const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+return ik ? <IkGizmo controller={ik} /> : null;
 ```
 
 | Config | Type | Default | Description |
@@ -164,17 +174,9 @@ The library includes one controller for interactive end-effector control:
 | `damping` | `number` | `0.01` | DLS damping |
 | `maxIterations` | `number` | `50` | Max solver iterations |
 
-Access IK state from inside `<IkController>` with `useIk()`:
+Returns `IkContextValue | null` with methods like `setIkEnabled`, `moveTarget`, `syncTargetToSite`, `solveIK`, and `getGizmoStats`.
 
-```tsx
-const { setIkEnabled, moveTarget, solveIK } = useIk();
-```
-
-Pass `{ optional: true }` for components that may or may not be inside an `<IkController>`:
-
-```tsx
-const ikCtx = useIk({ optional: true });
-```
+Pass the returned value to `<IkGizmo controller={ik} />` or to your own controller as a prop.
 
 ## Loading Models
 
@@ -289,13 +291,46 @@ Physics provider for use inside your own R3F `<Canvas>`. Same physics props as `
 | `paused` | `boolean` | Declarative pause |
 | `speed` | `number` | Simulation speed multiplier |
 
-### `<IkGizmo />`
+### `<Body />`
 
-drei PivotControls gizmo that tracks a MuJoCo site and drives IK on drag. Must be inside `<IkController>`.
+Declaratively add physics bodies to the simulation as JSX. Bodies are injected into the MJCF XML before model compilation.
+
+```tsx
+<Body name="cube" type="box" size={[0.05, 0.05, 0.05]}
+      position={[0.5, 0, 0.05]} rgba={[1, 0, 0, 1]}
+      mass={0.1} freejoint />
+
+// With custom Three.js visuals
+<Body name="ball" type="sphere" size={[0.03, 0, 0]}
+      position={[0, 0.3, 0.1]} mass={0.5} freejoint>
+  <mesh>
+    <sphereGeometry args={[0.03]} />
+    <meshPhysicalMaterial color="gold" metalness={0.8} />
+  </mesh>
+</Body>
+```
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `siteName` | `string?` | IkController's site | MuJoCo site to track |
+| `name` | `string` | **required** | Unique body name |
+| `type` | `'box' \| 'sphere' \| 'cylinder'` | **required** | Geom type |
+| `size` | `[number, number, number]` | **required** | Geom size |
+| `position` | `[number, number, number]` | `[0,0,0]` | Initial position |
+| `rgba` | `[number, number, number, number]` | `[0.5,0.5,0.5,1]` | Color (ignored with children) |
+| `mass` | `number?` | -- | Body mass in kg |
+| `freejoint` | `boolean?` | -- | Add freejoint for free movement |
+| `friction` | `string?` | -- | MuJoCo friction params |
+| `condim` | `number?` | -- | Contact dimensionality (4-6 for grasping) |
+| `children` | `ReactNode?` | -- | Custom Three.js visuals |
+
+### `<IkGizmo />`
+
+drei PivotControls gizmo that tracks a MuJoCo site and drives IK on drag. Requires a `controller` from `useIkController()`.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `controller` | `IkContextValue` | **required** | Controller from `useIkController()` |
+| `siteName` | `string?` | controller's site | MuJoCo site to track |
 | `scale` | `number?` | `0.18` | Gizmo handle scale |
 | `onDrag` | `(pos, quat) => void` | -- | Custom drag handler (disables auto-IK) |
 
@@ -373,10 +408,13 @@ Plays back recorded qpos trajectories with scrubbing.
 
 ### `useMujoco()`
 
-Access the simulation API and internal refs (must be inside `<MujocoCanvas>` or `<MujocoPhysics>`):
+Access the simulation API (must be inside `<MujocoCanvas>` or `<MujocoPhysics>`). Narrow on `isReady`, `isPending`, or `isError`:
 
 ```tsx
-const { api, status, mjModelRef, mjDataRef } = useMujoco();
+const sim = useMujoco();
+if (sim.isReady) {
+  sim.api.reset(); // fully typed
+}
 ```
 
 ### `useMujocoWasm()`
@@ -410,9 +448,9 @@ useBeforePhysicsStep((model, data) => {
 
 Run logic **after** `mj_step` each frame. Read results, compute rewards, log telemetry.
 
-### `useIk()` / `useIk({ optional: true })`
+### `useIkController(config | null)`
 
-Access IK controller state. `useIk()` throws if not inside `<IkController>`. Pass `{ optional: true }` to get `null` instead.
+Set up IK control for a MuJoCo site. Pass `null` to disable. Returns `IkContextValue | null`.
 
 ### `useCameraAnimation()`
 
@@ -579,7 +617,7 @@ useSceneLights(1.5);
 
 ## MujocoSimAPI
 
-The full API object available via `ref` or `useMujoco().api`:
+The full API object available via `ref` or `useMujoco()` (when `isReady`):
 
 ### Simulation Control
 
@@ -682,7 +720,7 @@ See [Click-to-Select](https://dadd.mintlify.app/guides/click-to-select) for the 
 | Priority | Owner | Purpose |
 |----------|-------|---------|
 | -1 | MujocoSimProvider | beforeStep, mj_step, afterStep |
-| 0 (default) | SceneRenderer (internal), IkController, your code | Body mesh sync, IK, rendering |
+| 0 (default) | SceneRenderer (internal), useIkController, your code | Body mesh sync, IK, rendering |
 
 ## Roadmap
 

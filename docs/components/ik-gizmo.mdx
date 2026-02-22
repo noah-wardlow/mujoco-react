@@ -4,30 +4,33 @@ description: "Interactive IK target with PivotControls"
 icon: "arrows-up-down-left-right"
 ---
 
-A draggable 3D gizmo (powered by drei's PivotControls) that drives inverse kinematics. Drag the gizmo to move the robot's end-effector. Must be a descendant of `<IkController>`.
+A draggable 3D gizmo (powered by drei's PivotControls) that drives inverse kinematics. Drag the gizmo to move the robot's end-effector. Requires a `controller` from `useIkController()`.
 
 ## Usage
 
 ```tsx
-<IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-  <IkGizmo />
-</IkController>
+import { useIkController, IkGizmo } from 'mujoco-react';
+
+function MyScene() {
+  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+
+  return ik ? <IkGizmo controller={ik} /> : null;
+}
 ```
 
 ### Custom Site
 
-Override the site tracked by this gizmo (defaults to the IkController's `siteName`):
+Override the site tracked by this gizmo (defaults to the controller's `siteName`):
 
 ```tsx
-<IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-  <IkGizmo siteName="left_hand" scale={0.25} />
-</IkController>
+<IkGizmo controller={ik} siteName="left_hand" scale={0.25} />
 ```
 
 ### Custom Drag Handler
 
 ```tsx
 <IkGizmo
+  controller={ik}
   onDrag={(pos, quat) => {
     // Consumer handles the response — IK is NOT auto-enabled
     console.log('Target:', pos, quat);
@@ -37,8 +40,12 @@ Override the site tracked by this gizmo (defaults to the IkController's `siteNam
 
 ## Props
 
-<ParamField body="siteName" type="string" default="IkController's siteName">
-  MuJoCo site to track and solve IK towards. Defaults to the parent `IkController`'s configured site.
+<ParamField body="controller" type="IkContextValue" required>
+  The IK controller value returned by `useIkController()`.
+</ParamField>
+
+<ParamField body="siteName" type="string" default="controller's siteName">
+  MuJoCo site to track. Defaults to the `useIkController` config's site.
 </ParamField>
 
 <ParamField body="scale" type="number" default="0.18">
@@ -56,7 +63,7 @@ Override the site tracked by this gizmo (defaults to the IkController's `siteNam
 - It "follows" the end-effector as the robot moves
 
 **When dragging (no `onDrag` prop):**
-- IK is automatically enabled via `useIk().setIkEnabled(true)`
+- IK is automatically enabled via `controller.setIkEnabled(true)`
 - The gizmo's position/orientation is written to the IK target
 - The IK solver runs each frame to compute joint angles
 - OrbitControls are disabled during drag
@@ -68,23 +75,23 @@ Override the site tracked by this gizmo (defaults to the IkController's `siteNam
 
 ## Programmatic Control
 
-Use the `useIk()` hook from any component inside `<IkController>`:
+Use the controller value from `useIkController()`:
 
 ```tsx
-const { setIkEnabled, moveTarget, syncTargetToSite } = useIk();
+const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
 
 // Animate the gizmo to a position over 500ms
-moveTarget(new THREE.Vector3(0.5, 0, 0.3), 500);
+ik?.moveTarget(new THREE.Vector3(0.5, 0, 0.3), 500);
 
 // Snap the gizmo to current site position
-syncTargetToSite();
+ik?.syncTargetToSite();
 
 // Enable/disable IK solving
-setIkEnabled(true);
+ik?.setIkEnabled(true);
 ```
 
 ## Notes
 
-- Must be a descendant of `<IkController>` — will throw if used outside
-- The IK solver respects `numJoints` from the IkController config
-- Disable IK with `useIk().setIkEnabled(false)` when using custom control (e.g., `useBeforePhysicsStep`)
+- Requires a `controller` prop from `useIkController()`
+- The IK solver respects `numJoints` from the controller config
+- Disable IK with `controller.setIkEnabled(false)` when using custom control (e.g., `useBeforePhysicsStep`)

@@ -27,6 +27,7 @@ import {
   PhysicsStepCallback,
   RayHit,
   SceneConfig,
+  SceneObject,
   SensorInfo,
   SiteInfo,
   StateSnapshot,
@@ -91,20 +92,68 @@ export interface MujocoSimContextValue {
   beforeStepCallbacks: React.RefObject<Set<PhysicsStepCallback>>;
   afterStepCallbacks: React.RefObject<Set<PhysicsStepCallback>>;
   resetCallbacks: React.RefObject<Set<() => void>>;
+  errorRef: React.RefObject<string | null>;
+  bodyRegistryRef: React.RefObject<Map<string, { definition: SceneObject; hasCustomChildren: boolean }>>;
+  hiddenBodiesRef: React.RefObject<Set<string>>;
+  requestBodyReload: () => void;
   status: 'loading' | 'ready' | 'error';
 }
 
 const MujocoSimContext = createContext<MujocoSimContextValue | null>(null);
 
-export function useMujoco(): MujocoSimContextValue {
+export type UseMujocoResult =
+  | { status: 'loading'; isPending: true; isReady: false; isError: false; error: null; api: null; mjModelRef: null; mjDataRef: null }
+  | { status: 'error'; isPending: false; isReady: false; isError: true; error: string; api: null; mjModelRef: null; mjDataRef: null }
+  | { status: 'ready'; isPending: false; isReady: true; isError: false; error: null;
+      api: MujocoSimAPI; mjModelRef: React.RefObject<MujocoModel | null>; mjDataRef: React.RefObject<MujocoData | null> };
+
+export function useMujocoContext(): MujocoSimContextValue {
   const ctx = useContext(MujocoSimContext);
   if (!ctx)
     throw new Error('useMujoco must be used inside <MujocoSimProvider>');
   return ctx;
 }
 
+export function useMujoco(): UseMujocoResult {
+  const ctx = useMujocoContext();
+  if (ctx.status === 'ready') {
+    return {
+      status: 'ready',
+      isPending: false,
+      isReady: true,
+      isError: false,
+      error: null,
+      api: ctx.api,
+      mjModelRef: ctx.mjModelRef,
+      mjDataRef: ctx.mjDataRef,
+    };
+  }
+  if (ctx.status === 'error') {
+    return {
+      status: 'error',
+      isPending: false,
+      isReady: false,
+      isError: true,
+      error: ctx.errorRef.current ?? 'Unknown error',
+      api: null,
+      mjModelRef: null,
+      mjDataRef: null,
+    };
+  }
+  return {
+    status: 'loading',
+    isPending: true,
+    isReady: false,
+    isError: false,
+    error: null,
+    api: null,
+    mjModelRef: null,
+    mjDataRef: null,
+  };
+}
+
 export function useBeforePhysicsStep(callback: PhysicsStepCallback) {
-  const { beforeStepCallbacks } = useMujoco();
+  const { beforeStepCallbacks } = useMujocoContext();
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
 
@@ -116,7 +165,7 @@ export function useBeforePhysicsStep(callback: PhysicsStepCallback) {
 }
 
 export function useAfterPhysicsStep(callback: PhysicsStepCallback) {
-  const { afterStepCallbacks } = useMujoco();
+  const { afterStepCallbacks } = useMujocoContext();
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
 
@@ -181,6 +230,10 @@ export function MujocoSimProvider({
   const beforeStepCallbacks = useRef(new Set<PhysicsStepCallback>());
   const afterStepCallbacks = useRef(new Set<PhysicsStepCallback>());
   const resetCallbacks = useRef(new Set<() => void>());
+  const errorRef = useRef<string | null>(null);
+  const bodyRegistryRef = useRef(new Map<string, { definition: SceneObject; hasCustomChildren: boolean }>());
+  const hiddenBodiesRef = useRef(new Set<string>());
+  const bodyReloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   configRef.current = config;
 
@@ -207,13 +260,26 @@ export function MujocoSimProvider({
     model.opt.timestep = timestep;
   }, [timestep]);
 
+  // --- Build merged config (base + body registry) ---
+  function buildMergedConfig(baseConfig: SceneConfig): SceneConfig {
+    if (bodyRegistryRef.current.size === 0) return baseConfig;
+    const registeredNames = new Set(bodyRegistryRef.current.keys());
+    const baseObjects = (baseConfig.sceneObjects ?? []).filter(o => !registeredNames.has(o.name));
+    const registeredBodies = Array.from(bodyRegistryRef.current.values()).map(e => e.definition);
+    hiddenBodiesRef.current.clear();
+    for (const [name, entry] of bodyRegistryRef.current) {
+      if (entry.hasCustomChildren) hiddenBodiesRef.current.add(name);
+    }
+    return { ...baseConfig, sceneObjects: [...baseObjects, ...registeredBodies] };
+  }
+
   // --- Load scene on mount ---
   useEffect(() => {
     let disposed = false;
 
     (async () => {
       try {
-        const result = await loadScene(mujoco, config);
+        const result = await loadScene(mujoco, buildMergedConfig(config));
         if (disposed) {
           result.mjModel.delete();
           result.mjData.delete();
@@ -236,8 +302,10 @@ export function MujocoSimProvider({
         setStatus('ready');
       } catch (e: unknown) {
         if (!disposed) {
+          const err = e instanceof Error ? e : new Error(String(e));
+          errorRef.current = err.message;
           setStatus('error');
-          onError?.(e instanceof Error ? e : new Error(String(e)));
+          onError?.(err);
         }
       }
     })();
@@ -755,10 +823,19 @@ export function MujocoSimProvider({
       setStatus('ready');
     } catch (e) {
       if (gen !== loadGenRef.current) return;
+      errorRef.current = e instanceof Error ? e.message : String(e);
       setStatus('error');
       throw e;
     }
   }, [mujoco]);
+
+  const requestBodyReload = useCallback(() => {
+    if (bodyReloadTimerRef.current) clearTimeout(bodyReloadTimerRef.current);
+    bodyReloadTimerRef.current = setTimeout(() => {
+      bodyReloadTimerRef.current = null;
+      loadSceneApi(buildMergedConfig(configRef.current));
+    }, 0);
+  }, [loadSceneApi]);
 
   const getCanvasSnapshot = useCallback(
     (width?: number, height?: number, mimeType = 'image/jpeg'): string => {
@@ -916,9 +993,13 @@ export function MujocoSimProvider({
       beforeStepCallbacks,
       afterStepCallbacks,
       resetCallbacks,
+      errorRef,
+      bodyRegistryRef,
+      hiddenBodiesRef,
+      requestBodyReload,
       status,
     }),
-    [api, status]
+    [api, status, requestBodyReload]
   );
 
   return (
