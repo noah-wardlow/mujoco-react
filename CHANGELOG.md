@@ -1,3 +1,10 @@
+# [8.1.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.0.0...v8.1.0) (2026-02-22)
+
+
+### Features
+
+* upgrade trajectory player with state machine, speed control, and physics mode ([9706d49](https://github.com/noah-wardlow/mujoco-react/commit/9706d49f3bfb506b6c7c820995544a0d897314cc))
+
 # [8.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v7.0.1...v8.0.0) (2026-02-22)
 
 
