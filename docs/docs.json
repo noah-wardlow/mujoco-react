@@ -12,34 +12,36 @@
     "isHidden": false
   },
   "navigation": {
-    "groups": [
-      {
-        "group": "Getting Started",
-        "pages": [
-          "overview",
-          "introduction",
-          "installation",
-          "guides/building-controllers",
-          "architecture",
-          "loading-models"
-        ]
-      },
-      {
-        "group": "Guides",
-        "pages": [
-          "guides/building-controllers",
-          "guides/graspable-objects",
-          "guides/click-to-select"
-        ]
-      },
-      {
-        "group": "More",
-        "pages": [
-          "roadmap"
-        ]
-      }
-    ],
     "tabs": [
+      {
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "overview",
+              "introduction",
+              "installation",
+              "guides/building-controllers",
+              "architecture",
+              "loading-models"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/graspable-objects",
+              "guides/click-to-select"
+            ]
+          },
+          {
+            "group": "More",
+            "pages": [
+              "roadmap"
+            ]
+          }
+        ]
+      },
       {
         "tab": "Components",
         "pages": [
