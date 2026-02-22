@@ -1,3 +1,10 @@
+## [7.0.1](https://github.com/noah-wardlow/mujoco-react/compare/v7.0.0...v7.0.1) (2026-02-22)
+
+
+### Bug Fixes
+
+* remove duplicate useMujoco() call in README example ([8bb7fe5](https://github.com/noah-wardlow/mujoco-react/commit/8bb7fe59c50de4eabe37e2ed67ece2a6a2024efd))
+
 # [7.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v6.0.1...v7.0.0) (2026-02-22)
 
 
