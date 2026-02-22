@@ -291,12 +291,6 @@ export interface SceneConfig {
   homeJoints?: number[];
   xmlPatches?: XmlPatch[];
   onReset?: (model: MujocoModel, data: MujocoData) => void;
-  /** @deprecated Use IkController config.siteName instead. */
-  tcpSiteName?: string;
-  /** @deprecated Use your own gripper control logic instead. */
-  gripperActuatorName?: string;
-  /** @deprecated Use IkController config.numJoints instead. */
-  numArmJoints?: number;
 }
 
 // ---- IK Controller Config ----
@@ -328,7 +322,6 @@ export interface PhysicsConfig {
   substeps?: number;
   paused?: boolean;
   speed?: number;
-  interpolate?: boolean;
 }
 
 // ---- IK ----
@@ -620,9 +613,6 @@ export type MujocoCanvasProps = Omit<CanvasProps, 'onError'> & {
   substeps?: number;
   paused?: boolean;
   speed?: number;
-  interpolate?: boolean;
-  gravityCompensation?: boolean;
-  mjcfLights?: boolean;
 };
 
 // ---- Hook Return Types ----

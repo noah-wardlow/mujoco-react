@@ -1,16 +1,17 @@
 ---
-title: "MujocoCanvas"
-description: "R3F Canvas wrapper with physics simulation"
-icon: "display"
+title: "MujocoPhysics"
+description: "Physics provider for use inside your own R3F Canvas"
+icon: "atom"
 ---
 
-A thin wrapper around React Three Fiber's `<Canvas>` that sets up the physics simulation. Accepts all standard R3F Canvas props plus MuJoCo-specific configuration.
+Physics context provider designed for use inside your own React Three Fiber `<Canvas>`. Same physics configuration as [`<MujocoCanvas>`](/components/mujoco-canvas), but without the Canvas wrapper — giving you full control over gl settings, post-processing, and R3F context composition.
 
 ## Usage
 
 ```tsx
 import { useRef } from 'react';
-import { MujocoProvider, MujocoCanvas, SceneRenderer } from 'mujoco-react';
+import { Canvas } from '@react-three/fiber';
+import { MujocoProvider, MujocoPhysics, SceneRenderer } from 'mujoco-react';
 import type { MujocoSimAPI } from 'mujoco-react';
 import { OrbitControls } from '@react-three/drei';
 
@@ -19,30 +20,42 @@ function App() {
 
   return (
     <MujocoProvider>
-      <MujocoCanvas
-        ref={apiRef}
-        config={{
-          robotId: 'franka_emika_panda',
-          sceneFile: 'scene.xml',
-        }}
-        camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
+      <Canvas
         shadows
-        paused={false}
-        speed={1.0}
+        camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
+        gl={{ antialias: true }}
         style={{ width: '100%', height: '100vh' }}
       >
+        <MujocoPhysics
+          ref={apiRef}
+          config={{
+            robotId: 'franka_emika_panda',
+            sceneFile: 'scene.xml',
+          }}
+          paused={false}
+          speed={1.0}
+        >
+          <SceneRenderer />
+          <ambientLight intensity={0.7} />
+        </MujocoPhysics>
         <OrbitControls makeDefault />
-        <SceneRenderer />
-        <ambientLight intensity={0.7} />
-      </MujocoCanvas>
+      </Canvas>
     </MujocoProvider>
   );
 }
 ```
 
-## Props
+## When to Use
 
-### MuJoCo Props
+Use `<MujocoPhysics>` instead of `<MujocoCanvas>` when you need:
+
+- Custom gl settings (`antialias`, `toneMapping`, `outputColorSpace`)
+- Post-processing pipelines (`EffectComposer`, bloom, SSAO)
+- Multiple physics contexts in one Canvas
+- Full control over the R3F `<Canvas>` props
+- Components outside the physics context but inside the Canvas (e.g., background effects)
+
+## Props
 
 <ParamField body="config" type="SceneConfig" required>
   Scene configuration — robot ID, model file, joints, etc. See [Loading Models](/loading-models).
@@ -64,8 +77,6 @@ function App() {
   Fired when a body is double-clicked in `SceneRenderer`.
 </ParamField>
 
-### Physics Props
-
 <ParamField body="paused" type="boolean" default="false">
   Pause/resume the simulation declaratively.
 </ParamField>
@@ -86,37 +97,23 @@ function App() {
   Number of physics substeps per frame for improved stability.
 </ParamField>
 
-### R3F Canvas Props
-
-All standard `@react-three/fiber` Canvas props are passed through:
-
-```tsx
-<MujocoCanvas
-  camera={{ position: [2, 2, 2], fov: 45, up: [0, 0, 1] }}
-  shadows
-  dpr={[1, 2]}
-  gl={{ antialias: true }}
-  style={{ width: '100%', height: '100vh' }}
-  className="my-canvas"
->
-```
-
 ## Ref
 
-`MujocoCanvas` forwards its ref as a `MujocoSimAPI` handle — the same object passed to `onReady`:
+`MujocoPhysics` forwards its ref as a `MujocoSimAPI` handle — the same object passed to `onReady`:
 
 ```tsx
 const apiRef = useRef<MujocoSimAPI>(null);
 
-<MujocoCanvas ref={apiRef} config={config}>
+<MujocoPhysics ref={apiRef} config={config}>
   {/* ... */}
-</MujocoCanvas>
+</MujocoPhysics>
 
 // Later: apiRef.current?.reset()
 ```
 
 ## Notes
 
-- Must be a child of `<MujocoProvider>`
+- Must be a child of `<MujocoProvider>` and inside an R3F `<Canvas>`
 - Children can use all mujoco-react hooks (`useMujocoSim`, `useBeforePhysicsStep`, etc.)
-- The `config` prop is read on mount and when `api.loadScene()` is called — changing it after mount has no effect
+- Components placed outside `<MujocoPhysics>` but inside `<Canvas>` won't have access to physics hooks
+- Renders nothing while WASM is loading or if loading fails (call `onError` to handle failures)

@@ -55,68 +55,104 @@ function App() {
 
 ## Architecture
 
+Two ways to set up your scene:
+
+### `<MujocoCanvas>` — Quick Start
+
+Wraps R3F `<Canvas>` for you. Fastest path to a working scene:
+
 ```
 <MujocoProvider>              <- WASM module lifecycle
-  <MujocoCanvas config={...}> <- Thin R3F Canvas wrapper + physics context
-    <OrbitControls />          <- You add your own controls
+  <MujocoCanvas config={...}> <- R3F Canvas + physics context
     <SceneRenderer />          <- Syncs MuJoCo bodies to Three.js meshes
     <IkController config={..}> <- Opt-in controller plugin
-      <IkGizmo />              <- PivotControls-based IK handle
+      <IkGizmo />
     </IkController>
     <YourController />         <- Bring your own controller
     <YourLights />             <- You compose your own scene
-    <YourGrid />
   </MujocoCanvas>
+</MujocoProvider>
+```
+
+### `<MujocoPhysics>` — Bring Your Own Canvas
+
+Use inside your own `<Canvas>` for full control over gl settings, post-processing, and R3F context composition:
+
+```
+<MujocoProvider>
+  <Canvas shadows camera={...} gl={...}>   <- Your Canvas, your settings
+    <MujocoPhysics config={config}>         <- Physics context only
+      <SceneRenderer />
+      <YourController />
+    </MujocoPhysics>
+    <OrbitControls />
+    <EffectComposer>...</EffectComposer>    <- Post-processing, etc.
+  </Canvas>
 </MujocoProvider>
 ```
 
 The library provides **only MuJoCo engine concerns**: WASM lifecycle, physics stepping, and body rendering. Controllers (IK, teleoperation, RL policies) are composable plugins you opt into — or bring your own.
 
-## Controller Plugins
+## Bring Your Own Controller
 
-Controllers are opt-in plugins that compose library hooks. The library ships `IkController` built with the `createController` factory, but the real power is building your own.
-
-### `<IkController>`
-
-The built-in IK controller. Wraps children with IK context — `<IkGizmo>` must be a descendant.
+**Controllers are just React components.** Write a function that calls `useBeforePhysicsStep` to drive `data.ctrl` each frame, return `null`, and drop it into your scene tree. No base class, no registration — just hooks.
 
 ```tsx
-<IkController config={{ siteName: 'tcp', numJoints: 7 }}>
+import { useBeforePhysicsStep } from 'mujoco-react';
+
+function MyController() {
+  useBeforePhysicsStep((_model, data) => {
+    data.ctrl[0] = Math.sin(data.time);        // sine wave on actuator 0
+    data.ctrl[1] = data.sensordata[0] * -0.5;  // feedback from a sensor
+  });
+  return null;
+}
+
+// Drop it in:
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <MyController />
+</MujocoCanvas>
+```
+
+This is the primary way to use the library. IK, teleoperation, RL policies, state machines — they're all just components that read input and write to `data.ctrl`.
+
+### Bring Your Own IK
+
+The built-in `<IkController>` uses a generic Damped Least-Squares solver, but you can plug in **any** IK solver — analytical, learned, or from another library:
+
+```tsx
+import type { IKSolveFn } from 'mujoco-react';
+
+const myIK: IKSolveFn = (pos, quat, currentQ) => {
+  return myAnalyticalSolver(pos, currentQ); // return joint angles or null
+};
+
+<IkController config={{ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK }}>
   <IkGizmo />
 </IkController>
 ```
 
-| Config | Type | Default | Description |
-|--------|------|---------|-------------|
-| `siteName` | `string` | **required** | MuJoCo site to track |
-| `numJoints` | `number` | **required** | Number of joints for IK |
-| `ikSolveFn` | `IKSolveFn` | built-in DLS | Custom solver function |
-| `damping` | `number` | `0.01` | DLS damping |
-| `maxIterations` | `number` | `50` | Max solver iterations |
-
-### `useIk()`
-
-Access IK state from inside `<IkController>`:
+Or skip `<IkController>` entirely and solve IK yourself inside `useBeforePhysicsStep`:
 
 ```tsx
-const { setIkEnabled, moveTarget, solveIK } = useIk();
-```
-
-Pass `{ optional: true }` for components that may or may not be inside an `<IkController>`:
-
-```tsx
-const ikCtx = useIk({ optional: true });
-if (ikCtx?.ikEnabledRef.current) {
-  ikCtx.setIkEnabled(false);
+function MyIKController() {
+  useBeforePhysicsStep((model, data) => {
+    const joints = myCustomIKSolve(model, data);
+    if (joints) {
+      for (let i = 0; i < joints.length; i++) data.ctrl[i] = joints[i];
+    }
+  });
+  return null;
 }
 ```
 
-### `createController<TConfig>(options, Impl)`
+### `createController<TConfig>()` Factory
 
-Build your own controller plugin with the typed factory:
+For reusable controller plugins with typed config and default merging:
 
 ```tsx
-import { createController, useBeforePhysicsStep, useMujocoSim } from 'mujoco-react';
+import { createController, useBeforePhysicsStep } from 'mujoco-react';
 
 interface MyConfig {
   gain: number;
@@ -136,6 +172,36 @@ export const MyController = createController<MyConfig>(
 );
 
 // Usage: <MyController config={{ gain: 2.0, targetJoint: 'shoulder' }} />
+```
+
+### Built-in `<IkController>`
+
+The library ships one controller out of the box — an IK gizmo you can drop in for interactive end-effector control:
+
+```tsx
+<IkController config={{ siteName: 'tcp', numJoints: 7 }}>
+  <IkGizmo />
+</IkController>
+```
+
+| Config | Type | Default | Description |
+|--------|------|---------|-------------|
+| `siteName` | `string` | **required** | MuJoCo site to track |
+| `numJoints` | `number` | **required** | Number of joints for IK |
+| `ikSolveFn` | `IKSolveFn` | built-in DLS | Custom solver function |
+| `damping` | `number` | `0.01` | DLS damping |
+| `maxIterations` | `number` | `50` | Max solver iterations |
+
+Access IK state from inside `<IkController>` with `useIk()`:
+
+```tsx
+const { setIkEnabled, moveTarget, solveIK } = useIk();
+```
+
+Pass `{ optional: true }` for components that may or may not be inside an `<IkController>`:
+
+```tsx
+const ikCtx = useIk({ optional: true });
 ```
 
 ## Loading Models
@@ -233,13 +299,39 @@ Thin wrapper around R3F `<Canvas>`. Accepts all R3F Canvas props plus:
 | `substeps` | `number` | mj_step calls per frame |
 | `paused` | `boolean` | Declarative pause |
 | `speed` | `number` | Simulation speed multiplier |
-| `interpolate` | `boolean` | Interpolate body transforms between physics frames |
-| `gravityCompensation` | `boolean` | Auto-apply gravity compensation |
-| `mjcfLights` | `boolean` | Auto-create lights from MJCF model |
+
+### `<MujocoPhysics>`
+
+Physics provider for use inside your own R3F `<Canvas>`. Same physics props as `<MujocoCanvas>` without the Canvas wrapper. Accepts a `ref` for the `MujocoSimAPI`.
+
+```tsx
+<MujocoProvider>
+  <Canvas shadows camera={{ position: [2, 2, 2] }}>
+    <MujocoPhysics ref={apiRef} config={config} paused={paused}>
+      <SceneRenderer />
+      <MyController />
+    </MujocoPhysics>
+    <OrbitControls />
+  </Canvas>
+</MujocoProvider>
+```
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `config` | `SceneConfig` | **Required.** Scene/robot configuration |
+| `onReady` | `(api: MujocoSimAPI) => void` | Fires when model is loaded |
+| `onError` | `(error: Error) => void` | Fires on scene load failure |
+| `onStep` | `(time: number) => void` | Called each physics step |
+| `onSelection` | `(bodyId: number, name: string) => void` | Called on double-click |
+| `gravity` | `[number, number, number]` | Override model gravity |
+| `timestep` | `number` | Override model.opt.timestep |
+| `substeps` | `number` | mj_step calls per frame |
+| `paused` | `boolean` | Declarative pause |
+| `speed` | `number` | Simulation speed multiplier |
 
 ### `<SceneRenderer />`
 
-Syncs MuJoCo bodies to Three.js meshes every frame. Must be inside `<MujocoCanvas>`.
+Syncs MuJoCo bodies to Three.js meshes every frame. Must be inside `<MujocoCanvas>` or `<MujocoPhysics>`.
 
 ### `<IkGizmo />`
 
@@ -254,6 +346,16 @@ drei PivotControls gizmo that tracks a MuJoCo site and drives IK on drag. Must b
 ### `<DragInteraction />`
 
 Click-drag to apply spring forces to bodies. Raycasts to find bodies, applies `F = (mouseWorld - grabWorld) * body_mass * stiffness` via `mj_applyFT`.
+
+### R3F Group Props
+
+All visual components (`SceneRenderer`, `DragInteraction`, `ContactMarkers`, `Debug`, `TendonRenderer`, `FlexRenderer`) accept standard R3F group props — `position`, `rotation`, `scale`, `visible`, etc.
+
+```tsx
+<SceneRenderer position={[0, 0, 1]} />
+<ContactMarkers visible={showContacts} />
+<Debug showJoints scale={0.5} />
+```
 
 ### `<ContactMarkers />`
 
@@ -577,34 +679,7 @@ The full API object available via `ref` or `useMujocoSim().api`:
 
 ### Building Controllers
 
-Controllers are thin components that compose library hooks. The simplest is a `useKeyboardTeleop` call:
-
-```tsx
-function FrankaController() {
-  useKeyboardTeleop({
-    bindings: { v: { actuator: 'gripper', toggle: [0, 255] } },
-  });
-  return null;
-}
-```
-
-For custom control (IK solvers, velocity control), use `useBeforePhysicsStep`:
-
-```tsx
-function MyController() {
-  const keys = useRef<Record<string, boolean>>({});
-  // ... keyboard listeners ...
-
-  useBeforePhysicsStep((_model, data) => {
-    if (keys.current['KeyW']) data.ctrl[0] += 0.01;
-  });
-  return null;
-}
-```
-
-For reusable controller plugins, use `createController<TConfig>()` to build typed components with config merging and metadata.
-
-See [Building Controllers](https://mujoco-react.mintlify.app/guides/building-controllers) for config-driven patterns, IK gizmo coexistence, and multi-arm support.
+See [Building Controllers](https://mujoco-react.mintlify.app/guides/building-controllers) for full patterns including config-driven controllers, IK gizmo coexistence, multi-arm support, and the `createController` factory.
 
 ### Graspable Objects
 
@@ -658,7 +733,7 @@ Features planned but not yet implemented:
 | **URDF loading** | P2 | Load URDF models via MuJoCo's built-in URDF compiler |
 | **XML mutation / recompile** | P1 | `addBody()`, `removeBody()`, `recompile()` for runtime XML editing |
 | **Observation builder utilities** | P2 | Helpers for projected gravity, joint positions/velocities for RL |
-| **Physics interpolation** | P1 | Smooth rendering between physics ticks for 120Hz+ displays |
+| **Physics interpolation** | P1 | Smooth rendering between physics ticks for very high refresh displays |
 | **Instanced geom rendering** | P2 | `<InstancedGeomRenderer />` for particle/granular sims |
 | **Web Worker physics** | P2 | Run `mj_step` off main thread via SharedArrayBuffer |
 

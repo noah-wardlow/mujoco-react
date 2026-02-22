@@ -1,10 +1,12 @@
 ---
 title: "Building Controllers"
-description: "Compose library hooks into robot-specific controllers"
+description: "Write your own controller, bring your own IK — compose library hooks into robot-specific logic"
 icon: "gamepad"
 ---
 
-Controllers are thin React components that compose library hooks to drive a specific robot. They render `null` — all they do is read input and write to `data.ctrl` each frame.
+**Controllers are just React components.** There's no base class to extend, no interface to implement, and no registration step. A controller is any component that calls `useBeforePhysicsStep` to write to `data.ctrl` each frame. It renders `null` — all it does is read input and drive actuators.
+
+The built-in `<IkController>` is itself built this way. You can use it, swap in your own IK solver, or skip it entirely and write your own controller from scratch.
 
 ## Pattern: Simple Keyboard Bindings
 
@@ -124,6 +126,57 @@ export function SO101Controller() {
   return null;
 }
 ```
+
+## Bring Your Own IK
+
+You have three options for IK:
+
+### 1. Use the built-in solver
+
+The default `<IkController>` uses Damped Least-Squares — works for any robot, no tuning needed:
+
+```tsx
+<IkController config={{ siteName: 'tcp', numJoints: 7 }}>
+  <IkGizmo />
+</IkController>
+```
+
+### 2. Plug in your own solver
+
+Pass `ikSolveFn` to replace the built-in solver while keeping the gizmo, reset handling, and context:
+
+```tsx
+import type { IKSolveFn } from 'mujoco-react';
+
+const myIK: IKSolveFn = (pos, quat, currentQ) => {
+  return myAnalyticalSolver(pos, currentQ); // return joint angles or null
+};
+
+<IkController config={{ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK }}>
+  <IkGizmo />
+</IkController>
+```
+
+### 3. Skip IkController entirely
+
+Solve IK yourself inside `useBeforePhysicsStep` with full access to the model and data:
+
+```tsx
+function MyIKController({ targetRef }) {
+  useBeforePhysicsStep((model, data) => {
+    const target = targetRef.current;
+    if (!target) return;
+
+    const joints = myCustomIKSolve(model, data, target);
+    if (joints) {
+      for (let i = 0; i < joints.length; i++) data.ctrl[i] = joints[i];
+    }
+  });
+  return null;
+}
+```
+
+This gives you complete control — use any solver library, any input source, any number of end-effectors.
 
 ## Pattern: Reusable Plugins with `createController`
 

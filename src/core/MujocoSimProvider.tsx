@@ -140,7 +140,6 @@ interface MujocoSimProviderProps {
   substeps?: number;
   paused?: boolean;
   speed?: number;
-  interpolate?: boolean;
   children: React.ReactNode;
 }
 
@@ -157,7 +156,6 @@ export function MujocoSimProvider({
   substeps,
   paused,
   speed,
-  interpolate,
   children,
 }: MujocoSimProviderProps) {
   const { gl, camera } = useThree();
@@ -171,14 +169,8 @@ export function MujocoSimProvider({
   const pausedRef = useRef(paused ?? false);
   const speedRef = useRef(speed ?? 1);
   const substepsRef = useRef(substeps ?? 1);
-  const interpolateRef = useRef(interpolate ?? false);
   const stepsToRunRef = useRef(0);
   const loadGenRef = useRef(0);
-
-  // Interpolation state
-  const prevXposRef = useRef<Float64Array | null>(null);
-  const prevXquatRef = useRef<Float64Array | null>(null);
-  const interpAlphaRef = useRef(0);
 
   const onSelectionRef = useRef(onSelection);
   onSelectionRef.current = onSelection;
@@ -195,7 +187,6 @@ export function MujocoSimProvider({
   useEffect(() => { pausedRef.current = paused ?? false; }, [paused]);
   useEffect(() => { speedRef.current = speed ?? 1; }, [speed]);
   useEffect(() => { substepsRef.current = substeps ?? 1; }, [substeps]);
-  useEffect(() => { interpolateRef.current = interpolate ?? false; }, [interpolate]);
 
   // Sync gravity prop
   useEffect(() => {
@@ -277,7 +268,7 @@ export function MujocoSimProvider({
   }, [status]);
 
   // --- Physics step (priority -1) ---
-  useFrame(() => {
+  useFrame((_state, delta) => {
     const model = mjModelRef.current;
     const data = mjDataRef.current;
     if (!model || !data) return;
@@ -305,7 +296,8 @@ export function MujocoSimProvider({
       stepsToRunRef.current = 0;
     } else {
       const startSimTime = data.time;
-      const frameTime = (1.0 / 60.0) * speedRef.current;
+      const clampedDelta = Math.min(delta, 1 / 15); // cap to avoid spiral of death
+      const frameTime = clampedDelta * speedRef.current;
       while (data.time - startSimTime < frameTime) {
         for (let s = 0; s < numSubsteps; s++) {
           mujoco.mj_step(model, data);

@@ -7,6 +7,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMujocoSim } from '../core/MujocoSimProvider';
 
@@ -14,7 +15,7 @@ import { useMujocoSim } from '../core/MujocoSimProvider';
  * Renders MuJoCo flex (deformable) bodies as dynamic meshes.
  * Vertices are updated every frame from flexvert_xpos.
  */
-export function FlexRenderer() {
+export function FlexRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
   const { mjModelRef, mjDataRef, status } = useMujocoSim();
   const groupRef = useRef<THREE.Group>(null);
   const meshesRef = useRef<THREE.Mesh[]>([]);
@@ -98,5 +99,5 @@ export function FlexRenderer() {
   });
 
   if (status !== 'ready') return null;
-  return <group ref={groupRef} />;
+  return <group {...props} ref={groupRef} />;
 }

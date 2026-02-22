@@ -6,16 +6,27 @@ icon: "sitemap"
 
 ## Provider Hierarchy
 
-mujoco-react uses a layered provider pattern:
+mujoco-react uses a layered provider pattern. Two setup options:
 
 ```
-MujocoProvider          <- WASM module lifecycle
-  └─ MujocoCanvas       <- R3F Canvas + scene config
-       └─ MujocoSimProvider  <- Physics loop + API (internal)
-            ├─ SceneRenderer  <- Body mesh sync
-            ├─ IkController   <- Opt-in IK plugin
-            │    └─ IkGizmo   <- IK gizmo handle
-            └─ YourComponents <- Your controllers, lights, etc.
+Option A: MujocoCanvas (quick start)
+
+MujocoProvider            <- WASM module lifecycle
+  └─ MujocoCanvas         <- R3F Canvas + scene config
+       └─ MujocoSimProvider    <- Physics loop + API
+            ├─ SceneRenderer   <- Body mesh sync
+            ├─ IkController    <- Opt-in IK plugin
+            │    └─ IkGizmo
+            └─ YourComponents
+
+Option B: MujocoPhysics (bring your own Canvas)
+
+MujocoProvider            <- WASM module lifecycle
+  └─ Canvas               <- Your R3F Canvas, your gl settings
+       └─ MujocoPhysics   <- Physics context (no Canvas wrapper)
+            └─ MujocoSimProvider    <- Physics loop + API
+                 ├─ SceneRenderer
+                 └─ YourComponents
 ```
 
 ### MujocoProvider
@@ -26,17 +37,45 @@ The outermost wrapper. Loads the `mujoco-js` WASM module and provides it to all 
 
 A thin wrapper around R3F's `<Canvas>`. It accepts a `SceneConfig` and all standard Canvas props (`camera`, `shadows`, `style`, etc.). Internally creates a `MujocoSimProvider` that loads the model and starts the physics loop.
 
+### MujocoPhysics
+
+For use inside your own `<Canvas>`. Accepts the same physics props as `MujocoCanvas` (`config`, `paused`, `speed`, `gravity`, etc.) but doesn't create a Canvas — you bring your own. This gives you full control over gl settings, post-processing pipelines, and R3F context composition.
+
+```tsx
+<MujocoProvider>
+  <Canvas shadows camera={...} gl={{ antialias: true }}>
+    <MujocoPhysics ref={apiRef} config={config} paused={paused}>
+      <SceneRenderer />
+      <MyController />
+    </MujocoPhysics>
+    <OrbitControls />
+  </Canvas>
+</MujocoProvider>
+```
+
 ### MujocoSimProvider (internal)
 
-You don't use this directly — `MujocoCanvas` creates it. It:
+You don't use this directly — `MujocoCanvas` and `MujocoPhysics` create it. It:
 - Loads the model from `SceneConfig`
 - Runs the physics loop via `useFrame` at priority `-1`
 - Exposes the `MujocoSimAPI` via React context
 - Provides callback registration for `useBeforePhysicsStep`, `useAfterPhysicsStep`, and `resetCallbacks`
 
-### Controller Plugins
+### Controller Plugins (Bring Your Own)
 
-Controllers like `IkController` are opt-in components that compose library hooks. They register their logic via `useBeforePhysicsStep` and listen for resets via `resetCallbacks`. See [Building Controllers](/guides/building-controllers) for details.
+The core library has **no built-in control logic**. Controllers are React components you write (or use from the library) that call `useBeforePhysicsStep` to drive `data.ctrl`. The library ships `<IkController>` as one example, but the real pattern is: write your own.
+
+```tsx
+// This is a complete controller:
+function MyController() {
+  useBeforePhysicsStep((_model, data) => {
+    data.ctrl[0] = Math.sin(data.time);
+  });
+  return null;
+}
+```
+
+See [Building Controllers](/guides/building-controllers) for full patterns including custom IK solvers, config-driven controllers, and the `createController` factory.
 
 ## Physics Loop
 
@@ -107,7 +146,7 @@ useFrame(() => {
 
 ## Composability
 
-Everything inside `<MujocoCanvas>` is a standard R3F child. You mix library components with your own:
+Everything inside `<MujocoCanvas>` (or `<MujocoPhysics>`) is a standard R3F child. You mix library components with your own:
 
 ```tsx
 <MujocoCanvas config={config}>
@@ -133,6 +172,8 @@ Everything inside `<MujocoCanvas>` is a standard R3F child. You mix library comp
   <RewardVisualizer />
 </MujocoCanvas>
 ```
+
+All visual components accept standard R3F group props (`position`, `rotation`, `scale`, `visible`, etc.), so you can position and transform them like any Three.js group.
 
 ## Accessing the API
 
@@ -169,5 +210,5 @@ function MyComponent() {
 ```
 
 <Warning>
-  `useMujocoSim()` can only be called from components that are children of `MujocoCanvas`. Calling it outside will throw an error.
+  `useMujocoSim()` can only be called from components that are children of `MujocoCanvas` or `MujocoPhysics`. Calling it outside will throw an error.
 </Warning>

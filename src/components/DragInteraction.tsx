@@ -4,6 +4,7 @@
  */
 
 import { useFrame, useThree } from '@react-three/fiber';
+import type { ThreeElements } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useMujocoSim, useBeforePhysicsStep } from '../core/MujocoSimProvider';
@@ -35,7 +36,8 @@ const _mouse = new THREE.Vector2();
 export function DragInteraction({
   stiffness = 250,
   showArrow = true,
-}: DragInteractionProps) {
+  ...groupProps
+}: DragInteractionProps & Omit<ThreeElements['group'], 'ref'>) {
   const { mjDataRef, mujocoRef, mjModelRef, status } = useMujocoSim();
   const { gl, camera, scene, controls } = useThree();
 
@@ -223,5 +225,5 @@ export function DragInteraction({
 
   if (status !== 'ready') return null;
 
-  return <group ref={groupRef} />;
+  return <group {...groupProps} ref={groupRef} />;
 }

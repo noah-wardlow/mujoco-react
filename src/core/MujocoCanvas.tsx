@@ -24,15 +24,12 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
       onError,
       onStep,
       onSelection,
-      // Declarative physics config (spec 1.1)
+      // Declarative physics config
       gravity,
       timestep,
       substeps,
       paused,
       speed,
-      interpolate,
-      gravityCompensation,
-      mjcfLights,
       children,
       ...canvasProps
     },
@@ -65,7 +62,6 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
           substeps={substeps}
           paused={paused}
           speed={speed}
-          interpolate={interpolate}
         >
           {children}
         </MujocoSimProvider>

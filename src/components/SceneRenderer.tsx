@@ -4,6 +4,7 @@
  */
 
 import { useFrame } from '@react-three/fiber';
+import type { ThreeElements } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { GeomBuilder } from '../rendering/GeomBuilder';
@@ -13,9 +14,9 @@ import { useMujocoSim } from '../core/MujocoSimProvider';
 
 /**
  * SceneRenderer — creates and syncs MuJoCo body meshes every frame.
- * Replaces RenderSystem.initScene() + RenderSystem.update() body loop.
+ * Accepts standard R3F group props (position, rotation, scale, visible, etc.).
  */
-export function SceneRenderer() {
+export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
   const { mjModelRef, mjDataRef, mujocoRef, onSelectionRef, status } = useMujocoSim();
   const groupRef = useRef<THREE.Group>(null);
   const bodyRefs = useRef<(THREE.Group | null)[]>([]);
@@ -85,8 +86,10 @@ export function SceneRenderer() {
 
   return (
     <group
+      {...props}
       ref={groupRef}
       onDoubleClick={(e) => {
+        if (typeof props.onDoubleClick === 'function') props.onDoubleClick(e);
         e.stopPropagation();
         let obj: THREE.Object3D | null = e.object;
         while (obj && obj.userData.bodyID === undefined && obj.parent) {

@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMujocoSim } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
@@ -40,7 +41,8 @@ export function Debug({
   showCOM = false,
   showInertia = false,
   showTendons = false,
-}: DebugProps) {
+  ...groupProps
+}: DebugProps & Omit<ThreeElements['group'], 'ref'>) {
   const { mjModelRef, mjDataRef, status } = useMujocoSim();
   const { scene } = useThree();
   const groupRef = useRef<THREE.Group>(null);
@@ -354,9 +356,9 @@ export function Debug({
   if (status !== 'ready') return null;
 
   return (
-    <>
+    <group {...groupProps}>
       <group ref={groupRef} />
       {showContacts && <group ref={contactGroupRef} />}
-    </>
+    </group>
   );
 }

@@ -10,6 +10,7 @@
 
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMujocoSim } from '../core/MujocoSimProvider';
 import { getContact } from '../types';
@@ -32,7 +33,8 @@ export function ContactMarkers({
   radius = 0.008,
   color = '#22d3ee',
   visible = true,
-}: ContactMarkersProps = {}) {
+  ...groupProps
+}: ContactMarkersProps & Omit<ThreeElements['group'], 'ref' | 'visible'> = {}) {
   const { mjDataRef, status } = useMujocoSim();
   const meshRef = useRef<THREE.InstancedMesh>(null);
 
@@ -66,9 +68,11 @@ export function ContactMarkers({
   if (status !== 'ready') return null;
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, maxContacts]} frustumCulled={false} renderOrder={999}>
-      <sphereGeometry args={[radius, 8, 8]} />
-      <meshBasicMaterial color={color} depthTest={false} />
-    </instancedMesh>
+    <group {...groupProps}>
+      <instancedMesh ref={meshRef} args={[undefined, undefined, maxContacts]} frustumCulled={false} renderOrder={999}>
+        <sphereGeometry args={[radius, 8, 8]} />
+        <meshBasicMaterial color={color} depthTest={false} />
+      </instancedMesh>
+    </group>
   );
 }

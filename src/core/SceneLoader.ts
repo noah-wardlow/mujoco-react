@@ -140,8 +140,6 @@ function sceneObjectToXml(obj: SceneObject): string {
 interface LoadResult {
   mjModel: MujocoModel;
   mjData: MujocoData;
-  siteId: number;
-  gripperId: number;
 }
 
 /**
@@ -241,11 +239,7 @@ export async function loadScene(
   const mjModel = mujoco.MjModel.loadFromXML(`/working/${config.sceneFile}`);
   const mjData = new mujoco.MjData(mjModel);
 
-  // 6. Find TCP site and gripper actuator
-  const siteId = findSiteByName(mjModel, config.tcpSiteName ?? 'tcp');
-  const gripperId = findActuatorByName(mjModel, config.gripperActuatorName ?? 'gripper');
-
-  // 7. Set initial pose — set both ctrl and qpos so robot starts at home.
+  // 6. Set initial pose — set both ctrl and qpos so robot starts at home.
   //    If homeJoints is not provided, keep raw MuJoCo defaults.
   if (config.homeJoints) {
     const homeCount = Math.min(config.homeJoints.length, mjModel.nu);
@@ -260,7 +254,7 @@ export async function loadScene(
 
   mujoco.mj_forward(mjModel, mjData);
 
-  return { mjModel, mjData, siteId, gripperId };
+  return { mjModel, mjData };
 }
 
 /**

@@ -12,11 +12,11 @@ icon: "rocket"
   <Card title="Composable" icon="puzzle-piece">
     Drop `<SceneRenderer />`, `<IkGizmo />`, `<Debug />` and more into your R3F scene as children. No monolithic wrapper.
   </Card>
-  <Card title="Unopinionated" icon="scale-balanced">
-    The core provides physics + rendering. Controllers (IK, teleoperation, RL policies) are composable plugins you opt into — or bring your own.
+  <Card title="Bring Your Own Controller" icon="scale-balanced">
+    The core provides physics + rendering. Controllers are just React components that call `useBeforePhysicsStep` — write your own IK, teleoperation, RL policy, or use the built-in ones.
   </Card>
-  <Card title="Extensible" icon="plug">
-    `createController<TConfig>()` factory for typed controller plugins. `useBeforePhysicsStep` and `useAfterPhysicsStep` for raw physics access.
+  <Card title="Bring Your Own IK" icon="plug">
+    Plug in any IK solver via `ikSolveFn`, or skip `IkController` entirely and solve IK yourself inside `useBeforePhysicsStep`. Nothing is baked in.
   </Card>
   <Card title="Full MuJoCo" icon="atom">
     Contacts, sensors, tendons, flex bodies, raycasting, domain randomization — the full MuJoCo API, React-ified.
@@ -63,6 +63,37 @@ function App() {
 
 This loads the Franka Panda from [DeepMind Menagerie](https://github.com/google-deepmind/mujoco_menagerie), renders all bodies, and adds an interactive IK gizmo on the end-effector — in under 30 lines.
 
+## Bring Your Own Controller
+
+Controllers are just React components. Call `useBeforePhysicsStep` to drive `data.ctrl` each frame:
+
+```tsx
+import { useBeforePhysicsStep } from 'mujoco-react';
+
+function MyController() {
+  useBeforePhysicsStep((_model, data) => {
+    data.ctrl[0] = Math.sin(data.time);        // sine wave on actuator 0
+    data.ctrl[1] = data.sensordata[0] * -0.5;  // feedback from a sensor
+  });
+  return null;
+}
+```
+
+Drop it into your scene — no base class, no registration:
+
+```tsx
+<MujocoCanvas config={config}>
+  <SceneRenderer />
+  <MyController />
+</MujocoCanvas>
+```
+
+IK, teleoperation, RL policies, state machines — they're all just components that read input and write to `data.ctrl`. The built-in `<IkController>` is itself built this way. You can also [plug in your own IK solver](/components/ik-controller#with-custom-solver) or skip it entirely.
+
+<Tip>
+  See the [Building Controllers](/guides/building-controllers) guide for config-driven patterns, `createController` factory, IK gizmo coexistence, and multi-arm support.
+</Tip>
+
 ## Design Philosophy
 
 mujoco-react follows the same pattern as [react-three-rapier](https://github.com/pmndrs/react-three-rapier):
@@ -72,28 +103,44 @@ mujoco-react follows the same pattern as [react-three-rapier](https://github.com
 - **Consumers compose everything else** — lights, grid, camera controls, UI, game logic
 - **All scene elements are R3F children** — no config objects for visual-only things
 
-```tsx
-<MujocoCanvas config={config}>
-  {/* Library: physics visualization */}
-  <SceneRenderer />
-  <ContactMarkers />
+Two ways to set up your scene:
 
-  {/* Opt-in controller plugin */}
-  <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
-    <IkGizmo />
-  </IkController>
-
-  {/* Your components — standard R3F */}
-  <OrbitControls />
-  <ambientLight />
-  <Grid />
-  <MyGameLogic />
-</MujocoCanvas>
-```
+<Tabs>
+  <Tab title="MujocoCanvas (quick start)">
+    Wraps R3F `<Canvas>` for you — fastest path to a working scene:
+    ```tsx
+    <MujocoCanvas config={config}>
+      <SceneRenderer />
+      <ContactMarkers />
+      <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
+        <IkGizmo />
+      </IkController>
+      <OrbitControls />
+      <ambientLight />
+    </MujocoCanvas>
+    ```
+  </Tab>
+  <Tab title="MujocoPhysics (bring your own Canvas)">
+    Use inside your own `<Canvas>` for full control over gl settings, post-processing, and R3F context:
+    ```tsx
+    <Canvas shadows camera={{ position: [2, 2, 2] }} gl={{ antialias: true }}>
+      <MujocoPhysics config={config}>
+        <SceneRenderer />
+        <MyController />
+      </MujocoPhysics>
+      <OrbitControls />
+      <EffectComposer>...</EffectComposer>
+    </Canvas>
+    ```
+  </Tab>
+</Tabs>
 
 ## Next Steps
 
 <CardGroup cols={2}>
+  <Card title="Building Controllers" icon="gamepad" href="/guides/building-controllers">
+    Write your own controller, bring your own IK, use the `createController` factory
+  </Card>
   <Card title="Installation" icon="download" href="/installation">
     Peer dependencies, bundler setup, and WASM notes
   </Card>
@@ -102,8 +149,5 @@ mujoco-react follows the same pattern as [react-three-rapier](https://github.com
   </Card>
   <Card title="Loading Models" icon="file-code" href="/loading-models">
     SceneConfig, Menagerie, custom model sources
-  </Card>
-  <Card title="Components" icon="puzzle-piece" href="/components/mujoco-provider">
-    Full component reference
   </Card>
 </CardGroup>
