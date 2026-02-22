@@ -1,3 +1,18 @@
+# [5.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v4.0.0...v5.0.0) (2026-02-22)
+
+
+### Features
+
+* replace modelId + baseUrl with src in SceneConfig ([44029d5](https://github.com/noah-wardlow/mujoco-react/commit/44029d5b97680b3a1af8a8c473cdb7bd79532550))
+
+
+### BREAKING CHANGES
+
+* SceneConfig.modelId and SceneConfig.baseUrl are removed.
+Use SceneConfig.src (required) as the base URL for model files.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
 # [4.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v3.0.0...v4.0.0) (2026-02-22)
 
 
