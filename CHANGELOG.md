@@ -1,3 +1,19 @@
+# [7.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v6.0.1...v7.0.0) (2026-02-22)
+
+
+### Features
+
+* add <Body> component, refactor IK to useIkController hook ([6d9ccbe](https://github.com/noah-wardlow/mujoco-react/commit/6d9ccbe281137788093c4902dbba5941d3587a58))
+
+
+### BREAKING CHANGES
+
+* <IkController> component and useIk() hook removed. Use useIkController() hook instead:
+  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  return ik ? <IkGizmo controller={ik} /> : null;
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
 ## [6.0.1](https://github.com/noah-wardlow/mujoco-react/compare/v6.0.0...v6.0.1) (2026-02-22)
 
 
