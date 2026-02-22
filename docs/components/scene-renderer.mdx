@@ -1,24 +1,14 @@
 ---
-title: "SceneRenderer"
-description: "Sync MuJoCo bodies to Three.js meshes"
+title: "SceneRenderer (Internal)"
+description: "Automatic body rendering — handled internally by MujocoSimProvider"
 icon: "cube"
 ---
 
-Renders all MuJoCo bodies as Three.js meshes. Updates positions and rotations from `data.xpos` / `data.xquat` every frame.
+`SceneRenderer` is rendered automatically inside `MujocoSimProvider`. You do not need to import or add it to your scene tree — body rendering happens as soon as a model is loaded.
 
-## Usage
-
-```tsx
-<MujocoCanvas config={config}>
-  <SceneRenderer />
-</MujocoCanvas>
-```
-
-This is the primary visual component — without it, you won't see any physics bodies.
-
-## Props
-
-`SceneRenderer` takes no props. It reads all configuration from the simulation context.
+<Note>
+  Prior to v1.1, `SceneRenderer` was a user-facing component that had to be added as a child of `MujocoCanvas`. It is now internal. Remove any `<SceneRenderer />` from your JSX and any `SceneRenderer` imports.
+</Note>
 
 ## How It Works
 
@@ -46,9 +36,24 @@ The renderer handles all standard MuJoCo geom types:
 
 MuJoCo stores quaternions as `[w, x, y, z]`. Three.js expects `(x, y, z, w)`. The renderer handles this conversion automatically.
 
+## Body IDs for Raycasting
+
+The renderer sets `userData.bodyID` on every mesh it creates. When raycasting, walk up the object tree with `obj.parent` until you find a node with `userData.bodyID` -- child meshes (e.g. geom sub-meshes) don't have it directly, but their parent body group does.
+
+```tsx
+// Walk up the scene graph to find the body ID
+let obj = hit.object;
+while (obj) {
+  if (obj.userData?.bodyID != null) {
+    console.log('Hit body:', obj.userData.bodyID);
+    break;
+  }
+  obj = obj.parent!;
+}
+```
+
 ## Notes
 
-- Body 0 (the world body) is skipped — it doesn't move
+- Body 0 (the world body) is skipped -- it doesn't move
 - Geom colors come from `model.geom_rgba`
 - Mesh geoms require the asset files to be accessible at the model's `baseUrl`
-- The renderer uses `userData.bodyID` on meshes for raycasting and selection

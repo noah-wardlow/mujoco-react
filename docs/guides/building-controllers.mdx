@@ -29,7 +29,6 @@ Drop it into your scene as a child of `<MujocoCanvas>`:
 
 ```tsx
 <MujocoCanvas config={frankaConfig}>
-  <SceneRenderer />
   <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
     <IkGizmo />
   </IkController>
@@ -299,7 +298,6 @@ Controllers are React children. Swap them based on state:
 
 ```tsx
 <MujocoCanvas config={entry.config}>
-  <SceneRenderer />
   {entry.hasIk && showGizmo && (
     <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
       <IkGizmo scale={entry.gizmoScale} />

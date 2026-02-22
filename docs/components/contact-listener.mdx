@@ -10,7 +10,6 @@ A component wrapper for contact event subscriptions. Fires callbacks when a body
 
 ```tsx
 <MujocoCanvas config={config}>
-  <SceneRenderer />
   <ContactListener
     body="cube"
     onContactEnter={(info) => console.log('Touch!', info.geom2Name)}

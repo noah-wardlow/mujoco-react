@@ -46,7 +46,6 @@
           "components/mujoco-provider",
           "components/mujoco-canvas",
           "components/mujoco-physics",
-          "components/scene-renderer",
           "components/ik-controller",
           "components/ik-gizmo",
           "components/drag-interaction",

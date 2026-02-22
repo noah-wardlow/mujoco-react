@@ -20,7 +20,6 @@ npm install mujoco-react three @react-three/fiber @react-three/drei
 import {
   MujocoProvider,
   MujocoCanvas,
-  SceneRenderer,
   IkController,
   IkGizmo,
 } from 'mujoco-react';
@@ -46,7 +45,6 @@ function App() {
         style={{ width: '100%', height: '100vh' }}
       >
         <OrbitControls enableDamping makeDefault />
-        <SceneRenderer />
         <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
           <IkGizmo />
         </IkController>
@@ -93,11 +91,10 @@ function MyController() {
 }
 ```
 
-Drop it into the tree alongside `<SceneRenderer />`:
+Drop it into the tree:
 
 ```tsx
 <MujocoCanvas config={config}>
-  <SceneRenderer />
   <MyController />
 </MujocoCanvas>
 ```
@@ -127,13 +124,12 @@ export const MyController = createController<{ gain: number }>(
 ```
 <MujocoProvider>                           <MujocoProvider>
   <MujocoCanvas config={...}>               <Canvas shadows gl={...}>
-    <SceneRenderer />                         <MujocoPhysics config={...}>
-    <IkController config={..}>                  <SceneRenderer />
-      <IkGizmo />                             </MujocoPhysics>
-    </IkController>                           <EffectComposer>...</EffectComposer>
-    <MyController />                        </Canvas>
-  </MujocoCanvas>                         </MujocoProvider>
-</MujocoProvider>
+    <IkController config={..}>                <MujocoPhysics config={...}>
+      <IkGizmo />                               <MyController />
+    </IkController>                           </MujocoPhysics>
+    <MyController />                          <EffectComposer>...</EffectComposer>
+  </MujocoCanvas>                           </Canvas>
+</MujocoProvider>                         </MujocoProvider>
 ```
 
 ### Custom IK Solvers
@@ -286,7 +282,6 @@ Physics provider for use inside your own R3F `<Canvas>`. Same physics props as `
 <MujocoProvider>
   <Canvas shadows camera={{ position: [2, 2, 2] }}>
     <MujocoPhysics ref={apiRef} config={config} paused={paused}>
-      <SceneRenderer />
       <MyController />
     </MujocoPhysics>
     <OrbitControls />
@@ -307,10 +302,6 @@ Physics provider for use inside your own R3F `<Canvas>`. Same physics props as `
 | `paused` | `boolean` | Declarative pause |
 | `speed` | `number` | Simulation speed multiplier |
 
-### `<SceneRenderer />`
-
-Syncs MuJoCo bodies to Three.js meshes every frame. Must be inside `<MujocoCanvas>` or `<MujocoPhysics>`.
-
 ### `<IkGizmo />`
 
 drei PivotControls gizmo that tracks a MuJoCo site and drives IK on drag. Must be inside `<IkController>`.
@@ -327,10 +318,9 @@ Click-drag to apply spring forces to bodies. Raycasts to find bodies, applies `F
 
 ### R3F Group Props
 
-All visual components (`SceneRenderer`, `DragInteraction`, `ContactMarkers`, `Debug`, `TendonRenderer`, `FlexRenderer`) accept standard R3F group props like `position`, `rotation`, `scale`, `visible`.
+All visual components (`DragInteraction`, `ContactMarkers`, `Debug`, `TendonRenderer`, `FlexRenderer`) accept standard R3F group props like `position`, `rotation`, `scale`, `visible`.
 
 ```tsx
-<SceneRenderer position={[0, 0, 1]} />
 <ContactMarkers visible={showContacts} />
 <Debug showJoints scale={0.5} />
 ```
@@ -713,7 +703,7 @@ See [Click-to-Select](https://dadd.mintlify.app/guides/click-to-select) for the 
 | Priority | Owner | Purpose |
 |----------|-------|---------|
 | -1 | MujocoSimProvider | beforeStep, mj_step, afterStep |
-| 0 (default) | SceneRenderer, IkController, your code | Body mesh sync, IK, rendering |
+| 0 (default) | SceneRenderer (internal), IkController, your code | Body mesh sync, IK, rendering |
 
 ## Roadmap
 

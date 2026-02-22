@@ -14,7 +14,6 @@ IK is **not baked into the core** — it's an opt-in plugin you add to your scen
 import { IkController, IkGizmo } from 'mujoco-react';
 
 <MujocoCanvas config={config}>
-  <SceneRenderer />
   <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
     <IkGizmo />
   </IkController>

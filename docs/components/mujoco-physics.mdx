@@ -11,7 +11,7 @@ Physics context provider for use inside your own React Three Fiber `<Canvas>`. S
 ```tsx
 import { useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { MujocoProvider, MujocoPhysics, SceneRenderer } from 'mujoco-react';
+import { MujocoProvider, MujocoPhysics } from 'mujoco-react';
 import type { MujocoSimAPI } from 'mujoco-react';
 import { OrbitControls } from '@react-three/drei';
 
@@ -35,7 +35,6 @@ function App() {
           paused={false}
           speed={1.0}
         >
-          <SceneRenderer />
           <ambientLight intensity={0.7} />
         </MujocoPhysics>
         <OrbitControls makeDefault />
@@ -74,7 +73,7 @@ Use `<MujocoPhysics>` instead of `<MujocoCanvas>` when you need:
 </ParamField>
 
 <ParamField body="onSelection" type="(bodyId: number, name: string) => void">
-  Fired when a body is double-clicked in `SceneRenderer`.
+  Fired when a body is double-clicked in the scene.
 </ParamField>
 
 <ParamField body="paused" type="boolean" default="false">

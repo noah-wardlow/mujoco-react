@@ -16,12 +16,10 @@ npm install mujoco-react three @react-three/fiber @react-three/drei
 ```
 
 ```tsx
-import { MujocoProvider, MujocoCanvas, SceneRenderer } from 'mujoco-react';
+import { MujocoProvider, MujocoCanvas } from 'mujoco-react';
 
 <MujocoProvider>
-  <MujocoCanvas config={{ robotId: 'franka_emika_panda', sceneFile: 'scene.xml' }}>
-    <SceneRenderer />
-  </MujocoCanvas>
+  <MujocoCanvas config={{ robotId: 'franka_emika_panda', sceneFile: 'scene.xml' }} />
 </MujocoProvider>
 ```
 
@@ -30,7 +28,7 @@ import { MujocoProvider, MujocoCanvas, SceneRenderer } from 'mujoco-react';
     Quick start, controllers, architecture
   </Card>
   <Card title="Components" icon="puzzle-piece" href="/components/mujoco-provider">
-    MujocoProvider, MujocoCanvas, SceneRenderer, IkGizmo, Debug, and more
+    MujocoProvider, MujocoCanvas, IkGizmo, Debug, and more
   </Card>
   <Card title="Hooks" icon="webhook" href="/hooks/use-mujoco-sim">
     useBeforePhysicsStep, useBodyState, useSensor, useCtrl, usePolicy, and more

@@ -12,7 +12,6 @@ Declarative component for playing back recorded qpos trajectories. Pauses the si
 const trajectory = [[0, 0, 0, ...], [0.01, 0.02, ...], ...]; // Array of qpos arrays
 
 <MujocoCanvas config={config}>
-  <SceneRenderer />
   <TrajectoryPlayer
     trajectory={trajectory}
     fps={30}

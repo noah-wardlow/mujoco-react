@@ -61,7 +61,7 @@ Works out of the box. No additional configuration needed.
 ## Verify Installation
 
 ```tsx
-import { MujocoProvider, MujocoCanvas, SceneRenderer } from 'mujoco-react';
+import { MujocoProvider, MujocoCanvas } from 'mujoco-react';
 
 function App() {
   return (
@@ -75,7 +75,6 @@ function App() {
         onReady={() => console.log('MuJoCo loaded!')}
         onError={(err) => console.error('Load failed:', err)}
       >
-        <SceneRenderer />
         <ambientLight />
       </MujocoCanvas>
     </MujocoProvider>

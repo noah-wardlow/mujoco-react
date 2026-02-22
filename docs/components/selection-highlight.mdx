@@ -17,7 +17,6 @@ function App() {
       config={config}
       onSelection={(bodyId, name) => setSelectedBody(bodyId)}
     >
-      <SceneRenderer />
       <SelectionHighlight bodyId={selectedBody} />
     </MujocoCanvas>
   );
@@ -60,6 +59,6 @@ function MyCustomComponent({ bodyId }) {
 
 ## Notes
 
-- Double-click a body in `SceneRenderer` to trigger the `onSelection` callback
+- Double-click a body in the scene to trigger the `onSelection` callback
 - The highlight applies to all geom meshes belonging to the body
 - The component delegates to `useSelectionHighlight` internally

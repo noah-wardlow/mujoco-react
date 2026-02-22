@@ -10,7 +10,7 @@ A thin wrapper around React Three Fiber's `<Canvas>` that sets up the physics si
 
 ```tsx
 import { useRef } from 'react';
-import { MujocoProvider, MujocoCanvas, SceneRenderer } from 'mujoco-react';
+import { MujocoProvider, MujocoCanvas } from 'mujoco-react';
 import type { MujocoSimAPI } from 'mujoco-react';
 import { OrbitControls } from '@react-three/drei';
 
@@ -32,7 +32,6 @@ function App() {
         style={{ width: '100%', height: '100vh' }}
       >
         <OrbitControls makeDefault />
-        <SceneRenderer />
         <ambientLight intensity={0.7} />
       </MujocoCanvas>
     </MujocoProvider>
@@ -61,7 +60,7 @@ function App() {
 </ParamField>
 
 <ParamField body="onSelection" type="(bodyId: number, name: string) => void">
-  Fired when a body is double-clicked in `SceneRenderer`.
+  Fired when a body is double-clicked in the scene.
 </ParamField>
 
 ### Physics Props

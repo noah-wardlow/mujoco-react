@@ -10,7 +10,6 @@ Renders debug overlays for MuJoCo simulation elements — geom wireframes, site 
 
 ```tsx
 <MujocoCanvas config={config}>
-  <SceneRenderer />
   <Debug showSites showJoints showContacts />
 </MujocoCanvas>
 ```
@@ -77,7 +76,6 @@ function App() {
 
   return (
     <MujocoCanvas config={config}>
-      <SceneRenderer />
       <Debug
         showSites={debug.sites}
         showJoints={debug.joints}

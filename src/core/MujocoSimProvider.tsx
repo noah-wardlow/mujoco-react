@@ -15,6 +15,7 @@ import {
 } from 'react';
 import * as THREE from 'three';
 import { MujocoData, MujocoModel, MujocoModule, getContact } from '../types';
+import { SceneRenderer } from '../components/SceneRenderer';
 import {
   ActuatorInfo,
   BodyInfo,
@@ -922,6 +923,7 @@ export function MujocoSimProvider({
 
   return (
     <MujocoSimContext.Provider value={contextValue}>
+      <SceneRenderer />
       {children}
     </MujocoSimContext.Provider>
   );

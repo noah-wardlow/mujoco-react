@@ -16,8 +16,8 @@ MujocoCanvas                          MujocoPhysics
 MujocoProvider                        MujocoProvider
   └─ MujocoCanvas                       └─ Canvas
        └─ MujocoSimProvider                  └─ MujocoPhysics
-            ├─ SceneRenderer                      └─ MujocoSimProvider
-            ├─ IkController                            ├─ SceneRenderer
+            ├─ (SceneRenderer — auto)             └─ MujocoSimProvider
+            ├─ IkController                            ├─ (SceneRenderer — auto)
             │    └─ IkGizmo                            └─ YourComponents
             └─ YourComponents
 ```
@@ -38,7 +38,6 @@ For use inside your own `<Canvas>`. Accepts the same physics props as `MujocoCan
 <MujocoProvider>
   <Canvas shadows camera={...} gl={{ antialias: true }}>
     <MujocoPhysics ref={apiRef} config={config} paused={paused}>
-      <SceneRenderer />
       <MyController />
     </MujocoPhysics>
     <OrbitControls />
@@ -89,7 +88,7 @@ The physics loop runs inside `useFrame` at **priority -1**, ensuring it executes
 ┌─────────────────────────────────────────────────────┐
 │  Priority 0 (default)                               │
 │                                                      │
-│  - SceneRenderer: sync body meshes to xpos/xquat    │
+│  - SceneRenderer (internal): sync body meshes       │
 │  - IkController: gizmo animation                    │
 │  - ContactMarkers: update contact positions          │
 │  - Your useFrame callbacks                           │
@@ -143,9 +142,6 @@ Everything inside `<MujocoCanvas>` (or `<MujocoPhysics>`) is a standard R3F chil
 
 ```tsx
 <MujocoCanvas config={config}>
-  {/* Library: physics visualization */}
-  <SceneRenderer />
-
   {/* Library: opt-in controller plugin */}
   <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
     <IkGizmo />

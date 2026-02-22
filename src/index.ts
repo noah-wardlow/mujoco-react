@@ -32,7 +32,6 @@ export { useIk } from './core/IkContext';
 export type { IkContextValue } from './core/IkContext';
 
 // Components
-export { SceneRenderer } from './components/SceneRenderer';
 export { IkGizmo } from './components/IkGizmo';
 export { ContactMarkers } from './components/ContactMarkers';
 export { DragInteraction } from './components/DragInteraction';

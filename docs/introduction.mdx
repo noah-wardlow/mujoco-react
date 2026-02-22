@@ -10,7 +10,7 @@ icon: "rocket"
 
 <CardGroup cols={2}>
   <Card title="Composable" icon="puzzle-piece">
-    `<SceneRenderer />`, `<IkGizmo />`, `<Debug />` etc. are R3F children you add to your scene.
+    `<IkGizmo />`, `<Debug />`, `<ContactMarkers />` etc. are R3F children you add to your scene.
   </Card>
   <Card title="Controller Pattern" icon="scale-balanced">
     Controllers are React components that call `useBeforePhysicsStep`. Write your own or use the built-in ones.
@@ -31,7 +31,7 @@ npm install mujoco-react mujoco-js @react-three/fiber @react-three/drei three
 
 ```tsx
 import {
-  MujocoProvider, MujocoCanvas, SceneRenderer, IkController, IkGizmo,
+  MujocoProvider, MujocoCanvas, IkController, IkGizmo,
 } from 'mujoco-react';
 import { OrbitControls } from '@react-three/drei';
 
@@ -49,7 +49,6 @@ function App() {
         style={{ width: '100%', height: '100vh' }}
       >
         <OrbitControls makeDefault />
-        <SceneRenderer />
         <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
           <IkGizmo />
         </IkController>
@@ -83,7 +82,6 @@ Add it as a child of `<MujocoCanvas>`:
 
 ```tsx
 <MujocoCanvas config={config}>
-  <SceneRenderer />
   <MyController />
 </MujocoCanvas>
 ```
@@ -109,7 +107,6 @@ mujoco-react follows the same pattern as [react-three-rapier](https://github.com
   <Tab title="MujocoCanvas">
     ```tsx
     <MujocoCanvas config={config} shadows camera={...}>
-      <SceneRenderer />
       <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
         <IkGizmo />
       </IkController>
@@ -121,7 +118,6 @@ mujoco-react follows the same pattern as [react-three-rapier](https://github.com
     ```tsx
     <Canvas shadows camera={...} gl={{ antialias: true }}>
       <MujocoPhysics config={config}>
-        <SceneRenderer />
         <MyController />
       </MujocoPhysics>
       <OrbitControls />

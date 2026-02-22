@@ -12,7 +12,6 @@ IK is provided by the `<IkController>` plugin — it is not part of the core `Mu
 import { IkController, IkGizmo, useIk } from 'mujoco-react';
 
 <MujocoCanvas config={config}>
-  <SceneRenderer />
   <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
     <IkGizmo />
     <MyIkConsumer />
