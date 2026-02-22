@@ -4,7 +4,7 @@ description: "Hook for applying emissive highlights to body meshes"
 icon: "highlighter"
 ---
 
-Applies an emissive glow to the meshes of a selected body. Hook form of [`<SelectionHighlight>`](/components/selection-highlight) for imperative usage inside your own components.
+Applies an emissive glow to the meshes of a selected body. This is a convenience hook built on top of [`useBodyMeshes`](/hooks/use-body-meshes) -- if you need more control over how meshes are styled, use `useBodyMeshes` directly.
 
 ## Signature
 
@@ -38,7 +38,7 @@ function MyInteractiveScene() {
 
 ### Composing with Other Logic
 
-The hook form is useful when you want to combine highlighting with other behavior in a single component:
+The hook is useful when you want to combine highlighting with other behavior in a single component:
 
 ```tsx
 function BodyInspector({ bodyId }: { bodyId: number }) {
@@ -58,17 +58,16 @@ function BodyInspector({ bodyId }: { bodyId: number }) {
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `bodyId` | `number \| null` | — | ID of the body to highlight. Pass `null` to clear. |
+| `bodyId` | `number \| null` | -- | ID of the body to highlight. Pass `null` to clear. |
 | `options.color` | `string` | `'#ff4444'` | Emissive highlight color. |
 | `options.emissiveIntensity` | `number` | `0.3` | Intensity of the emissive glow. |
 
 ## How It Works
 
-1. Traverses the scene graph for meshes with matching `userData.bodyID`
+1. Uses [`useBodyMeshes`](/hooks/use-body-meshes) to get the meshes for the given body ID
 2. Sets the mesh material's `emissive` color and `emissiveIntensity`
 3. Restores original emissive values when `bodyId` changes or the component unmounts
 
-## Notes
+## Related
 
-- For a declarative JSX API, use [`<SelectionHighlight>`](/components/selection-highlight) instead
-- The component form is a thin wrapper around this hook
+- [`useBodyMeshes`](/hooks/use-body-meshes) -- the low-level primitive this hook is built on, for custom visuals and postprocessing

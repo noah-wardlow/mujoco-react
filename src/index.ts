@@ -41,7 +41,6 @@ export { TendonRenderer } from './components/TendonRenderer';
 export { FlexRenderer } from './components/FlexRenderer';
 export { ContactListener } from './components/ContactListener';
 export { TrajectoryPlayer } from './components/TrajectoryPlayer';
-export { SelectionHighlight } from './components/SelectionHighlight';
 
 // Hooks
 export { useActuators } from './hooks/useActuators';
@@ -59,6 +58,7 @@ export { useTrajectoryRecorder } from './hooks/useTrajectoryRecorder';
 export { useGamepad } from './hooks/useGamepad';
 export { useVideoRecorder } from './hooks/useVideoRecorder';
 export { useCtrlNoise } from './hooks/useCtrlNoise';
+export { useBodyMeshes } from './hooks/useBodyMeshes';
 export { useSelectionHighlight } from './hooks/useSelectionHighlight';
 export { useSceneLights } from './hooks/useSceneLights';
 export { useCameraAnimation } from './hooks/useCameraAnimation';
@@ -106,7 +106,6 @@ export type {
   DebugProps,
   SceneLightsProps,
   TrajectoryPlayerProps,
-  SelectionHighlightProps,
   ContactListenerProps,
   // API
   MujocoSimAPI,

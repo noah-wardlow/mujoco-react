@@ -1,0 +1,107 @@
+---
+title: "useBodyMeshes"
+description: "Hook that returns Three.js meshes for a MuJoCo body"
+icon: "cubes"
+---
+
+Returns the `THREE.Mesh[]` array for a given MuJoCo body ID. This is the low-level primitive for building custom selection visuals, outlines, postprocessing effects, or any logic that needs direct access to the meshes belonging to a body.
+
+## Signature
+
+```tsx
+useBodyMeshes(bodyId: number | null): THREE.Mesh[]
+```
+
+## Usage
+
+```tsx
+import { useBodyMeshes } from 'mujoco-react';
+
+function CustomOutline({ bodyId }: { bodyId: number | null }) {
+  const meshes = useBodyMeshes(bodyId);
+
+  useEffect(() => {
+    // Apply a custom outline effect to each mesh
+    meshes.forEach((mesh) => {
+      mesh.layers.enable(1); // e.g. assign to an outline layer
+    });
+    return () => {
+      meshes.forEach((mesh) => {
+        mesh.layers.disable(1);
+      });
+    };
+  }, [meshes]);
+
+  return null;
+}
+```
+
+### Custom Selection Visuals
+
+Because `useBodyMeshes` gives you raw mesh references, you can implement any visual effect:
+
+```tsx
+import { useBodyMeshes } from 'mujoco-react';
+import { useFrame } from '@react-three/fiber';
+
+function PulsingHighlight({ bodyId }: { bodyId: number }) {
+  const meshes = useBodyMeshes(bodyId);
+
+  useFrame(({ clock }) => {
+    const intensity = (Math.sin(clock.elapsedTime * 4) + 1) / 2;
+    meshes.forEach((mesh) => {
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = intensity * 0.5;
+      mat.emissive.set('#ff8800');
+    });
+  });
+
+  return null;
+}
+```
+
+### Postprocessing
+
+Pair with `@react-three/postprocessing` to apply per-body effects:
+
+```tsx
+import { useBodyMeshes } from 'mujoco-react';
+import { Selection, Select, EffectComposer, Outline } from '@react-three/postprocessing';
+
+function OutlineSelectedBody({ bodyId }: { bodyId: number | null }) {
+  const meshes = useBodyMeshes(bodyId);
+
+  return (
+    <Selection>
+      <EffectComposer>
+        <Outline blur edgeStrength={3} />
+      </EffectComposer>
+      {meshes.map((mesh, i) => (
+        <Select key={i} enabled>
+          <primitive object={mesh} />
+        </Select>
+      ))}
+    </Selection>
+  );
+}
+```
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `bodyId` | `number \| null` | -- | ID of the MuJoCo body. Pass `null` to get an empty array. |
+
+## Returns
+
+| Type | Description |
+|------|-------------|
+| `THREE.Mesh[]` | Array of Three.js meshes belonging to the body. Empty array if `bodyId` is `null` or no meshes are found. |
+
+## How It Works
+
+Traverses the R3F scene graph and collects all meshes whose `userData.bodyID` matches the given `bodyId`. The `<SceneRenderer>` component sets `userData.bodyID` on every mesh it creates, so this hook works with any standard mujoco-react scene.
+
+## Related
+
+- [`useSelectionHighlight`](/hooks/use-selection-highlight) -- convenience hook built on `useBodyMeshes` for emissive highlights

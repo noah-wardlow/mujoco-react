@@ -4,17 +4,17 @@ description: "Implement body selection with raycasting and highlights"
 icon: "mouse-pointer"
 ---
 
-A common interaction pattern: double-click a body to select it, highlight the selected body, and use the selection for further actions. This combines R3F raycasting with the library's `<SelectionHighlight />` component.
+A common interaction pattern: double-click a body to select it, highlight the selected body, and use the selection for further actions. This combines R3F raycasting with the library's `useSelectionHighlight` hook.
 
 ## The Pattern
 
 1. A hook listens for double-clicks and raycasts to find the clicked body
-2. A component passes the selected body ID to `<SelectionHighlight />`
+2. The `useSelectionHighlight` hook applies a visual highlight to the selected body
 
 ```tsx
 import { useState, useCallback } from 'react';
 import { useThree } from '@react-three/fiber';
-import { SelectionHighlight } from 'mujoco-react';
+import { useSelectionHighlight } from 'mujoco-react';
 
 function useClickSelect(): number | null {
   const [selectedBodyId, setSelectedBodyId] = useState<number | null>(null);
@@ -53,12 +53,13 @@ function useClickSelect(): number | null {
 }
 ```
 
-## Composing with SelectionHighlight
+## Composing with useSelectionHighlight
 
 ```tsx
 function ClickSelectOverlay() {
   const selectedBodyId = useClickSelect();
-  return <SelectionHighlight bodyId={selectedBodyId} />;
+  useSelectionHighlight(selectedBodyId);
+  return null;
 }
 ```
 
@@ -75,24 +76,38 @@ Then drop it into your scene:
 `<MujocoCanvas>` also has a built-in `onSelection` callback that fires on double-click:
 
 ```tsx
-<MujocoCanvas
-  config={config}
-  onSelection={(bodyId, name) => {
-    console.log(`Selected body ${name} (id: ${bodyId})`);
-  }}
->
-  <SelectionHighlight bodyId={selectedBodyId} />
-</MujocoCanvas>
+function SelectionHandler({ bodyId }: { bodyId: number | null }) {
+  useSelectionHighlight(bodyId);
+  return null;
+}
+
+function App() {
+  const [selectedBodyId, setSelectedBodyId] = useState<number | null>(null);
+
+  return (
+    <MujocoCanvas
+      config={config}
+      onSelection={(bodyId, name) => {
+        console.log(`Selected body ${name} (id: ${bodyId})`);
+        setSelectedBodyId(bodyId);
+      }}
+    >
+      <SelectionHandler bodyId={selectedBodyId} />
+    </MujocoCanvas>
+  );
+}
 ```
 
 ## How SceneRenderer Stores Body IDs
 
-`<SceneRenderer />` sets `userData.bodyID` on every mesh it creates. When raycasting, walk up the object tree with `obj.parent` until you find a node with `userData.bodyID` — child meshes (e.g. geom sub-meshes) don't have it directly, but their parent body group does.
+`<SceneRenderer />` sets `userData.bodyID` on every mesh it creates. When raycasting, walk up the object tree with `obj.parent` until you find a node with `userData.bodyID` -- child meshes (e.g. geom sub-meshes) don't have it directly, but their parent body group does.
 
-## SelectionHighlight Props
+## useSelectionHighlight Options
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `bodyId` | `number \| null` | — | Body to highlight, or `null` to clear |
-| `color` | `string` | `'#ff4444'` | Emissive highlight color |
-| `emissiveIntensity` | `number` | `0.3` | Strength of the emissive glow |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `bodyId` (first argument) | `number \| null` | -- | Body to highlight, or `null` to clear |
+| `options.color` | `string` | `'#ff4444'` | Emissive highlight color |
+| `options.emissiveIntensity` | `number` | `0.3` | Strength of the emissive glow |
+
+For more advanced selection visuals (outlines, postprocessing, custom shaders), use [`useBodyMeshes`](/hooks/use-body-meshes) to get direct access to the body's Three.js meshes.

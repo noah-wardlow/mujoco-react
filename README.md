@@ -365,10 +365,6 @@ Component wrapper for contact events:
 />
 ```
 
-### `<SelectionHighlight />`
-
-Emissive highlight on selected body meshes. Also available as `useSelectionHighlight(bodyId, options?)` hook.
-
 ### `<TrajectoryPlayer />`
 
 Plays back recorded qpos trajectories with scrubbing.
@@ -555,9 +551,19 @@ Returns actuator metadata for building control UIs.
 
 Ref-based site position/quaternion tracking.
 
+### `useBodyMeshes(bodyId)`
+
+Returns the Three.js meshes belonging to a MuJoCo body. Use for custom selection visuals, outlines, postprocessing, or any per-body mesh manipulation:
+
+```tsx
+const meshes = useBodyMeshes(selectedBodyId);
+
+// Use with drei Outline, or manipulate materials directly
+```
+
 ### `useSelectionHighlight(bodyId, options?)`
 
-Hook form of `<SelectionHighlight>`. Apply emissive highlights imperatively:
+Convenience wrapper around `useBodyMeshes` that applies an emissive highlight:
 
 ```tsx
 useSelectionHighlight(selectedBodyId, { color: '#00ff00', emissiveIntensity: 0.5 });
@@ -659,12 +665,13 @@ Objects that need stable contact (grasping, stacking, etc.) require tuned MuJoCo
 
 ### Click-to-Select
 
-Combine R3F raycasting with `<SelectionHighlight />` for body selection:
+Combine R3F raycasting with `useSelectionHighlight` for body selection:
 
 ```tsx
 function ClickSelectOverlay() {
   const selectedBodyId = useClickSelect(); // your raycasting hook
-  return <SelectionHighlight bodyId={selectedBodyId} />;
+  useSelectionHighlight(selectedBodyId);
+  return null;
 }
 ```
 

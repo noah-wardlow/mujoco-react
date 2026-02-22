@@ -55,7 +55,6 @@
           "components/tendon-renderer",
           "components/flex-renderer",
           "components/contact-listener",
-          "components/selection-highlight",
           "components/trajectory-player"
         ]
       },
@@ -82,6 +81,7 @@
           "hooks/use-video-recorder",
           "hooks/use-ctrl-noise",
           "hooks/use-gravity-compensation",
+          "hooks/use-body-meshes",
           "hooks/use-selection-highlight",
           "hooks/use-scene-lights"
         ]
