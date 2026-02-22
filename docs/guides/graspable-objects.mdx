@@ -12,7 +12,7 @@ Add these to your `SceneObject` definitions:
 
 ```tsx
 const config: SceneConfig = {
-  robotId: 'franka_emika_panda',
+  modelId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
   sceneObjects: [{
     name: 'cube',
@@ -97,7 +97,7 @@ const graspableObjects: SceneObject[] = [
 ];
 
 const config: SceneConfig = {
-  robotId: 'franka_emika_panda',
+  modelId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
   gripperActuatorName: 'gripper',
   sceneObjects: graspableObjects,

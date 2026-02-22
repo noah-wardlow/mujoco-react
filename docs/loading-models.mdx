@@ -6,13 +6,13 @@ icon: "file-code"
 
 ## SceneConfig
 
-Every simulation starts with a `SceneConfig` object that tells mujoco-react what to load and how to configure the robot:
+Every simulation starts with a `SceneConfig` object that tells mujoco-react what to load and how to configure it:
 
 ```tsx
 import type { SceneConfig } from 'mujoco-react';
 
 const config: SceneConfig = {
-  robotId: 'franka_emika_panda',
+  modelId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
   numArmJoints: 7,
   tcpSiteName: 'tcp',
@@ -25,7 +25,7 @@ const config: SceneConfig = {
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `robotId` | `string` | Directory name in the model repository (e.g. `'franka_emika_panda'`) |
+| `modelId` | `string` | Directory name in the model repository (e.g. `'franka_emika_panda'`) |
 | `sceneFile` | `string` | Entry MJCF file to load (e.g. `'scene.xml'`) |
 
 ### Optional Fields
@@ -45,17 +45,17 @@ const config: SceneConfig = {
 
 ### DeepMind Menagerie (Default)
 
-By default, models are fetched from the [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) on GitHub. The `robotId` maps to a directory in the repository:
+By default, models are fetched from the [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) on GitHub. The `modelId` maps to a directory in the repository:
 
 ```tsx
 // Loads from: github.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/scene.xml
 const config: SceneConfig = {
-  robotId: 'franka_emika_panda',
+  modelId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
 };
 ```
 
-Available robots include `franka_emika_panda`, `universal_robots_ur5e`, `kuka_iiwa_14`, `robotiq_2f85`, and [many more](https://github.com/google-deepmind/mujoco_menagerie).
+Available models include `franka_emika_panda`, `universal_robots_ur5e`, `kuka_iiwa_14`, `robotiq_2f85`, and [many more](https://github.com/google-deepmind/mujoco_menagerie).
 
 ### Custom Base URL
 
@@ -63,7 +63,7 @@ Point `baseUrl` to any HTTP server hosting MJCF files:
 
 ```tsx
 const config: SceneConfig = {
-  robotId: 'my_robot',
+  modelId: 'my_robot',
   sceneFile: 'scene.xml',
   baseUrl: 'https://my-server.com/models',
 };
@@ -76,7 +76,7 @@ Use raw GitHub URLs for models hosted in your own repos:
 
 ```tsx
 const config: SceneConfig = {
-  robotId: 'my_robot',
+  modelId: 'my_robot',
   sceneFile: 'robot.xml',
   baseUrl: 'https://raw.githubusercontent.com/myorg/myrepo/main',
 };
@@ -88,7 +88,7 @@ Inject dynamic objects (boxes, spheres, cylinders) into the scene without modify
 
 ```tsx
 const config: SceneConfig = {
-  robotId: 'franka_emika_panda',
+  modelId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
   sceneObjects: [
     {
@@ -137,7 +137,7 @@ For more advanced model customization, use `xmlPatches` to transform the MJCF XM
 
 ```tsx
 const config: SceneConfig = {
-  robotId: 'franka_emika_panda',
+  modelId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
   xmlPatches: [
     // Replace a value in the XML
@@ -170,7 +170,7 @@ Run custom logic after each simulation reset (e.g., randomize object positions f
 
 ```tsx
 const config: SceneConfig = {
-  robotId: 'franka_emika_panda',
+  modelId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
   sceneObjects: [
     { name: 'cube', type: 'box', size: [0.025, 0.025, 0.025],
@@ -197,7 +197,7 @@ const { api } = useMujoco();
 
 async function switchRobot() {
   await api.loadScene({
-    robotId: 'universal_robots_ur5e',
+    modelId: 'universal_robots_ur5e',
     sceneFile: 'scene.xml',
   });
 }

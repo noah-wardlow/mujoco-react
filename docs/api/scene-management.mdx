@@ -12,7 +12,7 @@ Load a new model, replacing the current scene entirely.
 
 ```tsx
 await api.loadScene({
-  robotId: 'universal_robots_ur5e',
+  modelId: 'universal_robots_ur5e',
   sceneFile: 'scene.xml',
   numArmJoints: 6,
   tcpSiteName: 'tcp',
@@ -49,7 +49,7 @@ function RobotSelector() {
   async function switchRobot(robot: typeof robots[0]) {
     setLoading(true);
     await api.loadScene({
-      robotId: robot.id,
+      modelId: robot.id,
       sceneFile: 'scene.xml',
       numArmJoints: robot.joints,
       tcpSiteName: 'tcp',

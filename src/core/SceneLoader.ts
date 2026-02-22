@@ -156,7 +156,7 @@ export async function loadScene(
 
   const baseUrl =
     config.baseUrl ||
-    `https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/${config.robotId}/`;
+    `https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/${config.modelId}/`;
 
   const downloaded = new Set<string>();
   const queue: string[] = [config.sceneFile];

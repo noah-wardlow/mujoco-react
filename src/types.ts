@@ -284,7 +284,7 @@ export interface XmlPatch {
 }
 
 export interface SceneConfig {
-  robotId: string;
+  modelId: string;
   sceneFile: string;
   baseUrl?: string;
   sceneObjects?: SceneObject[];

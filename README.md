@@ -27,7 +27,7 @@ import type { SceneConfig } from 'mujoco-react';
 import { OrbitControls } from '@react-three/drei';
 
 const config: SceneConfig = {
-  robotId: 'franka_emika_panda',
+  modelId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
   homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
 };
@@ -181,22 +181,22 @@ const ikCtx = useIk({ optional: true });
 Models are loaded from any HTTP source via `SceneConfig.baseUrl`. Defaults to [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) on GitHub.
 
 ```tsx
-// Menagerie robots: just set robotId
+// Menagerie models: just set modelId
 const franka: SceneConfig = {
-  robotId: 'franka_emika_panda',
+  modelId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
 };
 
 // Any GitHub repo
 const so101: SceneConfig = {
-  robotId: 'so101',
+  modelId: 'so101',
   sceneFile: 'SO101.xml',
   baseUrl: 'https://raw.githubusercontent.com/your-org/your-repo/main/models/',
 };
 
 // Self-hosted
 const custom: SceneConfig = {
-  robotId: 'my_robot',
+  modelId: 'my_robot',
   sceneFile: 'robot.xml',
   baseUrl: 'http://localhost:3000/models/my_robot/',
 };
@@ -208,7 +208,7 @@ The loader fetches the scene XML, parses it for dependencies (meshes, textures, 
 
 ```ts
 interface SceneConfig {
-  robotId: string;                  // e.g. 'franka_emika_panda'
+  modelId: string;                  // e.g. 'franka_emika_panda'
   sceneFile: string;                // Entry XML file, e.g. 'scene.xml'
   baseUrl?: string;                 // Base URL for fetching model files
   sceneObjects?: SceneObject[];     // Objects injected into scene XML at load time
@@ -222,7 +222,7 @@ interface SceneConfig {
 
 ```tsx
 const config: SceneConfig = {
-  robotId: 'franka_emika_panda',
+  modelId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
   sceneObjects: [
     { name: 'ball', type: 'sphere', size: [0.03, 0.03, 0.03],
