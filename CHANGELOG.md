@@ -1,3 +1,19 @@
+# [3.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v2.0.0...v3.0.0) (2026-02-22)
+
+
+### Features
+
+* rename useMujocoSim() to useMujoco() and useMujoco() to useMujocoWasm() ([3399402](https://github.com/noah-wardlow/mujoco-react/commit/33994022d1b5130fe3da1155d27796f29c29ad7e))
+
+
+### BREAKING CHANGES
+
+* useMujocoSim() is now useMujoco() (sim API hook).
+The old useMujoco() (WASM lifecycle) is now useMujocoWasm().
+Updated README, docs, and all internal references.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
 # [2.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v1.0.0...v2.0.0) (2026-02-22)
 
 
