@@ -27,7 +27,7 @@ import type { SceneConfig } from 'mujoco-react';
 import { OrbitControls } from '@react-three/drei';
 
 const config: SceneConfig = {
-  modelId: 'franka_emika_panda',
+  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
   sceneFile: 'scene.xml',
   homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
 };
@@ -178,39 +178,28 @@ const ikCtx = useIk({ optional: true });
 
 ## Loading Models
 
-Models are loaded from any HTTP source via `SceneConfig.baseUrl`. Defaults to [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) on GitHub.
+The loader fetches `src + sceneFile`, parses the XML for dependencies (meshes, textures, includes), recursively fetches those too, and writes everything to MuJoCo's in-memory WASM filesystem.
 
 ```tsx
-// Menagerie models: just set modelId
+// MuJoCo Menagerie
 const franka: SceneConfig = {
-  modelId: 'franka_emika_panda',
+  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
   sceneFile: 'scene.xml',
 };
 
-// Any GitHub repo
-const so101: SceneConfig = {
-  modelId: 'so101',
-  sceneFile: 'SO101.xml',
-  baseUrl: 'https://raw.githubusercontent.com/your-org/your-repo/main/models/',
-};
-
-// Self-hosted
+// Any URL
 const custom: SceneConfig = {
-  modelId: 'my_robot',
-  sceneFile: 'robot.xml',
-  baseUrl: 'http://localhost:3000/models/my_robot/',
+  src: 'http://localhost:3000/models/my_model/',
+  sceneFile: 'model.xml',
 };
 ```
-
-The loader fetches the scene XML, parses it for dependencies (meshes, textures, includes), recursively fetches those too, applies any XML patches, and writes everything to MuJoCo's in-memory WASM filesystem.
 
 ## SceneConfig
 
 ```ts
 interface SceneConfig {
-  modelId: string;                  // e.g. 'franka_emika_panda'
+  src: string;                      // Base URL for model files
   sceneFile: string;                // Entry XML file, e.g. 'scene.xml'
-  baseUrl?: string;                 // Base URL for fetching model files
   sceneObjects?: SceneObject[];     // Objects injected into scene XML at load time
   homeJoints?: number[];            // Initial joint positions
   xmlPatches?: XmlPatch[];          // Patches applied to XML files during loading
@@ -222,7 +211,7 @@ interface SceneConfig {
 
 ```tsx
 const config: SceneConfig = {
-  modelId: 'franka_emika_panda',
+  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
   sceneFile: 'scene.xml',
   sceneObjects: [
     { name: 'ball', type: 'sphere', size: [0.03, 0.03, 0.03],

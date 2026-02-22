@@ -29,7 +29,7 @@ function App() {
         <MujocoPhysics
           ref={apiRef}
           config={{
-            modelId: 'franka_emika_panda',
+            src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
             sceneFile: 'scene.xml',
           }}
           paused={false}

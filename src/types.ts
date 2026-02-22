@@ -284,9 +284,10 @@ export interface XmlPatch {
 }
 
 export interface SceneConfig {
-  modelId: string;
+  /** Base URL for fetching model files. The loader fetches `src + sceneFile` and follows dependencies. */
+  src: string;
+  /** Entry MJCF XML file name, e.g. 'scene.xml'. */
   sceneFile: string;
-  baseUrl?: string;
   sceneObjects?: SceneObject[];
   homeJoints?: number[];
   xmlPatches?: XmlPatch[];

@@ -154,9 +154,7 @@ export async function loadScene(
   try { mujoco.FS.unmount('/working'); } catch { /* ignore */ }
   try { mujoco.FS.mkdir('/working'); } catch { /* ignore */ }
 
-  const baseUrl =
-    config.baseUrl ||
-    `https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/${config.modelId}/`;
+  const baseUrl = config.src.endsWith('/') ? config.src : config.src + '/';
 
   const downloaded = new Set<string>();
   const queue: string[] = [config.sceneFile];

@@ -22,7 +22,7 @@ function App() {
       <MujocoCanvas
         ref={apiRef}
         config={{
-          modelId: 'franka_emika_panda',
+          src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
           sceneFile: 'scene.xml',
         }}
         camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
