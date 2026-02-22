@@ -23,7 +23,7 @@ useVideoRecorder(options?: {
 ## Usage
 
 ```tsx
-import { useVideoRecorder } from 'mujoco-react';
+import { useVideoRecorder } from "mujoco-react";
 
 function VideoControls() {
   const video = useVideoRecorder({ fps: 30 });
@@ -33,7 +33,7 @@ function VideoControls() {
       {video.recording ? (
         <button onClick={async () => {
           await video.stop();
-          video.download('simulation.webm');
+          video.download("simulation.webm");
         }}>
           Stop Recording
         </button>

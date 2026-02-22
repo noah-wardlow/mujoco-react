@@ -15,10 +15,10 @@ useSensor(name: Sensors): SensorHandle
 ## Usage
 
 ```tsx
-import { useSensor } from 'mujoco-react';
+import { useSensor } from "mujoco-react";
 
 function ForceSensorDisplay() {
-  const force = useSensor('force_sensor');
+  const force = useSensor("force_sensor");
   const textRef = useRef<any>(null);
 
   useFrame(() => {

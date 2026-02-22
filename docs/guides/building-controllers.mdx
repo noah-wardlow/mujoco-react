@@ -13,12 +13,12 @@ The `useIkController()` hook follows this same pattern. You can use it, swap in 
 For robots where arm control comes from `<IkGizmo />`, the controller only adds extra bindings (gripper, etc.):
 
 ```tsx
-import { useKeyboardTeleop } from 'mujoco-react';
+import { useKeyboardTeleop } from "mujoco-react";
 
 export function FrankaController() {
   useKeyboardTeleop({
     bindings: {
-      v: { actuator: 'gripper', toggle: [0, 255] },
+      v: { actuator: "gripper", toggle: [0, 255] },
     },
   });
   return null;
@@ -29,7 +29,7 @@ Drop it into your scene as a child of `<MujocoCanvas>`:
 
 ```tsx
 function FrankaScene() {
-  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
   return (
     <>
       {ik && <IkGizmo controller={ik} />}
@@ -52,8 +52,8 @@ For more complex control (IK solvers, velocity control, state machines), use `us
 Read keyboard input via window event listeners and a ref:
 
 ```tsx
-import { useEffect, useRef } from 'react';
-import { useBeforePhysicsStep } from 'mujoco-react';
+import { useEffect, useRef } from "react";
+import { useBeforePhysicsStep } from "mujoco-react";
 
 function MyController() {
   const keys = useRef<Record<string, boolean>>({});
@@ -61,18 +61,18 @@ function MyController() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => { keys.current[e.code] = true; };
     const up = (e: KeyboardEvent) => { keys.current[e.code] = false; };
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
     return () => {
-      window.removeEventListener('keydown', down);
-      window.removeEventListener('keyup', up);
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
     };
   }, []);
 
   useBeforePhysicsStep((_model, data) => {
     const k = keys.current;
-    if (k['KeyW']) data.ctrl[0] += 0.01;
-    if (k['KeyS']) data.ctrl[0] -= 0.01;
+    if (k["KeyW"]) data.ctrl[0] += 0.01;
+    if (k["KeyS"]) data.ctrl[0] -= 0.01;
   });
 
   return null;
@@ -121,8 +121,8 @@ const SO101_CONFIG: ArmControllerConfig = {
   numActuators: 6,
   arms: [{
     indices: [0, 1, 2, 3, 4, 5],
-    keys: ['KeyD', 'KeyA', 'KeyW', 'KeyS', 'KeyQ', 'KeyE',
-           'KeyR', 'KeyF', 'KeyZ', 'KeyC', 'KeyV'],
+    keys: ["KeyD", "KeyA", "KeyW", "KeyS", "KeyQ", "KeyE",
+           "KeyR", "KeyF", "KeyZ", "KeyC", "KeyV"],
     initialJoints: [0.0158, 2.052, 2.1307, -0.0845, 1.5857, -0.3745],
   }],
 };
@@ -142,7 +142,7 @@ Three options for IK:
 The default `useIkController()` uses Damped Least-Squares:
 
 ```tsx
-const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+const ik = useIkController({ siteName: "tcp", numJoints: 7 });
 return ik ? <IkGizmo controller={ik} /> : null;
 ```
 
@@ -151,13 +151,13 @@ return ik ? <IkGizmo controller={ik} /> : null;
 Pass `ikSolveFn` to replace the built-in solver while keeping the gizmo, reset handling, and context:
 
 ```tsx
-import type { IKSolveFn } from 'mujoco-react';
+import type { IKSolveFn } from "mujoco-react";
 
 const myIK: IKSolveFn = (pos, quat, currentQ) => {
   return myAnalyticalSolver(pos, currentQ); // return joint angles or null
 };
 
-const ik = useIkController({ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK });
+const ik = useIkController({ siteName: "tcp", numJoints: 7, ikSolveFn: myIK });
 return ik ? <IkGizmo controller={ik} /> : null;
 ```
 
@@ -187,7 +187,7 @@ This gives you full access to model/data for whatever solver you want.
 For reusable controllers with typed config and default merging, use the `createController` factory. It handles config merging, display names, and metadata.
 
 ```tsx
-import { createController, useBeforePhysicsStep } from 'mujoco-react';
+import { createController, useBeforePhysicsStep } from "mujoco-react";
 
 // 1. Define your config type
 interface MyConfig {
@@ -207,7 +207,7 @@ function MyControllerImpl({ config, children }: { config: MyConfig; children?: R
 
 // 3. Create the controller with the factory
 export const MyController = createController<MyConfig>(
-  { name: 'MyController', defaultConfig: { gain: 1.0, frequency: 1.0 } },
+  { name: "MyController", defaultConfig: { gain: 1.0, frequency: 1.0 } },
   MyControllerImpl,
 );
 
@@ -267,8 +267,8 @@ When a robot supports both gizmo drag and keyboard control, the controller needs
 3. **Disable IK** via `ik.setIkEnabled(false)` when taking over
 
 ```tsx
-import { useBeforePhysicsStep } from 'mujoco-react';
-import type { IkContextValue } from 'mujoco-react';
+import { useBeforePhysicsStep } from "mujoco-react";
+import type { IkContextValue } from "mujoco-react";
 
 function MyArmController({ ik }: { ik?: IkContextValue | null }) {
   useBeforePhysicsStep((_model, data) => {
@@ -309,9 +309,9 @@ function SceneChildren({ robotKey, ikConfig, showGizmo }) {
       {ik && showGizmo && <IkGizmo controller={ik} />}
       <DragInteraction />
 
-      {robotKey === 'franka' && <FrankaController />}
-      {robotKey === 'so101' && <SO101Controller ik={ik} />}
-      {robotKey === 'xlerobot' && <XLeRobotController ik={ik} />}
+      {robotKey === "franka" && <FrankaController />}
+      {robotKey === "so101" && <SO101Controller ik={ik} />}
+      {robotKey === "xlerobot" && <XLeRobotController ik={ik} />}
     </>
   );
 }

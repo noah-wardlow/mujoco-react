@@ -24,7 +24,7 @@ usePolicy(config: {
 ## Usage
 
 ```tsx
-import { usePolicy } from 'mujoco-react';
+import { usePolicy } from "mujoco-react";
 
 function PolicyRunner({ model: nnModel }) {
   const policy = usePolicy({
@@ -84,13 +84,13 @@ function PolicyRunner({ model: nnModel }) {
 ## Example: TensorFlow.js Policy
 
 ```tsx
-import * as tf from '@tensorflow/tfjs';
+import * as tf from "@tensorflow/tfjs";
 
 function TFPolicy() {
   const modelRef = useRef<tf.LayersModel | null>(null);
 
   useEffect(() => {
-    tf.loadLayersModel('/policy/model.json').then(m => { modelRef.current = m; });
+    tf.loadLayersModel("/policy/model.json").then(m => { modelRef.current = m; });
   }, []);
 
   const policy = usePolicy({

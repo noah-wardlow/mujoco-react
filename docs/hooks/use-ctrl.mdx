@@ -15,10 +15,10 @@ useCtrl(name: Actuators): CtrlHandle
 ## Usage
 
 ```tsx
-import { useCtrl } from 'mujoco-react';
+import { useCtrl } from "mujoco-react";
 
 function GripperControl() {
-  const gripper = useCtrl('gripper');
+  const gripper = useCtrl("gripper");
 
   return (
     <div>
@@ -33,7 +33,7 @@ function GripperControl() {
 
 ```tsx
 function GripperDisplay() {
-  const gripper = useCtrl('gripper');
+  const gripper = useCtrl("gripper");
   const textRef = useRef<any>(null);
 
   useFrame(() => {
@@ -50,11 +50,13 @@ function GripperDisplay() {
 
 ```tsx
 function MyController() {
-  const joint1 = useCtrl('joint1');
-  const force = useSensor('force_sensor');
+  const shoulder = useCtrl("shoulder");
+  const elbow = useCtrl("elbow");
+  const force = useSensor("force_sensor");
 
   useBeforePhysicsStep(() => {
-    joint1.write(force.read()[0] * -0.5);
+    shoulder.write(Math.sin(Date.now() / 1000));
+    elbow.write(force.read()[0] * -0.5);
   });
   return null;
 }

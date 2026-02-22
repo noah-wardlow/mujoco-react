@@ -12,7 +12,7 @@ Get all bodies in the model.
 
 ```tsx
 const bodies = api.getBodies();
-// [{ id: 0, name: 'world', mass: 0, parentId: -1 }, ...]
+// [{ id: 0, name: "world", mass: 0, parentId: -1 }, ...]
 ```
 
 **Returns:** `BodyInfo[]`
@@ -44,7 +44,7 @@ interface JointInfo {
   id: number;
   name: string;
   type: number;
-  typeName: 'free' | 'ball' | 'slide' | 'hinge';
+  typeName: "free" | "ball" | "slide" | "hinge";
   range: [number, number];
   limited: boolean;
   bodyId: number;
@@ -80,7 +80,7 @@ Get all sites in the model.
 
 ```tsx
 const sites = api.getSites();
-const tcp = sites.find(s => s.name === 'tcp');
+const tcp = sites.find(s => s.name === "tcp");
 ```
 
 **Returns:** `SiteInfo[]`
@@ -143,9 +143,9 @@ interface SensorInfo {
 Read a specific sensor's current values.
 
 ```tsx
-const force = api.getSensorData('wrist_force');
+const force = api.getSensorData("wrist_force");
 if (force) {
-  console.log('Force:', force[0], force[1], force[2]);
+  console.log("Force:", force[0], force[1], force[2]);
 }
 ```
 
@@ -185,8 +185,8 @@ Get simulation options.
 
 ```tsx
 const opts = api.getModelOption();
-console.log('Timestep:', opts.timestep);
-console.log('Gravity:', opts.gravity);
+console.log("Timestep:", opts.timestep);
+console.log("Gravity:", opts.gravity);
 ```
 
 **Returns:** `ModelOptions`
@@ -204,7 +204,7 @@ interface ModelOptions {
 ```tsx
 function ModelInfo() {
   const { api } = useMujoco();
-  const [info, setInfo] = useState('');
+  const [info, setInfo] = useState("");
 
   useEffect(() => {
     const bodies = api.getBodies();

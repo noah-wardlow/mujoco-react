@@ -24,18 +24,18 @@ import {
   MujocoCanvas,
   useIkController,
   IkGizmo,
-} from 'mujoco-react';
-import type { SceneConfig } from 'mujoco-react';
-import { OrbitControls } from '@react-three/drei';
+} from "mujoco-react";
+import type { SceneConfig } from "mujoco-react";
+import { OrbitControls } from "@react-three/drei";
 
 const config: SceneConfig = {
-  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-  sceneFile: 'scene.xml',
+  src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+  sceneFile: "scene.xml",
   homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
 };
 
 function Scene() {
-  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
   return (
     <>
       <OrbitControls enableDamping makeDefault />
@@ -53,7 +53,7 @@ function App() {
         config={config}
         camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
         shadows
-        style={{ width: '100%', height: '100vh' }}
+        style={{ width: "100%", height: "100vh" }}
       >
         <Scene />
       </MujocoCanvas>
@@ -67,7 +67,7 @@ function App() {
 Inside `<MujocoCanvas>` or `<MujocoPhysics>`, `useMujoco()` gives you the simulation API, refs to the live model/data, and status:
 
 ```tsx
-import { useMujoco } from 'mujoco-react';
+import { useMujoco } from "mujoco-react";
 
 function MyComponent() {
   const { isPending, isError, error, api, mjModelRef } = useMujoco();
@@ -88,15 +88,16 @@ function MyComponent() {
 A controller is a React component that uses handle-based hooks for type-safe actuator and sensor access:
 
 ```tsx
-import { useCtrl, useSensor, useBeforePhysicsStep } from 'mujoco-react';
+import { useCtrl, useSensor, useBeforePhysicsStep } from "mujoco-react";
 
 function MyController() {
-  const joint1 = useCtrl('joint1');
-  const force = useSensor('force_sensor');
+  const shoulder = useCtrl("shoulder");
+  const elbow = useCtrl("elbow");
+  const force = useSensor("force_sensor");
 
   useBeforePhysicsStep(() => {
-    joint1.write(Math.sin(Date.now() / 1000));
-    joint1.write(force.read()[0] * -0.5);
+    shoulder.write(Math.sin(Date.now() / 1000));
+    elbow.write(force.read()[0] * -0.5);
   });
   return null;
 }
@@ -113,10 +114,10 @@ Drop it into the tree:
 The `createController<TConfig>()` factory adds typed config and default merging for reusable plugins:
 
 ```tsx
-import { createController, useBeforePhysicsStep } from 'mujoco-react';
+import { createController, useBeforePhysicsStep } from "mujoco-react";
 
 export const MyController = createController<{ gain: number }>(
-  { name: 'MyController', defaultConfig: { gain: 1.0 } },
+  { name: "MyController", defaultConfig: { gain: 1.0 } },
   ({ config }) => {
     useBeforePhysicsStep((_model, data) => {
       data.ctrl[0] = config.gain * Math.sin(data.time);
@@ -148,13 +149,13 @@ export const MyController = createController<{ gain: number }>(
 The built-in `useIkController()` uses Damped Least-Squares. Pass `ikSolveFn` to swap in your own solver (analytical, learned, etc.):
 
 ```tsx
-import type { IKSolveFn } from 'mujoco-react';
+import type { IKSolveFn } from "mujoco-react";
 
 const myIK: IKSolveFn = (pos, quat, currentQ) => {
   return myAnalyticalSolver(pos, currentQ); // return joint angles or null
 };
 
-const ik = useIkController({ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK });
+const ik = useIkController({ siteName: "tcp", numJoints: 7, ikSolveFn: myIK });
 ```
 
 ### `useIkController(config | null)`
@@ -162,7 +163,7 @@ const ik = useIkController({ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK });
 Hook for interactive end-effector control. Pass `null` to disable IK (safe to call unconditionally):
 
 ```tsx
-const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+const ik = useIkController({ siteName: "tcp", numJoints: 7 });
 return ik ? <IkGizmo controller={ik} /> : null;
 ```
 
@@ -184,11 +185,11 @@ Use TypeScript module augmentation to get autocomplete and type checking for act
 
 ```ts
 // e.g. in src/mujoco-register.d.ts
-declare module 'mujoco-react' {
+declare module "mujoco-react" {
   interface Register {
-    actuators: 'joint1' | 'joint2' | 'joint3' | 'gripper';
-    sensors: 'force_sensor' | 'torque_sensor';
-    bodies: 'link0' | 'link1' | 'hand';
+    actuators: "joint1" | "joint2" | "joint3" | "gripper";
+    sensors: "force_sensor" | "torque_sensor";
+    bodies: "link0" | "link1" | "hand";
   }
 }
 ```
@@ -202,14 +203,14 @@ The loader fetches `src + sceneFile`, parses the XML for dependencies (meshes, t
 ```tsx
 // MuJoCo Menagerie
 const franka: SceneConfig = {
-  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-  sceneFile: 'scene.xml',
+  src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+  sceneFile: "scene.xml",
 };
 
 // Any URL
 const custom: SceneConfig = {
-  src: 'http://localhost:3000/models/my_model/',
-  sceneFile: 'model.xml',
+  src: "http://localhost:3000/models/my_model/",
+  sceneFile: "model.xml",
 };
 ```
 
@@ -218,7 +219,7 @@ const custom: SceneConfig = {
 ```ts
 interface SceneConfig {
   src: string;                      // Base URL for model files
-  sceneFile: string;                // Entry XML file, e.g. 'scene.xml'
+  sceneFile: string;                // Entry XML file, e.g. "scene.xml"
   sceneObjects?: SceneObject[];     // Objects injected into scene XML at load time
   homeJoints?: number[];            // Initial joint positions
   xmlPatches?: XmlPatch[];          // Patches applied to XML files during loading
@@ -230,12 +231,12 @@ interface SceneConfig {
 
 ```tsx
 const config: SceneConfig = {
-  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-  sceneFile: 'scene.xml',
+  src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+  sceneFile: "scene.xml",
   sceneObjects: [
-    { name: 'ball', type: 'sphere', size: [0.03, 0.03, 0.03],
+    { name: "ball", type: "sphere", size: [0.03, 0.03, 0.03],
       position: [0.5, 0, 0.1], rgba: [1, 0, 0, 1], mass: 0.1, freejoint: true },
-    { name: 'platform', type: 'box', size: [0.2, 0.2, 0.01],
+    { name: "platform", type: "box", size: [0.2, 0.2, 0.01],
       position: [0.4, 0.3, 0], rgba: [0.5, 0.5, 0.5, 1] },
   ],
 };
@@ -245,10 +246,10 @@ const config: SceneConfig = {
 
 ```tsx
 xmlPatches: [{
-  target: 'panda.xml',
-  replace: ['name="actuator8"', 'name="gripper"'],
-  inject: '<site name="tcp" pos="0 0 0.1" size="0.01"/>',
-  injectAfter: '<body name="hand"',
+  target: "panda.xml",
+  replace: ["name=\"actuator8\"", "name=\"gripper\""],
+  inject: "<site name=\"tcp\" pos=\"0 0 0.1\" size=\"0.01\"/>",
+  injectAfter: "<body name=\"hand\"",
 }]
 ```
 
@@ -372,7 +373,7 @@ InstancedMesh showing MuJoCo contact points for debugging.
 |------|------|---------|-------------|
 | `maxContacts` | `number?` | `100` | Max contacts to display |
 | `radius` | `number?` | `0.005` | Marker sphere radius |
-| `color` | `string?` | `'#4f46e5'` | Marker color |
+| `color` | `string?` | `"#4f46e5"` | Marker color |
 | `visible` | `boolean?` | `true` | Toggle visibility |
 
 ### `<SceneLights />`
@@ -392,10 +393,10 @@ Visualization overlays:
 | `showCOM` | `boolean?` | `false` | Center of mass markers |
 | `showInertia` | `boolean?` | `false` | Inertia ellipsoids |
 | `showTendons` | `boolean?` | `false` | Tendon paths |
-| `geomColor` | `string?` | `'#00ff00'` | Color for wireframe geoms |
-| `siteColor` | `string?` | `'#ff00ff'` | Color for site markers |
-| `contactColor` | `string?` | `'#ff4444'` | Color for contact force arrows |
-| `comColor` | `string?` | `'#ff0000'` | Color for COM markers |
+| `geomColor` | `string?` | `"#00ff00"` | Color for wireframe geoms |
+| `siteColor` | `string?` | `"#ff00ff"` | Color for site markers |
+| `contactColor` | `string?` | `"#ff4444"` | Color for contact force arrows |
+| `comColor` | `string?` | `"#ff0000"` | Color for COM markers |
 
 ### `<TendonRenderer />`
 
@@ -412,8 +413,8 @@ Component wrapper for contact events:
 ```tsx
 <ContactListener
   body="block_1"
-  onContactEnter={(info) => console.log('contact!', info)}
-  onContactExit={(info) => console.log('released', info)}
+  onContactEnter={(info) => console.log("contact!", info)}
+  onContactExit={(info) => console.log("released", info)}
 />
 ```
 
@@ -439,12 +440,12 @@ if (sim.isReady) {
 Access the raw WASM module lifecycle from any child of `<MujocoProvider>`. Most users won't need this — `useMujoco()` and hooks like `useBeforePhysicsStep` handle the model/data lifecycle for you.
 
 ```tsx
-import { useMujocoWasm } from 'mujoco-react';
+import { useMujocoWasm } from "mujoco-react";
 
 const { mujoco, status } = useMujocoWasm();
 
 if (mujoco) {
-  const model = mujoco.MjModel.loadFromXML('/path/to/scene.xml');
+  const model = mujoco.MjModel.loadFromXML("/path/to/scene.xml");
   const data = new mujoco.MjData(model);
   mujoco.mj_step(model, data);
   console.log(data.qpos);  // joint positions after one step
@@ -489,8 +490,8 @@ await moveCameraTo(
 Read sensor values by name. Returns a `SensorHandle` with `read()`, `dim`, and `name`:
 
 ```tsx
-const force = useSensor('force_sensor_1');
-// force.read() → Float64Array, force.dim → number
+const force = useSensor("force_sensor_1");
+// force.read() -> Float64Array, force.dim -> number
 ```
 
 ### `useBodyState(name)`
@@ -498,7 +499,7 @@ const force = useSensor('force_sensor_1');
 Position, quaternion, linear/angular velocity of a body (ref-based):
 
 ```tsx
-const { position, quaternion, linearVelocity, angularVelocity } = useBodyState('block_1');
+const { position, quaternion, linearVelocity, angularVelocity } = useBodyState("block_1");
 ```
 
 ### `useJointState(name)`
@@ -506,7 +507,7 @@ const { position, quaternion, linearVelocity, angularVelocity } = useBodyState('
 Joint position and velocity:
 
 ```tsx
-const { position, velocity } = useJointState('joint1');
+const { position, velocity } = useJointState("joint1");
 ```
 
 ### `useCtrl(name)`
@@ -514,8 +515,8 @@ const { position, velocity } = useJointState('joint1');
 Read/write actuator control by name. Returns a `CtrlHandle` with `read()`, `write()`, `name`, and `range`:
 
 ```tsx
-const gripper = useCtrl('gripper');
-// gripper.read() → number, gripper.write(0.04), gripper.range → [min, max]
+const gripper = useCtrl("gripper");
+// gripper.read() -> number, gripper.write(0.04), gripper.range -> [min, max]
 ```
 
 ### `useContacts(bodyName?)` / `useContactEvents(bodyName, handlers)`
@@ -523,9 +524,9 @@ const gripper = useCtrl('gripper');
 Query contacts or subscribe to enter/exit events:
 
 ```tsx
-useContactEvents('block_1', {
-  onEnter: (info) => console.log('contact!', info),
-  onExit: (info) => console.log('released', info),
+useContactEvents("block_1", {
+  onEnter: (info) => console.log("contact!", info),
+  onExit: (info) => console.log("released", info),
 });
 ```
 
@@ -536,9 +537,9 @@ Map keyboard keys to actuators:
 ```tsx
 useKeyboardTeleop({
   bindings: {
-    'w': { actuator: 'forward', delta: 0.1 },
-    's': { actuator: 'forward', delta: -0.1 },
-    'v': { actuator: 'gripper', toggle: [0, 0.04] },
+    "w": { actuator: "forward", delta: 0.1 },
+    "s": { actuator: "forward", delta: -0.1 },
+    "v": { actuator: "gripper", toggle: [0, 0.04] },
   },
 });
 ```
@@ -549,8 +550,8 @@ Map gamepad axes/buttons to actuators:
 
 ```tsx
 useGamepad({
-  axes: { 0: 'joint1', 1: 'joint2' },
-  buttons: { 0: 'gripper' },
+  axes: { 0: "joint1", 1: "joint2" },
+  buttons: { 0: "gripper" },
   deadzone: 0.1,
 });
 ```
@@ -572,7 +573,7 @@ const { step, isRunning } = usePolicy({
 Record and play back simulation trajectories:
 
 ```tsx
-const recorder = useTrajectoryRecorder({ fields: ['qpos', 'qvel', 'ctrl'] });
+const recorder = useTrajectoryRecorder({ fields: ["qpos", "qvel", "ctrl"] });
 // recorder.start(), recorder.stop(), recorder.downloadJSON(), recorder.downloadCSV()
 
 const player = useTrajectoryPlayer(trajectory, { fps: 30, loop: true });
@@ -584,7 +585,7 @@ const player = useTrajectoryPlayer(trajectory, { fps: 30, loop: true });
 Record the canvas as video:
 
 ```tsx
-const video = useVideoRecorder({ fps: 30, mimeType: 'video/webm' });
+const video = useVideoRecorder({ fps: 30, mimeType: "video/webm" });
 // video.start(), video.stop() -> returns Blob
 ```
 
@@ -623,7 +624,7 @@ const meshes = useBodyMeshes(selectedBodyId);
 Convenience wrapper around `useBodyMeshes` that applies an emissive highlight:
 
 ```tsx
-useSelectionHighlight(selectedBodyId, { color: '#00ff00', emissiveIntensity: 0.5 });
+useSelectionHighlight(selectedBodyId, { color: "#00ff00", emissiveIntensity: 0.5 });
 ```
 
 ### `useSceneLights(intensity?)`

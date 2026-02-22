@@ -18,8 +18,8 @@ const hit = api.raycast(
 );
 
 if (hit) {
-  console.log('Hit body', hit.bodyId, 'at distance', hit.distance);
-  console.log('Point:', hit.point);
+  console.log("Hit body", hit.bodyId, "at distance", hit.distance);
+  console.log("Point:", hit.point);
 }
 ```
 
@@ -59,8 +59,8 @@ const hit = api.project2DTo3D(
 );
 
 if (hit) {
-  console.log('World point:', hit.point);
-  console.log('Body:', hit.bodyId);
+  console.log("World point:", hit.point);
+  console.log("Body:", hit.bodyId);
 }
 ```
 
@@ -91,7 +91,7 @@ const base64 = api.getCanvasSnapshot();
 // "data:image/png;base64,iVBORw0KGgo..."
 
 // Custom size and format
-const jpeg = api.getCanvasSnapshot(640, 480, 'image/jpeg');
+const jpeg = api.getCanvasSnapshot(640, 480, "image/jpeg");
 ```
 
 <ParamField body="width" type="number">
@@ -113,14 +113,14 @@ const jpeg = api.getCanvasSnapshot(640, 480, 'image/jpeg');
 Camera state and animation are available via the standalone `useCameraAnimation()` hook:
 
 ```tsx
-import { useCameraAnimation } from 'mujoco-react';
+import { useCameraAnimation } from "mujoco-react";
 
 const { getCameraState, moveCameraTo } = useCameraAnimation();
 
 // Get current camera state
 const cam = getCameraState();
-console.log('Camera at:', cam.position);
-console.log('Looking at:', cam.target);
+console.log("Camera at:", cam.position);
+console.log("Looking at:", cam.target);
 
 // Animate camera
 await moveCameraTo(
@@ -135,7 +135,7 @@ See [useCameraAnimation](/hooks/use-camera-animation) for full documentation.
 ## Example: Vision Pipeline
 
 ```tsx
-import { useCameraAnimation } from 'mujoco-react';
+import { useCameraAnimation } from "mujoco-react";
 
 async function detectObjects(api: MujocoSimAPI) {
   const { getCameraState } = useCameraAnimation();

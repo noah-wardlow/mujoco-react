@@ -29,7 +29,7 @@ useTrajectoryPlayer(
 ## Usage
 
 ```tsx
-import { useTrajectoryPlayer } from 'mujoco-react';
+import { useTrajectoryPlayer } from "mujoco-react";
 
 function PlaybackControls({ trajectory }) {
   const player = useTrajectoryPlayer(trajectory, {
@@ -40,7 +40,7 @@ function PlaybackControls({ trajectory }) {
   return (
     <div>
       <button onClick={player.playing ? player.pause : player.play}>
-        {player.playing ? 'Pause' : 'Play'}
+        {player.playing ? "Pause" : "Play"}
       </button>
       <button onClick={player.reset}>Reset</button>
       <input

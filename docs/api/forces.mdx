@@ -12,10 +12,10 @@ Apply a force to a body at an optional point.
 
 ```tsx
 // Push body upward
-api.applyForce('block', new THREE.Vector3(0, 0, 10));
+api.applyForce("block", new THREE.Vector3(0, 0, 10));
 
 // Push at a specific point (creates torque)
-api.applyForce('block',
+api.applyForce("block",
   new THREE.Vector3(5, 0, 0),
   new THREE.Vector3(0.1, 0, 0.05)
 );
@@ -38,7 +38,7 @@ api.applyForce('block',
 Apply a pure torque to a body.
 
 ```tsx
-api.applyTorque('wheel', new THREE.Vector3(0, 0, 5)); // Spin around Z
+api.applyTorque("wheel", new THREE.Vector3(0, 0, 5)); // Spin around Z
 ```
 
 <ParamField body="bodyName" type="string" required>
@@ -55,7 +55,7 @@ Set both force and torque on a body via `xfrc_applied`.
 
 ```tsx
 api.setExternalForce(
-  'block',
+  "block",
   new THREE.Vector3(0, 0, 10),  // Force
   new THREE.Vector3(0, 0, 1),   // Torque
 );
@@ -99,7 +99,7 @@ To apply a continuous force, call it every frame:
 
 ```tsx
 useBeforePhysicsStep(() => {
-  api.applyForce('block', new THREE.Vector3(0, 0, 9.81 * mass)); // Hover
+  api.applyForce("block", new THREE.Vector3(0, 0, 9.81 * mass)); // Hover
 });
 ```
 
@@ -109,7 +109,7 @@ Set actuator controls by name or as a batch.
 
 ```tsx
 // Single actuator by name
-api.setCtrl('gripper', 0.04);
+api.setCtrl("gripper", 0.04);
 
 // Multiple actuators at once
 api.setCtrl({

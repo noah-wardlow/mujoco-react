@@ -11,7 +11,7 @@ Narrow on `isReady`, `isPending`, or `isError` to get type-safe access to the AP
 ## Usage
 
 ```tsx
-import { useMujoco } from 'mujoco-react';
+import { useMujoco } from "mujoco-react";
 
 function MyComponent() {
   const sim = useMujoco();
@@ -33,20 +33,20 @@ function MyComponent() {
 ### Loading
 
 ```ts
-{ status: 'loading'; isPending: true; isReady: false; isError: false; error: null; api: null }
+{ status: "loading"; isPending: true; isReady: false; isError: false; error: null; api: null }
 ```
 
 ### Error
 
 ```ts
-{ status: 'error'; isPending: false; isReady: false; isError: true; error: string; api: null }
+{ status: "error"; isPending: false; isReady: false; isError: true; error: string; api: null }
 ```
 
 ### Ready
 
 ```ts
 {
-  status: 'ready';
+  status: "ready";
   isPending: false;
   isReady: true;
   isError: false;

@@ -9,7 +9,7 @@ Standalone hook for smooth camera animation. Works with OrbitControls or any cam
 ## Usage
 
 ```tsx
-import { useCameraAnimation } from 'mujoco-react';
+import { useCameraAnimation } from "mujoco-react";
 
 function CameraController() {
   const { getCameraState, moveCameraTo } = useCameraAnimation();
@@ -20,7 +20,7 @@ function CameraController() {
       new THREE.Vector3(0, 0, 0.5),   // Target look-at
       1000                             // Duration (ms)
     );
-    console.log('Camera animation complete');
+    console.log("Camera animation complete");
   };
 
   return <button onClick={handleClick}>Move Camera</button>;
@@ -42,8 +42,8 @@ Returns the current camera position and orbit target.
 
 ```tsx
 const { position, target } = getCameraState();
-console.log('Camera at:', position);
-console.log('Looking at:', target);
+console.log("Camera at:", position);
+console.log("Looking at:", target);
 ```
 
 ### `moveCameraTo(position, target, durationMs)`

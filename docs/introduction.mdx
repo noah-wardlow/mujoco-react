@@ -32,11 +32,11 @@ npm install mujoco-react mujoco-js @react-three/fiber @react-three/drei three
 ```tsx
 import {
   MujocoProvider, MujocoCanvas, useIkController, IkGizmo,
-} from 'mujoco-react';
-import { OrbitControls } from '@react-three/drei';
+} from "mujoco-react";
+import { OrbitControls } from "@react-three/drei";
 
 function Scene() {
-  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
   return (
     <>
       <OrbitControls makeDefault />
@@ -52,13 +52,13 @@ function App() {
     <MujocoProvider>
       <MujocoCanvas
         config={{
-          src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-          sceneFile: 'scene.xml',
+          src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+          sceneFile: "scene.xml",
           homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
         }}
         camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
         shadows
-        style={{ width: '100%', height: '100vh' }}
+        style={{ width: "100%", height: "100vh" }}
       >
         <Scene />
       </MujocoCanvas>
@@ -74,7 +74,7 @@ This loads the Franka Panda from [DeepMind Menagerie](https://github.com/google-
 A controller is a React component that calls `useBeforePhysicsStep` to write `data.ctrl` each frame:
 
 ```tsx
-import { useBeforePhysicsStep } from 'mujoco-react';
+import { useBeforePhysicsStep } from "mujoco-react";
 
 function MyController() {
   useBeforePhysicsStep((_model, data) => {

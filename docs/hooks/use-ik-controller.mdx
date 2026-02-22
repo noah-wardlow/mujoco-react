@@ -9,10 +9,10 @@ Hook that sets up IK control for a MuJoCo site. Pass `null` to disable IK (safe 
 ## Usage
 
 ```tsx
-import { useIkController, IkGizmo } from 'mujoco-react';
+import { useIkController, IkGizmo } from "mujoco-react";
 
 function MyScene({ hasIk }: { hasIk: boolean }) {
-  const ik = useIkController(hasIk ? { siteName: 'tcp', numJoints: 7 } : null);
+  const ik = useIkController(hasIk ? { siteName: "tcp", numJoints: 7 } : null);
 
   return ik ? <IkGizmo controller={ik} /> : null;
 }
@@ -21,13 +21,13 @@ function MyScene({ hasIk }: { hasIk: boolean }) {
 ### With Custom Solver
 
 ```tsx
-import type { IKSolveFn } from 'mujoco-react';
+import type { IKSolveFn } from "mujoco-react";
 
 const myIK: IKSolveFn = (pos, quat, currentQ) => {
   return myAnalyticalSolver(pos, currentQ);
 };
 
-const ik = useIkController({ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK });
+const ik = useIkController({ siteName: "tcp", numJoints: 7, ikSolveFn: myIK });
 ```
 
 ## Config
@@ -85,7 +85,7 @@ A common pattern is disabling IK when keyboard control takes over. Pass the `ik`
 
 ```tsx
 function MyScene() {
-  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
 
   return (
     <>
@@ -119,7 +119,7 @@ The gizmo re-enables IK automatically when dragged.
 
 ```tsx
 function WaypointFollower({ waypoints }: { waypoints: THREE.Vector3[] }) {
-  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
   const [index, setIndex] = useState(0);
 
   useEffect(() => {

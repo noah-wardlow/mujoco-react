@@ -12,19 +12,19 @@ Add these to your `SceneObject` definitions:
 
 ```tsx
 const config: SceneConfig = {
-  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-  sceneFile: 'scene.xml',
+  src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+  sceneFile: "scene.xml",
   sceneObjects: [{
-    name: 'cube',
-    type: 'box',
+    name: "cube",
+    type: "box",
     size: [0.025, 0.025, 0.025],
     position: [0.4, 0, 0.025],
     rgba: [0.9, 0.2, 0.15, 1],
     mass: 0.05,
     freejoint: true,
-    friction: '1.5 0.3 0.1',
-    solref: '0.01 1',
-    solimp: '0.95 0.99 0.001 0.5 2',
+    friction: "1.5 0.3 0.1",
+    solref: "0.01 1",
+    solimp: "0.95 0.99 0.001 0.5 2",
     condim: 4,
   }],
 };
@@ -69,37 +69,37 @@ If you omit `condim: 4` and friction settings:
 ```tsx
 const graspableObjects: SceneObject[] = [
   {
-    name: 'red_cube',
-    type: 'box',
+    name: "red_cube",
+    type: "box",
     size: [0.025, 0.025, 0.025],
     position: [0.4, 0.0, 0.025],
     rgba: [0.9, 0.2, 0.15, 1],
     mass: 0.05,
     freejoint: true,
-    friction: '1.5 0.3 0.1',
-    solref: '0.01 1',
-    solimp: '0.95 0.99 0.001 0.5 2',
+    friction: "1.5 0.3 0.1",
+    solref: "0.01 1",
+    solimp: "0.95 0.99 0.001 0.5 2",
     condim: 4,
   },
   {
-    name: 'green_cube',
-    type: 'box',
+    name: "green_cube",
+    type: "box",
     size: [0.025, 0.025, 0.025],
     position: [0.35, 0.1, 0.025],
     rgba: [0.15, 0.8, 0.3, 1],
     mass: 0.05,
     freejoint: true,
-    friction: '1.5 0.3 0.1',
-    solref: '0.01 1',
-    solimp: '0.95 0.99 0.001 0.5 2',
+    friction: "1.5 0.3 0.1",
+    solref: "0.01 1",
+    solimp: "0.95 0.99 0.001 0.5 2",
     condim: 4,
   },
 ];
 
 const config: SceneConfig = {
-  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-  sceneFile: 'scene.xml',
-  gripperActuatorName: 'gripper',
+  src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+  sceneFile: "scene.xml",
+  gripperActuatorName: "gripper",
   sceneObjects: graspableObjects,
 };
 ```

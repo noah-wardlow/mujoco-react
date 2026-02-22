@@ -9,10 +9,10 @@ IK is provided by the `useIkController()` hook — it is not part of the core `M
 ## Setup
 
 ```tsx
-import { useIkController, IkGizmo } from 'mujoco-react';
+import { useIkController, IkGizmo } from "mujoco-react";
 
 function MyScene() {
-  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
 
   return (
     <>
@@ -85,8 +85,8 @@ Get the current IK gizmo position and orientation.
 ```tsx
 const stats = ik?.getGizmoStats();
 if (stats) {
-  console.log('Gizmo position:', stats.pos);
-  console.log('Gizmo rotation:', stats.rot);
+  console.log("Gizmo position:", stats.pos);
+  console.log("Gizmo rotation:", stats.rot);
 }
 ```
 
@@ -106,14 +106,14 @@ const ik = useIkController(hasIk ? ikConfig : null);
 Pass `ikSolveFn` to the config to replace the built-in solver:
 
 ```tsx
-import type { IKSolveFn } from 'mujoco-react';
+import type { IKSolveFn } from "mujoco-react";
 
 const myIK: IKSolveFn = (pos, quat, currentQ) => {
   const solution = myAnalyticalSolver(pos, currentQ);
   return solution;
 };
 
-const ik = useIkController({ siteName: 'tcp', numJoints: 7, ikSolveFn: myIK });
+const ik = useIkController({ siteName: "tcp", numJoints: 7, ikSolveFn: myIK });
 ```
 
 **When to use a custom solver:**

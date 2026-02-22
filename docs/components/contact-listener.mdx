@@ -12,8 +12,8 @@ A component wrapper for contact event subscriptions. Fires callbacks when a body
 <MujocoCanvas config={config}>
   <ContactListener
     body="cube"
-    onContactEnter={(info) => console.log('Touch!', info.geom2Name)}
-    onContactExit={(info) => console.log('Released!', info.geom2Name)}
+    onContactEnter={(info) => console.log("Touch!", info.geom2Name)}
+    onContactExit={(info) => console.log("Released!", info.geom2Name)}
   />
 </MujocoCanvas>
 ```
@@ -56,10 +56,10 @@ function PickupDetector() {
       <ContactListener
         body="gripper_left"
         onContactEnter={(info) => {
-          if (info.geom2Name === 'cube') setHolding(true);
+          if (info.geom2Name === "cube") setHolding(true);
         }}
         onContactExit={(info) => {
-          if (info.geom2Name === 'cube') setHolding(false);
+          if (info.geom2Name === "cube") setHolding(false);
         }}
       />
       {holding && <Billboard>Holding cube!</Billboard>}

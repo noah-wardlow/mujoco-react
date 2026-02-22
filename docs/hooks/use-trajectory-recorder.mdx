@@ -10,7 +10,7 @@ Record simulation trajectories (qpos, qvel, ctrl, sensordata) for playback, anal
 
 ```tsx
 useTrajectoryRecorder(options?: {
-  fields?: ('qpos' | 'qvel' | 'ctrl' | 'sensordata')[];
+  fields?: ("qpos" | "qvel" | "ctrl" | "sensordata")[];
 }): {
   start: () => void;
   stop: () => TrajectoryFrame[];
@@ -25,11 +25,11 @@ useTrajectoryRecorder(options?: {
 ## Usage
 
 ```tsx
-import { useTrajectoryRecorder } from 'mujoco-react';
+import { useTrajectoryRecorder } from "mujoco-react";
 
 function RecordButton() {
   const recorder = useTrajectoryRecorder({
-    fields: ['qpos', 'qvel', 'ctrl'],
+    fields: ["qpos", "qvel", "ctrl"],
   });
 
   return (

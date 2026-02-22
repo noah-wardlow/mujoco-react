@@ -18,10 +18,10 @@ useJointState(name: string): {
 ## Usage
 
 ```tsx
-import { useJointState } from 'mujoco-react';
+import { useJointState } from "mujoco-react";
 
 function JointDisplay() {
-  const { position, velocity } = useJointState('joint1');
+  const { position, velocity } = useJointState("joint1");
   const textRef = useRef<any>(null);
 
   useFrame(() => {

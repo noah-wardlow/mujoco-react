@@ -12,10 +12,10 @@ Load a new model, replacing the current scene entirely.
 
 ```tsx
 await api.loadScene({
-  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/universal_robots_ur5e/',
-  sceneFile: 'scene.xml',
+  src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/universal_robots_ur5e/",
+  sceneFile: "scene.xml",
   numArmJoints: 6,
-  tcpSiteName: 'tcp',
+  tcpSiteName: "tcp",
 });
 ```
 
@@ -41,18 +41,18 @@ function RobotSelector() {
   const [loading, setLoading] = useState(false);
 
   const robots = [
-    { src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/', label: 'Franka Panda', joints: 7 },
-    { src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/universal_robots_ur5e/', label: 'UR5e', joints: 6 },
-    { src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/kuka_iiwa_14/', label: 'KUKA iiwa', joints: 7 },
+    { src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/", label: "Franka Panda", joints: 7 },
+    { src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/universal_robots_ur5e/", label: "UR5e", joints: 6 },
+    { src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/kuka_iiwa_14/", label: "KUKA iiwa", joints: 7 },
   ];
 
   async function switchRobot(robot: typeof robots[0]) {
     setLoading(true);
     await api.loadScene({
       src: robot.src,
-      sceneFile: 'scene.xml',
+      sceneFile: "scene.xml",
       numArmJoints: robot.joints,
-      tcpSiteName: 'tcp',
+      tcpSiteName: "tcp",
     });
     setLoading(false);
   }
@@ -79,7 +79,7 @@ These standalone functions are exported for advanced use cases (e.g., building c
 Read a null-terminated C string from the WASM model's name buffer.
 
 ```tsx
-import { getName } from 'mujoco-react';
+import { getName } from "mujoco-react";
 const bodyName = getName(model, model.name_bodyadr[bodyId]);
 ```
 
@@ -97,12 +97,12 @@ import {
   findSensorByName,
   findTendonByName,
   findKeyframeByName,
-} from 'mujoco-react';
+} from "mujoco-react";
 
-const bodyId = findBodyByName(model, 'gripper');
-const jointId = findJointByName(model, 'joint1');
-const siteId = findSiteByName(model, 'tcp');
-const actuatorId = findActuatorByName(model, 'gripper');
+const bodyId = findBodyByName(model, "gripper");
+const jointId = findJointByName(model, "joint1");
+const siteId = findSiteByName(model, "tcp");
+const actuatorId = findActuatorByName(model, "gripper");
 ```
 
 ### loadScene(mujoco, config, onProgress?)
@@ -110,10 +110,10 @@ const actuatorId = findActuatorByName(model, 'gripper');
 The standalone scene loader function (used internally by the provider).
 
 ```tsx
-import { loadScene } from 'mujoco-react';
+import { loadScene } from "mujoco-react";
 
 const result = await loadScene(mujoco, config, (msg) => {
-  console.log('Loading:', msg);
+  console.log("Loading:", msg);
 });
 // result: { mjModel, mjData, siteId, gripperId }
 ```

@@ -20,11 +20,11 @@ useBodyState(name: string): {
 ## Usage
 
 ```tsx
-import { useBodyState } from 'mujoco-react';
-import { useFrame } from '@react-three/fiber';
+import { useBodyState } from "mujoco-react";
+import { useFrame } from "@react-three/fiber";
 
 function BodyTracker() {
-  const { position, quaternion } = useBodyState('block_1');
+  const { position, quaternion } = useBodyState("block_1");
 
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -42,7 +42,7 @@ function BodyTracker() {
 
 ```tsx
 function SpeedDisplay() {
-  const { linearVelocity } = useBodyState('ball');
+  const { linearVelocity } = useBodyState("ball");
   const textRef = useRef<any>(null);
 
   useFrame(() => {

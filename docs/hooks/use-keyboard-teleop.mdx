@@ -18,16 +18,16 @@ useKeyboardTeleop(config: {
 ## Usage
 
 ```tsx
-import { useKeyboardTeleop } from 'mujoco-react';
+import { useKeyboardTeleop } from "mujoco-react";
 
 function TeleopControls() {
   useKeyboardTeleop({
     bindings: {
-      'w': { actuator: 'joint1', delta: 0.1 },
-      's': { actuator: 'joint1', delta: -0.1 },
-      'a': { actuator: 'joint2', delta: 0.1 },
-      'd': { actuator: 'joint2', delta: -0.1 },
-      'space': { actuator: 'gripper', toggle: [0, 0.04] },
+      "w": { actuator: "joint1", delta: 0.1 },
+      "s": { actuator: "joint1", delta: -0.1 },
+      "a": { actuator: "joint2", delta: 0.1 },
+      "d": { actuator: "joint2", delta: -0.1 },
+      "space": { actuator: "gripper", toggle: [0, 0.04] },
     },
     enabled: true,
   });
@@ -43,8 +43,8 @@ function TeleopControls() {
 Add a delta value to the actuator each frame while the key is held:
 
 ```tsx
-'w': { actuator: 'forward', delta: 0.1 }
-// While 'w' is held: ctrl[forward] += 0.1 per frame
+"w": { actuator: "forward", delta: 0.1 }
+// While "w" is held: ctrl[forward] += 0.1 per frame
 ```
 
 ### `toggle` — Toggle between two values on press
@@ -52,7 +52,7 @@ Add a delta value to the actuator each frame while the key is held:
 Press once to set the first value, press again for the second:
 
 ```tsx
-'space': { actuator: 'gripper', toggle: [0, 0.04] }
+"space": { actuator: "gripper", toggle: [0, 0.04] }
 // Press space: ctrl[gripper] = 0
 // Press again: ctrl[gripper] = 0.04
 ```
@@ -62,7 +62,7 @@ Press once to set the first value, press again for the second:
 Set a fixed value while the key is held, revert when released:
 
 ```tsx
-'x': { actuator: 'brake', set: 1.0 }
+"x": { actuator: "brake", set: 1.0 }
 // While 'x' is held: ctrl[brake] = 1.0
 // On release: ctrl[brake] = previous value
 ```

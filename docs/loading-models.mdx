@@ -9,14 +9,14 @@ icon: "file-code"
 Every simulation starts with a `SceneConfig` object that tells mujoco-react what to load and how to configure it:
 
 ```tsx
-import type { SceneConfig } from 'mujoco-react';
+import type { SceneConfig } from "mujoco-react";
 
 const config: SceneConfig = {
-  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-  sceneFile: 'scene.xml',
+  src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+  sceneFile: "scene.xml",
   numArmJoints: 7,
-  tcpSiteName: 'tcp',
-  gripperActuatorName: 'gripper',
+  tcpSiteName: "tcp",
+  gripperActuatorName: "gripper",
   homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
 };
 ```
@@ -49,8 +49,8 @@ Models from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menager
 ```tsx
 // Loads from: raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/scene.xml
 const config: SceneConfig = {
-  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-  sceneFile: 'scene.xml',
+  src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+  sceneFile: "scene.xml",
 };
 ```
 
@@ -62,8 +62,8 @@ Point `src` to any HTTP server hosting MJCF files:
 
 ```tsx
 const config: SceneConfig = {
-  src: 'https://my-server.com/models/my_robot/',
-  sceneFile: 'scene.xml',
+  src: "https://my-server.com/models/my_robot/",
+  sceneFile: "scene.xml",
 };
 // Fetches: https://my-server.com/models/my_robot/scene.xml
 ```
@@ -74,8 +74,8 @@ Use raw GitHub URLs for models hosted in your own repos:
 
 ```tsx
 const config: SceneConfig = {
-  src: 'https://raw.githubusercontent.com/myorg/myrepo/main/my_robot/',
-  sceneFile: 'robot.xml',
+  src: "https://raw.githubusercontent.com/myorg/myrepo/main/my_robot/",
+  sceneFile: "robot.xml",
 };
 ```
 
@@ -85,12 +85,12 @@ Inject dynamic objects (boxes, spheres, cylinders) into the scene without modify
 
 ```tsx
 const config: SceneConfig = {
-  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-  sceneFile: 'scene.xml',
+  src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+  sceneFile: "scene.xml",
   sceneObjects: [
     {
-      name: 'red_cube',
-      type: 'box',
+      name: "red_cube",
+      type: "box",
       size: [0.025, 0.025, 0.025],
       position: [0.5, 0.0, 0.025],
       rgba: [1, 0, 0, 1],
@@ -98,8 +98,8 @@ const config: SceneConfig = {
       freejoint: true,
     },
     {
-      name: 'blue_sphere',
-      type: 'sphere',
+      name: "blue_sphere",
+      type: "sphere",
       size: [0.02, 0, 0],
       position: [0.4, 0.1, 0.02],
       rgba: [0, 0, 1, 1],
@@ -134,19 +134,19 @@ For more advanced model customization, use `xmlPatches` to transform the MJCF XM
 
 ```tsx
 const config: SceneConfig = {
-  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-  sceneFile: 'scene.xml',
+  src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+  sceneFile: "scene.xml",
   xmlPatches: [
     // Replace a value in the XML
     {
-      target: 'scene.xml',
-      replace: ['timestep="0.002"', 'timestep="0.001"'],
+      target: "scene.xml",
+      replace: ["timestep=\"0.002\"", "timestep=\"0.001\""],
     },
     // Inject XML after a specific tag
     {
-      target: 'scene.xml',
-      inject: '<body name="table" pos="0.5 0 0"><geom type="box" size="0.3 0.3 0.01" rgba="0.6 0.4 0.2 1"/></body>',
-      injectAfter: '<worldbody>',
+      target: "scene.xml",
+      inject: "<body name=\"table\" pos=\"0.5 0 0\"><geom type=\"box\" size=\"0.3 0.3 0.01\" rgba=\"0.6 0.4 0.2 1\"/></body>",
+      injectAfter: "<worldbody>",
     },
   ],
 };
@@ -167,10 +167,10 @@ Run custom logic after each simulation reset (e.g., randomize object positions f
 
 ```tsx
 const config: SceneConfig = {
-  src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-  sceneFile: 'scene.xml',
+  src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+  sceneFile: "scene.xml",
   sceneObjects: [
-    { name: 'cube', type: 'box', size: [0.025, 0.025, 0.025],
+    { name: "cube", type: "box", size: [0.025, 0.025, 0.025],
       position: [0.5, 0, 0.025], rgba: [1, 0, 0, 1],
       mass: 0.1, freejoint: true },
   ],
@@ -194,8 +194,8 @@ const { api } = useMujoco();
 
 async function switchRobot() {
   await api.loadScene({
-    src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/universal_robots_ur5e/',
-    sceneFile: 'scene.xml',
+    src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/universal_robots_ur5e/",
+    sceneFile: "scene.xml",
   });
 }
 ```

@@ -45,7 +45,7 @@ The renderer sets `userData.bodyID` on every mesh it creates. When raycasting, w
 let obj = hit.object;
 while (obj) {
   if (obj.userData?.bodyID != null) {
-    console.log('Hit body:', obj.userData.bodyID);
+    console.log("Hit body:", obj.userData.bodyID);
     break;
   }
   obj = obj.parent!;

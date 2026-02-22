@@ -42,8 +42,8 @@ api.setTimestep(0.005);  // 5ms (faster, less stable)
 Change a body's mass.
 
 ```tsx
-api.setBodyMass('block', 0.5);   // 500g
-api.setBodyMass('block', 2.0);   // 2kg
+api.setBodyMass("block", 0.5);   // 500g
+api.setBodyMass("block", 2.0);   // 2kg
 ```
 
 <ParamField body="name" type="string" required>
@@ -59,8 +59,8 @@ api.setBodyMass('block', 2.0);   // 2kg
 Change a geom's friction coefficients.
 
 ```tsx
-api.setGeomFriction('floor', [1.0, 0.005, 0.0001]);  // High friction
-api.setGeomFriction('ice', [0.1, 0.001, 0.00001]);    // Low friction
+api.setGeomFriction("floor", [1.0, 0.005, 0.0001]);  // High friction
+api.setGeomFriction("ice", [0.1, 0.001, 0.00001]);    // Low friction
 ```
 
 <ParamField body="name" type="string" required>
@@ -76,8 +76,8 @@ api.setGeomFriction('ice', [0.1, 0.001, 0.00001]);    // Low friction
 Change a geom's size.
 
 ```tsx
-api.setGeomSize('box', [0.05, 0.05, 0.05]);  // 10cm cube
-api.setGeomSize('ball', [0.03, 0, 0]);        // 3cm radius sphere
+api.setGeomSize("box", [0.05, 0.05, 0.05]);  // 10cm cube
+api.setGeomSize("ball", [0.03, 0, 0]);        // 3cm radius sphere
 ```
 
 <ParamField body="name" type="string" required>
@@ -100,11 +100,11 @@ function DomainRandomizer() {
     api.setGravity([0, 0, gz]);
 
     // Randomize object mass
-    api.setBodyMass('cube', 0.05 + Math.random() * 0.2);
+    api.setBodyMass("cube", 0.05 + Math.random() * 0.2);
 
     // Randomize floor friction
     const friction = 0.5 + Math.random() * 1.0;
-    api.setGeomFriction('floor', [friction, 0.005, 0.0001]);
+    api.setGeomFriction("floor", [friction, 0.005, 0.0001]);
 
     // Reset to apply changes
     api.reset();

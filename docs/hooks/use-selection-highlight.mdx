@@ -21,13 +21,13 @@ useSelectionHighlight(
 ## Usage
 
 ```tsx
-import { useSelectionHighlight } from 'mujoco-react';
+import { useSelectionHighlight } from "mujoco-react";
 
 function MyInteractiveScene() {
   const [selectedBody, setSelectedBody] = useState<number | null>(null);
 
   useSelectionHighlight(selectedBody, {
-    color: '#00ff00',
+    color: "#00ff00",
     emissiveIntensity: 0.5,
   });
 

@@ -36,8 +36,8 @@ mujoco-js includes a WASM binary embedded in its JS bundle. No special WASM conf
 
 ```ts
 // vite.config.ts
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
@@ -49,9 +49,9 @@ export default defineConfig({
 Since mujoco-js uses WASM, it must run client-side only:
 
 ```tsx
-import dynamic from 'next/dynamic';
+import dynamic from "next/dynamic";
 
-const MujocoApp = dynamic(() => import('./MujocoApp'), { ssr: false });
+const MujocoApp = dynamic(() => import("./MujocoApp"), { ssr: false });
 ```
 
 ### Create React App
@@ -61,19 +61,19 @@ Works out of the box. No additional configuration needed.
 ## Verify Installation
 
 ```tsx
-import { MujocoProvider, MujocoCanvas } from 'mujoco-react';
+import { MujocoProvider, MujocoCanvas } from "mujoco-react";
 
 function App() {
   return (
     <MujocoProvider>
       <MujocoCanvas
         config={{
-          src: 'https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/',
-          sceneFile: 'scene.xml',
+          src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
+          sceneFile: "scene.xml",
         }}
-        style={{ width: '100%', height: '100vh' }}
-        onReady={() => console.log('MuJoCo loaded!')}
-        onError={(err) => console.error('Load failed:', err)}
+        style={{ width: "100%", height: "100vh" }}
+        onReady={() => console.log("MuJoCo loaded!")}
+        onError={(err) => console.error("Load failed:", err)}
       >
         <ambientLight />
       </MujocoCanvas>

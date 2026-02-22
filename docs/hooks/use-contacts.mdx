@@ -22,10 +22,10 @@ useContacts(
 ### Usage
 
 ```tsx
-import { useContacts } from 'mujoco-react';
+import { useContacts } from "mujoco-react";
 
 function ContactCounter() {
-  const contacts = useContacts('block_1');
+  const contacts = useContacts("block_1");
 
   useFrame(() => {
     if (contacts.current.length > 0) {
@@ -40,11 +40,11 @@ function ContactCounter() {
 ### With Callback
 
 ```tsx
-const contacts = useContacts('gripper_left', (contacts) => {
+const contacts = useContacts("gripper_left", (contacts) => {
   const touchingCube = contacts.some(c =>
-    c.geom1Name === 'cube' || c.geom2Name === 'cube'
+    c.geom1Name === "cube" || c.geom2Name === "cube"
   );
-  if (touchingCube) console.log('Gripper touching cube!');
+  if (touchingCube) console.log("Gripper touching cube!");
 });
 ```
 
@@ -73,15 +73,15 @@ useContactEvents(
 ### Usage
 
 ```tsx
-import { useContactEvents } from 'mujoco-react';
+import { useContactEvents } from "mujoco-react";
 
 function CollisionSound() {
-  useContactEvents('ball', {
+  useContactEvents("ball", {
     onEnter: (info) => {
-      playSound('bounce', { volume: Math.min(info.depth * 10, 1) });
+      playSound("bounce", { volume: Math.min(info.depth * 10, 1) });
     },
     onExit: (info) => {
-      console.log('Lost contact with', info.geom2Name);
+      console.log("Lost contact with", info.geom2Name);
     },
   });
 

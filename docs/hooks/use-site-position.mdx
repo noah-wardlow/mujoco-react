@@ -18,13 +18,13 @@ useSitePosition(siteName: string): {
 ## Usage
 
 ```tsx
-import { useSitePosition } from 'mujoco-react';
+import { useSitePosition } from "mujoco-react";
 
 function TCPTracker() {
-  const { position, quaternion } = useSitePosition('tcp');
+  const { position, quaternion } = useSitePosition("tcp");
 
   useFrame(() => {
-    console.log('TCP at:', position.current.toArray());
+    console.log("TCP at:", position.current.toArray());
   });
 
   return null;

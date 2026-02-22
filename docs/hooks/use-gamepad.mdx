@@ -22,18 +22,18 @@ useGamepad(config: {
 ## Usage
 
 ```tsx
-import { useGamepad } from 'mujoco-react';
+import { useGamepad } from "mujoco-react";
 
 function GamepadControl() {
   useGamepad({
     axes: {
-      0: 'joint1',   // Left stick X → joint1
-      1: 'joint2',   // Left stick Y → joint2
-      2: 'joint3',   // Right stick X → joint3
-      3: 'joint4',   // Right stick Y → joint4
+      0: "joint1",   // Left stick X → joint1
+      1: "joint2",   // Left stick Y → joint2
+      2: "joint3",   // Right stick X → joint3
+      3: "joint4",   // Right stick Y → joint4
     },
     buttons: {
-      0: 'gripper',  // A button → gripper
+      0: "gripper",  // A button → gripper
     },
     deadzone: 0.1,
     scale: 1.0,

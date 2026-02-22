@@ -12,9 +12,9 @@ A common interaction pattern: double-click a body to select it, highlight the se
 2. The `useSelectionHighlight` hook applies a visual highlight to the selected body
 
 ```tsx
-import { useState, useCallback } from 'react';
-import { useThree } from '@react-three/fiber';
-import { useSelectionHighlight } from 'mujoco-react';
+import { useState, useCallback } from "react";
+import { useThree } from "@react-three/fiber";
+import { useSelectionHighlight } from "mujoco-react";
 
 function useClickSelect(): number | null {
   const [selectedBodyId, setSelectedBodyId] = useState<number | null>(null);
@@ -45,8 +45,8 @@ function useClickSelect(): number | null {
   }, [scene, camera, gl]);
 
   useEffect(() => {
-    gl.domElement.addEventListener('dblclick', handleDoubleClick);
-    return () => gl.domElement.removeEventListener('dblclick', handleDoubleClick);
+    gl.domElement.addEventListener("dblclick", handleDoubleClick);
+    return () => gl.domElement.removeEventListener("dblclick", handleDoubleClick);
   }, [gl, handleDoubleClick]);
 
   return selectedBodyId;

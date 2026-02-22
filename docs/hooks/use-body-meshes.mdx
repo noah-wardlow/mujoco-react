@@ -15,7 +15,7 @@ useBodyMeshes(bodyId: number | null): THREE.Mesh[]
 ## Usage
 
 ```tsx
-import { useBodyMeshes } from 'mujoco-react';
+import { useBodyMeshes } from "mujoco-react";
 
 function CustomOutline({ bodyId }: { bodyId: number | null }) {
   const meshes = useBodyMeshes(bodyId);
@@ -41,8 +41,8 @@ function CustomOutline({ bodyId }: { bodyId: number | null }) {
 Because `useBodyMeshes` gives you raw mesh references, you can implement any visual effect:
 
 ```tsx
-import { useBodyMeshes } from 'mujoco-react';
-import { useFrame } from '@react-three/fiber';
+import { useBodyMeshes } from "mujoco-react";
+import { useFrame } from "@react-three/fiber";
 
 function PulsingHighlight({ bodyId }: { bodyId: number }) {
   const meshes = useBodyMeshes(bodyId);
@@ -52,7 +52,7 @@ function PulsingHighlight({ bodyId }: { bodyId: number }) {
     meshes.forEach((mesh) => {
       const mat = mesh.material as THREE.MeshStandardMaterial;
       mat.emissiveIntensity = intensity * 0.5;
-      mat.emissive.set('#ff8800');
+      mat.emissive.set("#ff8800");
     });
   });
 
@@ -65,8 +65,8 @@ function PulsingHighlight({ bodyId }: { bodyId: number }) {
 Pair with `@react-three/postprocessing` to apply per-body effects:
 
 ```tsx
-import { useBodyMeshes } from 'mujoco-react';
-import { Selection, Select, EffectComposer, Outline } from '@react-three/postprocessing';
+import { useBodyMeshes } from "mujoco-react";
+import { Selection, Select, EffectComposer, Outline } from "@react-three/postprocessing";
 
 function OutlineSelectedBody({ bodyId }: { bodyId: number | null }) {
   const meshes = useBodyMeshes(bodyId);

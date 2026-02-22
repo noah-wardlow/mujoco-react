@@ -128,7 +128,7 @@ const [qpos, setQpos] = useState<Float64Array>();  // Don't do this
 Hooks like `useBodyState` and `useJointState` return refs that update every frame without re-rendering:
 
 ```tsx
-const { position } = useBodyState('block');
+const { position } = useBodyState("block");
 
 useFrame(() => {
   // Read current position, no re-renders
@@ -142,7 +142,7 @@ Everything inside `<MujocoCanvas>` (or `<MujocoPhysics>`) is a standard R3F chil
 
 ```tsx
 function Scene() {
-  const ik = useIkController({ siteName: 'tcp', numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
 
   return (
     <>
