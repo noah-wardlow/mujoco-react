@@ -1,3 +1,19 @@
+# [6.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v5.0.0...v6.0.0) (2026-02-22)
+
+
+### Features
+
+* add useBodyMeshes hook, remove SelectionHighlight component ([a273979](https://github.com/noah-wardlow/mujoco-react/commit/a273979295bd7cebf01b92fc7b288d960da89ea2))
+
+
+### BREAKING CHANGES
+
+* <SelectionHighlight> component is removed.
+Use useSelectionHighlight(bodyId) hook or useBodyMeshes(bodyId)
+for custom visuals.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
 # [5.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v4.0.0...v5.0.0) (2026-02-22)
 
 
