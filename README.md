@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/mj2.gif" alt="mujoco-react demo" width="100%" />
+</p>
+
 # mujoco-react
 
 Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper around [mujoco-js](https://github.com/nicepkg/mujoco-js). Load any MuJoCo model, step physics, render bodies, and write controllers as React components.
