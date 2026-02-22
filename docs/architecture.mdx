@@ -39,7 +39,7 @@ A thin wrapper around R3F's `<Canvas>`. It accepts a `SceneConfig` and all stand
 
 ### MujocoPhysics
 
-For use inside your own `<Canvas>`. Accepts the same physics props as `MujocoCanvas` (`config`, `paused`, `speed`, `gravity`, etc.) but doesn't create a Canvas — you bring your own. This gives you full control over gl settings, post-processing pipelines, and R3F context composition.
+For use inside your own `<Canvas>`. Accepts the same physics props as `MujocoCanvas` (`config`, `paused`, `speed`, `gravity`, etc.) but doesn't create a Canvas. This gives you control over gl settings, post-processing pipelines, and R3F context composition.
 
 ```tsx
 <MujocoProvider>
@@ -55,7 +55,7 @@ For use inside your own `<Canvas>`. Accepts the same physics props as `MujocoCan
 
 ### MujocoSimProvider (internal)
 
-You don't use this directly — `MujocoCanvas` and `MujocoPhysics` create it. It:
+You don't use this directly. `MujocoCanvas` and `MujocoPhysics` create it. It:
 - Loads the model from `SceneConfig`
 - Runs the physics loop via `useFrame` at priority `-1`
 - Exposes the `MujocoSimAPI` via React context
@@ -63,7 +63,7 @@ You don't use this directly — `MujocoCanvas` and `MujocoPhysics` create it. It
 
 ### Controller Plugins (Bring Your Own)
 
-The core library has **no built-in control logic**. Controllers are React components you write (or use from the library) that call `useBeforePhysicsStep` to drive `data.ctrl`. The library ships `<IkController>` as one example, but the real pattern is: write your own.
+The core library has no built-in control logic. Controllers are React components that call `useBeforePhysicsStep` to write `data.ctrl`. The library ships `<IkController>` as one example, but the intended pattern is to write your own.
 
 ```tsx
 // This is a complete controller:
@@ -122,7 +122,7 @@ while (simTime < wallTime * speed) {
 
 ## State Management
 
-All mutable simulation state lives in **refs**, not React state. This is critical for performance — React state updates trigger re-renders, and at 60fps that would be catastrophic.
+All mutable simulation state lives in **refs**, not React state. React state updates trigger re-renders, and at 60fps that kills performance.
 
 ```tsx
 // Correct: refs for physics data
@@ -139,7 +139,7 @@ Hooks like `useBodyState` and `useJointState` return refs that update every fram
 const { position } = useBodyState('block');
 
 useFrame(() => {
-  // Read current position — no re-renders
+  // Read current position, no re-renders
   console.log(position.current.x);
 });
 ```

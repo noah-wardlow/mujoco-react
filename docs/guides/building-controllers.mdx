@@ -1,12 +1,12 @@
 ---
 title: "Building Controllers"
-description: "Write your own controller, bring your own IK — compose library hooks into robot-specific logic"
+description: "Write your own controller, bring your own IK, compose library hooks into robot-specific logic"
 icon: "gamepad"
 ---
 
-**Controllers are just React components.** There's no base class to extend, no interface to implement, and no registration step. A controller is any component that calls `useBeforePhysicsStep` to write to `data.ctrl` each frame. It renders `null` — all it does is read input and drive actuators.
+A controller is a React component that calls `useBeforePhysicsStep` to write `data.ctrl` each frame and renders `null`.
 
-The built-in `<IkController>` is itself built this way. You can use it, swap in your own IK solver, or skip it entirely and write your own controller from scratch.
+The built-in `<IkController>` follows this same pattern. You can use it, swap in your own IK solver, or write your own controller from scratch.
 
 ## Pattern: Simple Keyboard Bindings
 
@@ -75,7 +75,7 @@ function MyController() {
 
 ### Config-Driven Arm Controller
 
-A generic hook that accepts a static config object makes it easy to support multiple robots. Each robot is just a different config — no per-robot logic:
+A generic hook that accepts a static config object makes it easy to support multiple robots. Each robot is a different config:
 
 ```tsx
 interface ArmConfig {
@@ -133,7 +133,7 @@ You have three options for IK:
 
 ### 1. Use the built-in solver
 
-The default `<IkController>` uses Damped Least-Squares — works for any robot, no tuning needed:
+The default `<IkController>` uses Damped Least-Squares:
 
 ```tsx
 <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
@@ -176,11 +176,11 @@ function MyIKController({ targetRef }) {
 }
 ```
 
-This gives you complete control — use any solver library, any input source, any number of end-effectors.
+This gives you full access to model/data for whatever solver you want.
 
 ## Pattern: Reusable Plugins with `createController`
 
-For reusable controllers with typed config and default merging, use the `createController` factory. It handles config merging, display names, and metadata — you focus on the control logic.
+For reusable controllers with typed config and default merging, use the `createController` factory. It handles config merging, display names, and metadata.
 
 ```tsx
 import { createController, useBeforePhysicsStep } from 'mujoco-react';
@@ -259,7 +259,7 @@ The library's `IkController` is itself built with `createController`, demonstrat
 When a robot supports both gizmo drag and keyboard control, the controller needs to:
 
 1. **Detect when IK is active** via `useIk({ optional: true })`
-2. **Sync state on transition** — when the user switches from gizmo to keyboard, read `data.ctrl` to avoid a position jump
+2. **Sync state on transition**: when the user switches from gizmo to keyboard, read `data.ctrl` to avoid a position jump
 3. **Disable IK** via `ikCtx.setIkEnabled(false)` when taking over
 
 ```tsx
@@ -280,7 +280,7 @@ function MyArmController() {
     }
 
     if (!ikCtx?.ikEnabledRef.current) {
-      // Keyboard is in control — solve IK and write ctrl
+      // Keyboard is in control, solve IK and write ctrl
       for (let i = 0; i < arm.indices.length; i++) {
         data.ctrl[arm.indices[i]] = targetJoints[i];
       }
@@ -289,13 +289,13 @@ function MyArmController() {
 }
 ```
 
-The `{ optional: true }` parameter means the hook returns `null` if no `<IkController>` exists in the tree — so the controller works with or without IK.
+The `{ optional: true }` parameter means the hook returns `null` if no `<IkController>` exists in the tree, so the controller works with or without IK.
 
 The gizmo re-enables IK automatically when dragged.
 
 ## Composing Controllers in Your Scene
 
-Controllers are just React children. Swap them based on state:
+Controllers are React children. Swap them based on state:
 
 ```tsx
 <MujocoCanvas config={entry.config}>
@@ -315,7 +315,7 @@ Controllers are just React children. Swap them based on state:
 
 ## Performance Tips
 
-- Use `for` loops instead of `.forEach` / `.map` in `useBeforePhysicsStep` — it runs every physics tick
-- Store keyboard state in a `useRef`, not `useState` — avoids re-renders at 60fps
+- Use `for` loops instead of `.forEach` / `.map` in `useBeforePhysicsStep` (it runs every physics tick)
+- Store keyboard state in a `useRef`, not `useState` (avoids re-renders at 60fps)
 - Cache actuator IDs once (not every frame) using `findActuatorByName`
-- Keep the callback closure stable — avoid creating new functions each render
+- Keep the callback closure stable; avoid creating new functions each render

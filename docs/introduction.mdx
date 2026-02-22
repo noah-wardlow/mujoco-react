@@ -1,25 +1,25 @@
 ---
 title: "Introduction"
-description: "A thin, unopinionated wrapper around mujoco-js — composable and extensible via React"
+description: "Composable React Three Fiber wrapper around mujoco-js"
 icon: "rocket"
 ---
 
 # mujoco-react
 
-**mujoco-react** is a thin, unopinionated wrapper around [mujoco-js](https://github.com/nicepkg/mujoco-js) — composable and extensible via React. It provides [React Three Fiber](https://r3f.docs.pmnd.rs/) components for loading models, stepping physics, and rendering bodies. Controllers like IK are opt-in plugins, not baked-in opinions.
+**mujoco-react** is a composable [React Three Fiber](https://r3f.docs.pmnd.rs/) wrapper around [mujoco-js](https://github.com/nicepkg/mujoco-js). It provides components for loading models, stepping physics, and rendering bodies. Controllers like IK are opt-in plugins.
 
 <CardGroup cols={2}>
   <Card title="Composable" icon="puzzle-piece">
-    Drop `<SceneRenderer />`, `<IkGizmo />`, `<Debug />` and more into your R3F scene as children. No monolithic wrapper.
+    `<SceneRenderer />`, `<IkGizmo />`, `<Debug />` etc. are R3F children you add to your scene.
   </Card>
   <Card title="Bring Your Own Controller" icon="scale-balanced">
-    The core provides physics + rendering. Controllers are just React components that call `useBeforePhysicsStep` — write your own IK, teleoperation, RL policy, or use the built-in ones.
+    Controllers are React components that call `useBeforePhysicsStep`. Write your own or use the built-in ones.
   </Card>
   <Card title="Bring Your Own IK" icon="plug">
-    Plug in any IK solver via `ikSolveFn`, or skip `IkController` entirely and solve IK yourself inside `useBeforePhysicsStep`. Nothing is baked in.
+    Plug in any IK solver via `ikSolveFn`, or skip `IkController` entirely and solve IK yourself in `useBeforePhysicsStep`.
   </Card>
   <Card title="Full MuJoCo" icon="atom">
-    Contacts, sensors, tendons, flex bodies, raycasting, domain randomization — the full MuJoCo API, React-ified.
+    Contacts, sensors, tendons, flex bodies, raycasting, domain randomization. The full MuJoCo API via React hooks.
   </Card>
 </CardGroup>
 
@@ -61,11 +61,11 @@ function App() {
 }
 ```
 
-This loads the Franka Panda from [DeepMind Menagerie](https://github.com/google-deepmind/mujoco_menagerie), renders all bodies, and adds an interactive IK gizmo on the end-effector — in under 30 lines.
+This loads the Franka Panda from [DeepMind Menagerie](https://github.com/google-deepmind/mujoco_menagerie), renders all bodies, and adds an interactive IK gizmo on the end-effector.
 
 ## Bring Your Own Controller
 
-Controllers are just React components. Call `useBeforePhysicsStep` to drive `data.ctrl` each frame:
+A controller is a React component that calls `useBeforePhysicsStep` to write `data.ctrl` each frame:
 
 ```tsx
 import { useBeforePhysicsStep } from 'mujoco-react';
@@ -79,7 +79,7 @@ function MyController() {
 }
 ```
 
-Drop it into your scene — no base class, no registration:
+Add it as a child of `<MujocoCanvas>`:
 
 ```tsx
 <MujocoCanvas config={config}>
@@ -88,7 +88,7 @@ Drop it into your scene — no base class, no registration:
 </MujocoCanvas>
 ```
 
-IK, teleoperation, RL policies, state machines — they're all just components that read input and write to `data.ctrl`. The built-in `<IkController>` is itself built this way. You can also [plug in your own IK solver](/components/ik-controller#with-custom-solver) or skip it entirely.
+IK, teleoperation, RL policies, state machines all follow this pattern. The built-in `<IkController>` is itself built this way. You can also [plug in your own IK solver](/components/ik-controller#with-custom-solver) or skip it entirely.
 
 <Tip>
   See the [Building Controllers](/guides/building-controllers) guide for config-driven patterns, `createController` factory, IK gizmo coexistence, and multi-arm support.
@@ -98,16 +98,16 @@ IK, teleoperation, RL policies, state machines — they're all just components t
 
 mujoco-react follows the same pattern as [react-three-rapier](https://github.com/pmndrs/react-three-rapier):
 
-- **Library handles MuJoCo engine concerns only** — WASM lifecycle, physics stepping, body rendering
-- **Controllers are opt-in plugins** — IK, teleoperation, and custom controllers are composable components, not baked into the core
-- **Consumers compose everything else** — lights, grid, camera controls, UI, game logic
-- **All scene elements are R3F children** — no config objects for visual-only things
+- **Library handles MuJoCo engine concerns only**: WASM lifecycle, physics stepping, body rendering
+- **Controllers are opt-in plugins**: IK, teleoperation, custom controllers are composable components
+- **Consumers compose everything else**: lights, grid, camera controls, UI, game logic
+- **All scene elements are R3F children**: no config objects for visual-only things
 
 Two ways to set up your scene:
 
 <Tabs>
   <Tab title="MujocoCanvas (quick start)">
-    Wraps R3F `<Canvas>` for you — fastest path to a working scene:
+    Wraps R3F `<Canvas>` for you:
     ```tsx
     <MujocoCanvas config={config}>
       <SceneRenderer />

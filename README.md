@@ -1,6 +1,6 @@
 # mujoco-react
 
-A thin, unopinionated wrapper around [mujoco-js](https://github.com/nicepkg/mujoco-js) — composable and extensible via React. Built on [React Three Fiber](https://docs.pmnd.rs/react-three-fiber). Works with **any robot, any scene**.
+Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper around [mujoco-js](https://github.com/nicepkg/mujoco-js). Load any MuJoCo model, step physics, render bodies, and write controllers as React components.
 
 
 ## Install
@@ -57,9 +57,9 @@ function App() {
 
 Two ways to set up your scene:
 
-### `<MujocoCanvas>` — Quick Start
+### `<MujocoCanvas>`
 
-Wraps R3F `<Canvas>` for you. Fastest path to a working scene:
+Wraps R3F `<Canvas>` for you:
 
 ```
 <MujocoProvider>              <- WASM module lifecycle
@@ -74,9 +74,9 @@ Wraps R3F `<Canvas>` for you. Fastest path to a working scene:
 </MujocoProvider>
 ```
 
-### `<MujocoPhysics>` — Bring Your Own Canvas
+### `<MujocoPhysics>`
 
-Use inside your own `<Canvas>` for full control over gl settings, post-processing, and R3F context composition:
+Use inside your own `<Canvas>` for control over gl settings, post-processing, etc:
 
 ```
 <MujocoProvider>
@@ -91,11 +91,11 @@ Use inside your own `<Canvas>` for full control over gl settings, post-processin
 </MujocoProvider>
 ```
 
-The library provides **only MuJoCo engine concerns**: WASM lifecycle, physics stepping, and body rendering. Controllers (IK, teleoperation, RL policies) are composable plugins you opt into — or bring your own.
+The library handles WASM lifecycle, physics stepping, and body rendering. Controllers (IK, teleoperation, RL policies) are composable plugins you opt into or write yourself.
 
 ## Bring Your Own Controller
 
-**Controllers are just React components.** Write a function that calls `useBeforePhysicsStep` to drive `data.ctrl` each frame, return `null`, and drop it into your scene tree. No base class, no registration — just hooks.
+A controller is a React component that calls `useBeforePhysicsStep` to write `data.ctrl` each frame and returns `null`.
 
 ```tsx
 import { useBeforePhysicsStep } from 'mujoco-react';
@@ -115,11 +115,11 @@ function MyController() {
 </MujocoCanvas>
 ```
 
-This is the primary way to use the library. IK, teleoperation, RL policies, state machines — they're all just components that read input and write to `data.ctrl`.
+IK, teleoperation, RL policies, state machines all follow this same pattern.
 
 ### Bring Your Own IK
 
-The built-in `<IkController>` uses a generic Damped Least-Squares solver, but you can plug in **any** IK solver — analytical, learned, or from another library:
+The built-in `<IkController>` uses a Damped Least-Squares solver. You can replace it with your own (analytical, learned, etc.):
 
 ```tsx
 import type { IKSolveFn } from 'mujoco-react';
@@ -176,7 +176,7 @@ export const MyController = createController<MyConfig>(
 
 ### Built-in `<IkController>`
 
-The library ships one controller out of the box — an IK gizmo you can drop in for interactive end-effector control:
+The library includes one controller for interactive end-effector control:
 
 ```tsx
 <IkController config={{ siteName: 'tcp', numJoints: 7 }}>
@@ -209,7 +209,7 @@ const ikCtx = useIk({ optional: true });
 Models are loaded from any HTTP source via `SceneConfig.baseUrl`. Defaults to [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) on GitHub.
 
 ```tsx
-// Menagerie robots — just set robotId
+// Menagerie robots: just set robotId
 const franka: SceneConfig = {
   robotId: 'franka_emika_panda',
   sceneFile: 'scene.xml',
@@ -349,7 +349,7 @@ Click-drag to apply spring forces to bodies. Raycasts to find bodies, applies `F
 
 ### R3F Group Props
 
-All visual components (`SceneRenderer`, `DragInteraction`, `ContactMarkers`, `Debug`, `TendonRenderer`, `FlexRenderer`) accept standard R3F group props — `position`, `rotation`, `scale`, `visible`, etc.
+All visual components (`SceneRenderer`, `DragInteraction`, `ContactMarkers`, `Debug`, `TendonRenderer`, `FlexRenderer`) accept standard R3F group props like `position`, `rotation`, `scale`, `visible`.
 
 ```tsx
 <SceneRenderer position={[0, 0, 1]} />

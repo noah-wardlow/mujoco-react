@@ -4,7 +4,7 @@ description: "Physics provider for use inside your own R3F Canvas"
 icon: "atom"
 ---
 
-Physics context provider designed for use inside your own React Three Fiber `<Canvas>`. Same physics configuration as [`<MujocoCanvas>`](/components/mujoco-canvas), but without the Canvas wrapper — giving you full control over gl settings, post-processing, and R3F context composition.
+Physics context provider for use inside your own React Three Fiber `<Canvas>`. Same physics configuration as [`<MujocoCanvas>`](/components/mujoco-canvas), but without the Canvas wrapper. Use this when you need control over gl settings, post-processing, or R3F context composition.
 
 ## Usage
 
@@ -58,7 +58,7 @@ Use `<MujocoPhysics>` instead of `<MujocoCanvas>` when you need:
 ## Props
 
 <ParamField body="config" type="SceneConfig" required>
-  Scene configuration — robot ID, model file, joints, etc. See [Loading Models](/loading-models).
+  Scene configuration: robot ID, model file, joints, etc. See [Loading Models](/loading-models).
 </ParamField>
 
 <ParamField body="onReady" type="(api: MujocoSimAPI) => void">
@@ -99,7 +99,7 @@ Use `<MujocoPhysics>` instead of `<MujocoCanvas>` when you need:
 
 ## Ref
 
-`MujocoPhysics` forwards its ref as a `MujocoSimAPI` handle — the same object passed to `onReady`:
+`MujocoPhysics` forwards its ref as a `MujocoSimAPI` handle (the same object passed to `onReady`):
 
 ```tsx
 const apiRef = useRef<MujocoSimAPI>(null);
