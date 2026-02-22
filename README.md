@@ -2,7 +2,7 @@
 
 Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper around [mujoco-js](https://github.com/nicepkg/mujoco-js). Load any MuJoCo model, step physics, render bodies, and write controllers as React components.
 
-**[Live Demo](https://mujoco-react-example.pages.dev)** | **[Docs](https://mujoco-react.mintlify.app)** | **[Example Source](https://github.com/noah-wardlow/mujoco-react-example)**
+**[Live Demo](https://mujoco-react-example.pages.dev)** | **[Docs](https://dadd.mintlify.app)** | **[Example Source](https://github.com/noah-wardlow/mujoco-react-example)**
 
 ## Install
 
@@ -680,7 +680,7 @@ The full API object available via `ref` or `useMujocoSim().api`:
 
 ### Building Controllers
 
-See [Building Controllers](https://mujoco-react.mintlify.app/guides/building-controllers) for full patterns including config-driven controllers, IK gizmo coexistence, multi-arm support, and the `createController` factory.
+See [Building Controllers](https://dadd.mintlify.app/guides/building-controllers) for full patterns including config-driven controllers, IK gizmo coexistence, multi-arm support, and the `createController` factory.
 
 ### Graspable Objects
 
@@ -702,7 +702,7 @@ sceneObjects: [{
 }]
 ```
 
-Without `condim: 4` and high friction, objects slide out of the gripper when lifted. See [Graspable Objects](https://mujoco-react.mintlify.app/guides/graspable-objects) for details.
+Without `condim: 4` and high friction, objects slide out of the gripper when lifted. See [Graspable Objects](https://dadd.mintlify.app/guides/graspable-objects) for details.
 
 ### Click-to-Select
 
@@ -715,7 +715,7 @@ function ClickSelectOverlay() {
 }
 ```
 
-See [Click-to-Select](https://mujoco-react.mintlify.app/guides/click-to-select) for the full implementation.
+See [Click-to-Select](https://dadd.mintlify.app/guides/click-to-select) for the full implementation.
 
 ## useFrame Priority
 

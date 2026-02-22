@@ -16,6 +16,7 @@
       {
         "group": "Getting Started",
         "pages": [
+          "overview",
           "introduction",
           "installation",
           "guides/building-controllers",
@@ -102,6 +103,6 @@
     ]
   },
   "footerSocials": {
-    "github": "https://github.com/nicepkg/mujoco-react"
+    "github": "https://github.com/noah-wardlow/mujoco-react"
   }
 }

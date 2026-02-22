@@ -1,0 +1,43 @@
+---
+title: "mujoco-react"
+description: "MuJoCo physics in the browser with React Three Fiber"
+---
+
+<div style={{ textAlign: 'center', marginBottom: '24px' }}>
+  <a href="https://mujoco-react-example.pages.dev" target="_blank">Live Demo</a> · <a href="https://github.com/noah-wardlow/mujoco-react" target="_blank">GitHub</a> · <a href="https://www.npmjs.com/package/mujoco-react" target="_blank">npm</a>
+</div>
+
+```bash
+npm install mujoco-react three @react-three/fiber @react-three/drei
+```
+
+```tsx
+import { MujocoProvider, MujocoCanvas, SceneRenderer } from 'mujoco-react';
+
+<MujocoProvider>
+  <MujocoCanvas config={{ robotId: 'franka_emika_panda', sceneFile: 'scene.xml' }}>
+    <SceneRenderer />
+  </MujocoCanvas>
+</MujocoProvider>
+```
+
+<CardGroup cols={3}>
+  <Card title="Getting Started" icon="play" href="/introduction">
+    Quick start, controllers, architecture
+  </Card>
+  <Card title="Components" icon="puzzle-piece" href="/components/mujoco-provider">
+    MujocoProvider, MujocoCanvas, SceneRenderer, IkGizmo, Debug, and more
+  </Card>
+  <Card title="Hooks" icon="webhook" href="/hooks/use-mujoco-sim">
+    useBeforePhysicsStep, useBodyState, useSensor, useCtrl, usePolicy, and more
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Building Controllers" icon="gamepad" href="/guides/building-controllers">
+    Write your own controller, bring your own IK
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/simulation-control">
+    Simulation control, state management, forces, model introspection
+  </Card>
+</CardGroup>
