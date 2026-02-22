@@ -8,7 +8,7 @@
 import { useEffect, useRef } from 'react';
 import { useMujocoContext, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
-import type { JointStateResult } from '../types';
+import type { Joints, JointStateResult } from '../types';
 
 /**
  * Track a MuJoCo joint's position and velocity by name.
@@ -18,7 +18,7 @@ import type { JointStateResult } from '../types';
  * For ball joints, position is quat (4), velocity is angular vel (3).
  * For free joints, position is pos+quat (7), velocity is lin+ang vel (6).
  */
-export function useJointState(name: string): JointStateResult {
+export function useJointState(name: Joints): JointStateResult {
   const { mjModelRef, mjDataRef, status } = useMujocoContext();
   const jointIdRef = useRef(-1);
   const qposAdrRef = useRef(0);

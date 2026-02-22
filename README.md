@@ -85,15 +85,18 @@ function MyComponent() {
 
 ## Writing a Controller
 
-A controller is a React component that calls `useBeforePhysicsStep` to write `data.ctrl` each frame:
+A controller is a React component that uses handle-based hooks for type-safe actuator and sensor access:
 
 ```tsx
-import { useBeforePhysicsStep } from 'mujoco-react';
+import { useCtrl, useSensor, useBeforePhysicsStep } from 'mujoco-react';
 
 function MyController() {
-  useBeforePhysicsStep((_model, data) => {
-    data.ctrl[0] = Math.sin(data.time);        // sine wave on actuator 0
-    data.ctrl[1] = data.sensordata[0] * -0.5;  // feedback from a sensor
+  const joint1 = useCtrl('joint1');
+  const force = useSensor('force_sensor');
+
+  useBeforePhysicsStep(() => {
+    joint1.write(Math.sin(Date.now() / 1000));
+    joint1.write(force.read()[0] * -0.5);
   });
   return null;
 }
@@ -174,6 +177,23 @@ return ik ? <IkGizmo controller={ik} /> : null;
 Returns `IkContextValue | null` with methods like `setIkEnabled`, `moveTarget`, `syncTargetToSite`, `solveIK`, and `getGizmoStats`.
 
 Pass the returned value to `<IkGizmo controller={ik} />` or to your own controller as a prop.
+
+## Type-Safe Resource Names
+
+Use TypeScript module augmentation to get autocomplete and type checking for actuator, sensor, body, joint, site, geom, and keyframe names:
+
+```ts
+// e.g. in src/mujoco-register.d.ts
+declare module 'mujoco-react' {
+  interface Register {
+    actuators: 'joint1' | 'joint2' | 'joint3' | 'gripper';
+    sensors: 'force_sensor' | 'torque_sensor';
+    bodies: 'link0' | 'link1' | 'hand';
+  }
+}
+```
+
+Once declared, hooks like `useCtrl`, `useSensor`, `useBodyState`, and API methods like `setCtrl`, `applyForce`, `getSensorData` will only accept the declared names. When no `Register` augmentation is provided, all names fall back to `string`.
 
 ## Loading Models
 
@@ -466,10 +486,11 @@ await moveCameraTo(
 
 ### `useSensor(name)` / `useSensors()`
 
-Read sensor values by name (ref-based, no re-renders):
+Read sensor values by name. Returns a `SensorHandle` with `read()`, `dim`, and `name`:
 
 ```tsx
-const { value, size, type } = useSensor('force_sensor_1');
+const force = useSensor('force_sensor_1');
+// force.read() → Float64Array, force.dim → number
 ```
 
 ### `useBodyState(name)`
@@ -490,10 +511,11 @@ const { position, velocity } = useJointState('joint1');
 
 ### `useCtrl(name)`
 
-Read/write actuator control by name:
+Read/write actuator control by name. Returns a `CtrlHandle` with `read()`, `write()`, `name`, and `range`:
 
 ```tsx
-const [value, setValue] = useCtrl('gripper');
+const gripper = useCtrl('gripper');
+// gripper.read() → number, gripper.write(0.04), gripper.range → [min, max]
 ```
 
 ### `useContacts(bodyName?)` / `useContactEvents(bodyName, handlers)`
@@ -732,6 +754,7 @@ Features planned but not yet implemented:
 | **Physics interpolation** | P1 | Smooth rendering between physics ticks for very high refresh displays |
 | **Instanced geom rendering** | P2 | `<InstancedGeomRenderer />` for particle/granular sims |
 | **Web Worker physics** | P2 | Run `mj_step` off main thread via SharedArrayBuffer |
+| **Register codegen** | P2 | CLI to auto-generate `Register` type augmentation from MJCF XML |
 
 ### WASM Limitations (mujoco-js 0.0.7)
 

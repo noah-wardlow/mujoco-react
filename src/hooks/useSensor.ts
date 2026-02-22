@@ -8,13 +8,14 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { useMujocoContext, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
-import type { SensorInfo, SensorResult } from '../types';
+import type { Sensors, SensorHandle, SensorInfo } from '../types';
 
 /**
- * Access a single MuJoCo sensor by name. Returns a ref-based value
- * updated every physics frame without causing React re-renders.
+ * Access a single MuJoCo sensor by name. Returns a `SensorHandle` with
+ * `read()`, `dim`, and `name`. The backing array is updated every physics
+ * frame without causing React re-renders.
  */
-export function useSensor(name: string): SensorResult {
+export function useSensor(name: Sensors): SensorHandle {
   const { mjModelRef, mjDataRef, status } = useMujocoContext();
   const sensorIdRef = useRef(-1);
   const sensorAdrRef = useRef(0);
@@ -47,7 +48,15 @@ export function useSensor(name: string): SensorResult {
     }
   });
 
-  return { value: valueRef, size: sensorDimRef.current };
+  return useMemo<SensorHandle>(() => ({
+    read() {
+      return valueRef.current;
+    },
+    get dim() {
+      return sensorDimRef.current;
+    },
+    name,
+  }), [name]);
 }
 
 /**

@@ -4,15 +4,12 @@ description: "Read/write a single actuator control by name"
 icon: "sliders"
 ---
 
-Provides read/write access to a single actuator's control value by name.
+Provides handle-based read/write access to a single actuator's control value by name.
 
 ## Signature
 
 ```tsx
-useCtrl(name: string): [
-  value: React.RefObject<number>,
-  setValue: (v: number) => void
-]
+useCtrl(name: Actuators): CtrlHandle
 ```
 
 ## Usage
@@ -21,12 +18,12 @@ useCtrl(name: string): [
 import { useCtrl } from 'mujoco-react';
 
 function GripperControl() {
-  const [gripperValue, setGripper] = useCtrl('gripper');
+  const gripper = useCtrl('gripper');
 
   return (
     <div>
-      <button onClick={() => setGripper(0.04)}>Open</button>
-      <button onClick={() => setGripper(0.0)}>Close</button>
+      <button onClick={() => gripper.write(0.04)}>Open</button>
+      <button onClick={() => gripper.write(0.0)}>Close</button>
     </div>
   );
 }
@@ -36,12 +33,12 @@ function GripperControl() {
 
 ```tsx
 function GripperDisplay() {
-  const [value] = useCtrl('gripper');
+  const gripper = useCtrl('gripper');
   const textRef = useRef<any>(null);
 
   useFrame(() => {
     if (textRef.current) {
-      textRef.current.text = `Gripper: ${value.current.toFixed(3)}`;
+      textRef.current.text = `Gripper: ${gripper.read().toFixed(3)}`;
     }
   });
 
@@ -49,15 +46,41 @@ function GripperDisplay() {
 }
 ```
 
+### Inside useBeforePhysicsStep
+
+```tsx
+function MyController() {
+  const joint1 = useCtrl('joint1');
+  const force = useSensor('force_sensor');
+
+  useBeforePhysicsStep(() => {
+    joint1.write(force.read()[0] * -0.5);
+  });
+  return null;
+}
+```
+
 ## Return Value
 
-| Index | Type | Description |
+```tsx
+interface CtrlHandle {
+  read(): number;
+  write(value: number): void;
+  name: Actuators;
+  range: [number, number];
+}
+```
+
+| Field | Type | Description |
 |-------|------|-------------|
-| `[0]` | `RefObject<number>` | Current control value (updated each frame) |
-| `[1]` | `(v: number) => void` | Setter function to update the control value |
+| `read()` | `() => number` | Read the current control value from `data.ctrl` |
+| `write()` | `(v: number) => void` | Write a control value directly to `data.ctrl` |
+| `name` | `Actuators` | Actuator name |
+| `range` | `[number, number]` | Control range `[min, max]` from `actuator_ctrlrange` |
 
 ## Notes
 
-- The setter writes to `data.ctrl` on the next physics step
+- `read()` and `write()` operate directly on `data.ctrl` — no re-renders
 - For setting multiple actuators at once, use `api.setCtrl({ name: value, ... })`
-- The actuator is looked up by name once on mount
+- The actuator index is resolved once on mount
+- The `name` parameter accepts `string` by default, or a union type if you've declared a [`Register`](/guides/type-safe-names) augmentation

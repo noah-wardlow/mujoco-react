@@ -2,39 +2,52 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  *
- * useCtrl — clean read/write access to a named actuator's ctrl value (spec 3.1)
+ * useCtrl — handle-based read/write access to a named actuator's ctrl value (spec 3.1)
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useMujocoContext } from '../core/MujocoSimProvider';
 import { findActuatorByName } from '../core/SceneLoader';
+import type { Actuators, CtrlHandle } from '../types';
 
 /**
  * Access a single actuator's control value by name.
  *
- * Returns [currentValue, setValue]:
- * - `currentValue` is a ref updated every frame (no re-renders).
- * - `setValue` writes directly to `data.ctrl[actuatorId]`.
+ * Returns a `CtrlHandle` with `read()` and `write()` methods that
+ * operate directly on `data.ctrl` without causing React re-renders.
  */
-export function useCtrl(name: string): [React.RefObject<number>, (value: number) => void] {
+export function useCtrl(name: Actuators): CtrlHandle {
   const { mjModelRef, mjDataRef, status } = useMujocoContext();
   const actuatorIdRef = useRef(-1);
-  const valueRef = useRef(0);
+  const rangeRef = useRef<[number, number]>([0, 0]);
 
   useEffect(() => {
     const model = mjModelRef.current;
     if (!model || status !== 'ready') return;
-    actuatorIdRef.current = findActuatorByName(model, name);
+    const id = findActuatorByName(model, name);
+    actuatorIdRef.current = id;
+    if (id >= 0) {
+      rangeRef.current = [
+        model.actuator_ctrlrange[id * 2],
+        model.actuator_ctrlrange[id * 2 + 1],
+      ];
+    }
   }, [name, status, mjModelRef]);
 
-  // Read current value each frame (via afterStep would be ideal but
-  // useCtrl is primarily for writing; reading can use the ref)
-  const setValue = useCallback((value: number) => {
-    const data = mjDataRef.current;
-    if (!data || actuatorIdRef.current < 0) return;
-    data.ctrl[actuatorIdRef.current] = value;
-    valueRef.current = value;
-  }, [mjDataRef]);
-
-  return [valueRef, setValue];
+  return useMemo<CtrlHandle>(() => ({
+    read() {
+      const data = mjDataRef.current;
+      if (!data || actuatorIdRef.current < 0) return 0;
+      return data.ctrl[actuatorIdRef.current];
+    },
+    write(value: number) {
+      const data = mjDataRef.current;
+      if (!data || actuatorIdRef.current < 0) return;
+      data.ctrl[actuatorIdRef.current] = value;
+    },
+    name,
+    get range(): [number, number] {
+      return rangeRef.current;
+    },
+  }), [name, mjDataRef]);
 }

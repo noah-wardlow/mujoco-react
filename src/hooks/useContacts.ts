@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useMujocoContext, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import { findBodyByName, getName } from '../core/SceneLoader';
 import { getContact } from '../types';
-import type { ContactInfo, MujocoModel } from '../types';
+import type { Bodies, ContactInfo, MujocoModel } from '../types';
 
 // Cache geom names per model to avoid cross-model id collisions.
 const geomNameCacheByModel = new WeakMap<MujocoModel, Map<number, string>>();
@@ -36,7 +36,7 @@ function getGeomNameCached(model: MujocoModel, geomId: number): string {
  * Reads `data.ncon` first to avoid allocating for zero contacts.
  */
 export function useContacts(
-  bodyName?: string,
+  bodyName?: Bodies,
   callback?: (contacts: ContactInfo[]) => void,
 ): React.RefObject<ContactInfo[]> {
   const { mjModelRef, status } = useMujocoContext();
@@ -108,7 +108,7 @@ export function useContacts(
  * onEnter/onExit callbacks on transitions.
  */
 export function useContactEvents(
-  bodyName: string,
+  bodyName: Bodies,
   handlers: {
     onEnter?: (info: ContactInfo) => void;
     onExit?: (info: ContactInfo) => void;

@@ -8,6 +8,34 @@ import type { ReactNode } from 'react';
 import type { CanvasProps } from '@react-three/fiber';
 import * as THREE from 'three';
 
+// ---- Register (type-safe named resources) ----
+
+/**
+ * Module augmentation interface for type-safe resource names.
+ *
+ * Declare your model's resource names via module augmentation:
+ * ```ts
+ * declare module 'mujoco-react' {
+ *   interface Register {
+ *     actuators: 'joint1' | 'joint2' | 'gripper';
+ *     sensors: 'force_sensor' | 'torque_sensor';
+ *     bodies: 'link0' | 'link1' | 'hand';
+ *   }
+ * }
+ * ```
+ *
+ * When no augmentation is declared, all names fall back to `string`.
+ */
+export interface Register {}
+
+export type Actuators = Register extends { actuators: infer T extends string } ? T : string;
+export type Sensors = Register extends { sensors: infer T extends string } ? T : string;
+export type Bodies = Register extends { bodies: infer T extends string } ? T : string;
+export type Joints = Register extends { joints: infer T extends string } ? T : string;
+export type Sites = Register extends { sites: infer T extends string } ? T : string;
+export type Geoms = Register extends { geoms: infer T extends string } ? T : string;
+export type Keyframes = Register extends { keyframes: infer T extends string } ? T : string;
+
 // ---- MuJoCo WASM Types ----
 
 /**
@@ -300,7 +328,7 @@ export interface SceneConfig {
 
 export interface IkConfig {
   /** MuJoCo site name for IK target. */
-  siteName: string;
+  siteName: Sites;
   /** Number of joints to solve for. */
   numJoints: number;
   /** Custom IK solver. When omitted, uses built-in Damped Least-Squares solver. */
@@ -462,7 +490,7 @@ export interface TrajectoryData {
 // ---- Keyboard Teleop (spec 12.1) ----
 
 export interface KeyBinding {
-  actuator: string;
+  actuator: Actuators;
   delta?: number;
   toggle?: [number, number];
   set?: number;
@@ -527,13 +555,13 @@ export interface SelectionHighlightProps {
 }
 
 export interface ContactListenerProps {
-  body: string;
+  body: Bodies;
   onContactEnter?: (info: ContactInfo) => void;
   onContactExit?: (info: ContactInfo) => void;
 }
 
 export interface BodyProps {
-  name: string;
+  name: Bodies;
   type: 'box' | 'sphere' | 'cylinder';
   size: [number, number, number];
   position?: [number, number, number];
@@ -562,7 +590,7 @@ export interface MujocoSimAPI {
   step(n?: number): void;
   getTime(): number;
   getTimestep(): number;
-  applyKeyframe(nameOrIndex: string | number): void;
+  applyKeyframe(nameOrIndex: Keyframes | number): void;
 
   // State management (spec 4.1, 4.2, 4.3)
   saveState(): StateSnapshot;
@@ -573,17 +601,17 @@ export interface MujocoSimAPI {
   getQvel(): Float64Array;
 
   // Actuator / control (spec 3.1)
-  setCtrl(nameOrValues: string | Record<string, number>, value?: number): void;
+  setCtrl(nameOrValues: Actuators | Record<Actuators, number>, value?: number): void;
   getCtrl(): Float64Array;
 
   // Force application (spec 8.1)
-  applyForce(bodyName: string, force: THREE.Vector3, point?: THREE.Vector3): void;
-  applyTorque(bodyName: string, torque: THREE.Vector3): void;
-  setExternalForce(bodyName: string, force: THREE.Vector3, torque: THREE.Vector3): void;
+  applyForce(bodyName: Bodies, force: THREE.Vector3, point?: THREE.Vector3): void;
+  applyTorque(bodyName: Bodies, torque: THREE.Vector3): void;
+  setExternalForce(bodyName: Bodies, force: THREE.Vector3, torque: THREE.Vector3): void;
   applyGeneralizedForce(values: Float64Array | number[]): void;
 
   // Sensors (spec 2.1)
-  getSensorData(name: string): Float64Array | null;
+  getSensorData(name: Sensors): Float64Array | null;
 
   // Contacts (spec 2.4)
   getContacts(): ContactInfo[];
@@ -621,9 +649,9 @@ export interface MujocoSimAPI {
   ): { point: THREE.Vector3; bodyId: number; geomId: number } | null;
 
   // Domain randomization (spec 10.3)
-  setBodyMass(name: string, mass: number): void;
-  setGeomFriction(name: string, friction: [number, number, number]): void;
-  setGeomSize(name: string, size: [number, number, number]): void;
+  setBodyMass(name: Bodies, mass: number): void;
+  setGeomFriction(name: Geoms, friction: [number, number, number]): void;
+  setGeomSize(name: Geoms, size: [number, number, number]): void;
 
   // Internal refs for advanced use
   readonly mjModelRef: React.RefObject<MujocoModel | null>;
@@ -659,9 +687,30 @@ export interface MujocoContextValue {
   error: string | null;
 }
 
+/** @deprecated Use `SensorHandle` instead. */
 export interface SensorResult {
   value: React.RefObject<Float64Array>;
   size: number;
+}
+
+export interface CtrlHandle {
+  /** Read the current ctrl value. */
+  read(): number;
+  /** Write a ctrl value (goes directly to data.ctrl). */
+  write(value: number): void;
+  /** Actuator name. */
+  name: Actuators;
+  /** Actuator control range [min, max]. */
+  range: [number, number];
+}
+
+export interface SensorHandle {
+  /** Read the current sensor data. */
+  read(): Float64Array;
+  /** Sensor dimensionality. */
+  dim: number;
+  /** Sensor name. */
+  name: Sensors;
 }
 
 export interface BodyStateResult {

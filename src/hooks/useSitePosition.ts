@@ -8,7 +8,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMujocoContext } from '../core/MujocoSimProvider';
 import { findSiteByName } from '../core/SceneLoader';
-import type { SitePositionResult } from '../types';
+import type { Sites, SitePositionResult } from '../types';
 
 // Preallocated temp for rotation matrix extraction
 const _mat4 = new THREE.Matrix4();
@@ -17,7 +17,7 @@ const _mat4 = new THREE.Matrix4();
  * Returns reactive refs for a MuJoCo site's world position and orientation.
  * Refs are updated every frame without triggering React re-renders.
  */
-export function useSitePosition(siteName: string): SitePositionResult {
+export function useSitePosition(siteName: Sites): SitePositionResult {
   const { mjModelRef, mjDataRef, status } = useMujocoContext();
   const siteIdRef = useRef(-1);
   const positionRef = useRef(new THREE.Vector3());

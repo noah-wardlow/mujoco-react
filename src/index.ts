@@ -115,8 +115,19 @@ export type {
   // Hook return types
   SitePositionResult,
   SensorResult,
+  CtrlHandle,
+  SensorHandle,
   BodyStateResult,
   JointStateResult,
+  // Register (type-safe named resources)
+  Register,
+  Actuators,
+  Sensors,
+  Bodies,
+  Joints,
+  Sites,
+  Geoms,
+  Keyframes,
 } from './types';
 
 // Re-export MuJoCo types for convenience

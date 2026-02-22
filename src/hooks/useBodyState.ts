@@ -9,13 +9,13 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useMujocoContext, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import { findBodyByName } from '../core/SceneLoader';
-import type { BodyStateResult } from '../types';
+import type { Bodies, BodyStateResult } from '../types';
 
 /**
  * Track a MuJoCo body's world position, quaternion, and velocities.
  * All values are ref-based — updated every physics frame without re-renders.
  */
-export function useBodyState(name: string): BodyStateResult {
+export function useBodyState(name: Bodies): BodyStateResult {
   const { mjModelRef, status } = useMujocoContext();
   const bodyIdRef = useRef(-1);
   const position = useRef(new THREE.Vector3());
