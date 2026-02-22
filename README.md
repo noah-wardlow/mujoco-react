@@ -70,10 +70,8 @@ Inside `<MujocoCanvas>` or `<MujocoPhysics>`, `useMujoco()` gives you the simula
 import { useMujoco } from 'mujoco-react';
 
 function MyComponent() {
-  const { api, status } = useMujoco();
   const sim = useMujoco();
 
-  if (!api) return null;
   if (sim.isPending) return <span>Loading...</span>;
   if (sim.isError) return <span>Error: {sim.error}</span>;
 
