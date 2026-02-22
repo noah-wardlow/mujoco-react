@@ -1,3 +1,10 @@
+## [6.0.1](https://github.com/noah-wardlow/mujoco-react/compare/v6.0.0...v6.0.1) (2026-02-22)
+
+
+### Bug Fixes
+
+* restructure docs navigation so overview is the landing page ([e4f4309](https://github.com/noah-wardlow/mujoco-react/commit/e4f4309158ebd86b2d2d2c586331bb4737451ddf))
+
 # [6.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v5.0.0...v6.0.0) (2026-02-22)
 
 
