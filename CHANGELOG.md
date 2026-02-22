@@ -1,3 +1,18 @@
+# [8.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v7.0.1...v8.0.0) (2026-02-22)
+
+
+### Features
+
+* add Register pattern and handle-based useCtrl/useSensor ([fdead7d](https://github.com/noah-wardlow/mujoco-react/commit/fdead7d92b0868e12bd52935ea8c66c1cd71a175))
+
+
+### BREAKING CHANGES
+
+* useCtrl returns CtrlHandle instead of [RefObject, setter] tuple.
+useSensor returns SensorHandle instead of SensorResult { value, size }.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
 ## [7.0.1](https://github.com/noah-wardlow/mujoco-react/compare/v7.0.0...v7.0.1) (2026-02-22)
 
 
