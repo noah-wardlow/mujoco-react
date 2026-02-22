@@ -1,3 +1,17 @@
+# [2.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v1.0.0...v2.0.0) (2026-02-22)
+
+
+### Features
+
+* render SceneRenderer automatically inside MujocoSimProvider ([cda052e](https://github.com/noah-wardlow/mujoco-react/commit/cda052ed7de05ba1f735a389519156addbec03fd))
+
+
+### BREAKING CHANGES
+
+* SceneRenderer is no longer exported. Remove <SceneRenderer /> from your JSX and its import.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
 # 1.0.0 (2026-02-22)
 
 
