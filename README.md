@@ -4,7 +4,7 @@
 
 # mujoco-react
 
-Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper around [mujoco-js](https://github.com/nicepkg/mujoco-js). Load any MuJoCo model, step physics, render bodies, and write controllers as React components.
+Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper around [mujoco-js](https://www.npmjs.com/package/mujoco-js). Load any MuJoCo model, step physics, render bodies, and write controllers as React components.
 
 **[Live Demo](https://mujoco-react-example.pages.dev)** | **[Docs](https://dadd.mintlify.app)** | **[Example Source](https://github.com/noah-wardlow/mujoco-react-example)**
 
