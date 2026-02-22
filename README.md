@@ -70,15 +70,14 @@ Inside `<MujocoCanvas>` or `<MujocoPhysics>`, `useMujoco()` gives you the simula
 import { useMujoco } from 'mujoco-react';
 
 function MyComponent() {
-  const sim = useMujoco();
+  const { isPending, isError, error, api, mjModelRef } = useMujoco();
 
-  if (sim.isPending) return <span>Loading...</span>;
-  if (sim.isError) return <span>Error: {sim.error}</span>;
+  if (isPending) return <span>Loading...</span>;
+  if (isError) return <span>Error: {error}</span>;
 
-  // sim.api is fully typed here
   return (
-    <button onClick={() => sim.api.reset()}>
-      Reset ({sim.mjModelRef.current?.nq} joints)
+    <button onClick={() => api.reset()}>
+      Reset ({mjModelRef.current?.nq} joints)
     </button>
   );
 }
