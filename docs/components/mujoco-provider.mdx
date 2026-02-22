@@ -13,7 +13,7 @@ import { MujocoProvider } from 'mujoco-react';
 
 function App() {
   return (
-    <MujocoProvider onError={(err) => console.error(err)}>
+    <MujocoProvider>
       <MujocoCanvas config={config}>
         {/* ... */}
       </MujocoCanvas>
