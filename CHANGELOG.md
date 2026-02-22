@@ -1,3 +1,17 @@
+# [4.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v3.0.0...v4.0.0) (2026-02-22)
+
+
+### Features
+
+* rename robotId to modelId in SceneConfig ([5452189](https://github.com/noah-wardlow/mujoco-react/commit/545218937c3678552c2af7044ad89a252d2a1e7d))
+
+
+### BREAKING CHANGES
+
+* SceneConfig.robotId is now SceneConfig.modelId.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
 # [3.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v2.0.0...v3.0.0) (2026-02-22)
 
 
