@@ -23,7 +23,7 @@ import {
   IkController,
   IkGizmo,
 } from 'mujoco-react';
-import type { SceneConfig, MujocoSimAPI } from 'mujoco-react';
+import type { SceneConfig } from 'mujoco-react';
 import { OrbitControls } from '@react-three/drei';
 
 const config: SceneConfig = {
@@ -33,12 +33,9 @@ const config: SceneConfig = {
 };
 
 function App() {
-  const apiRef = useRef<MujocoSimAPI>(null);
-
   return (
     <MujocoProvider>
       <MujocoCanvas
-        ref={apiRef}
         config={config}
         camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
         shadows
@@ -56,24 +53,25 @@ function App() {
 }
 ```
 
-## Direct WASM Access
+## `useMujoco()`
 
-`useMujoco()` gives you the full typed MuJoCo WASM binary — `mj_step`, `mj_forward`, `MjModel`, `MjData`, and everything else:
+Inside `<MujocoCanvas>` or `<MujocoPhysics>`, `useMujoco()` gives you the simulation API, refs to the live model/data, and status:
 
 ```tsx
 import { useMujoco } from 'mujoco-react';
 
-const { mujoco, status } = useMujoco();
+function StatusOverlay() {
+  const { status, api, mjModelRef, mjDataRef } = useMujoco();
 
-if (mujoco) {
-  const model = mujoco.MjModel.loadFromXML('/path/to/scene.xml');
-  const data = new mujoco.MjData(model);
-  mujoco.mj_step(model, data);
-  console.log(data.qpos);  // joint positions after one step
+  if (status !== 'ready') return <span>Loading...</span>;
+
+  return (
+    <button onClick={() => api?.reset()}>
+      Reset ({mjModelRef.current?.nq} joints)
+    </button>
+  );
 }
 ```
-
-Most users won't need this — `<MujocoCanvas>` and hooks like `useBeforePhysicsStep` handle the model/data lifecycle for you. But the raw module is always available when you need it.
 
 ## Writing a Controller
 
@@ -390,24 +388,27 @@ Plays back recorded qpos trajectories with scrubbing.
 
 ### `useMujoco()`
 
-Access the WASM module lifecycle from any child of `<MujocoProvider>`:
-
-```tsx
-const { mujoco, status, error } = useMujoco();
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `mujoco` | `MujocoModule \| null` | The raw WASM module, or `null` while loading |
-| `status` | `'pending' \| 'error'` | Lifecycle state (absent once loaded) |
-| `error` | `string \| null` | Error message if loading failed |
-
-### `useMujocoSim()`
-
 Access the simulation API and internal refs (must be inside `<MujocoCanvas>` or `<MujocoPhysics>`):
 
 ```tsx
-const { api, mjModelRef, mjDataRef } = useMujocoSim();
+const { api, status, mjModelRef, mjDataRef } = useMujoco();
+```
+
+### `useMujocoWasm()`
+
+Access the raw WASM module lifecycle from any child of `<MujocoProvider>`. Most users won't need this — `useMujoco()` and hooks like `useBeforePhysicsStep` handle the model/data lifecycle for you.
+
+```tsx
+import { useMujocoWasm } from 'mujoco-react';
+
+const { mujoco, status } = useMujocoWasm();
+
+if (mujoco) {
+  const model = mujoco.MjModel.loadFromXML('/path/to/scene.xml');
+  const data = new mujoco.MjData(model);
+  mujoco.mj_step(model, data);
+  console.log(data.qpos);  // joint positions after one step
+}
 ```
 
 ### `useBeforePhysicsStep(callback)`
@@ -583,7 +584,7 @@ useSceneLights(1.5);
 
 ## MujocoSimAPI
 
-The full API object available via `ref` or `useMujocoSim().api`:
+The full API object available via `ref` or `useMujoco().api`:
 
 ### Simulation Control
 
@@ -663,27 +664,9 @@ The full API object available via `ref` or `useMujocoSim().api`:
 
 See [Building Controllers](https://dadd.mintlify.app/guides/building-controllers) for full patterns including config-driven controllers, IK gizmo coexistence, multi-arm support, and the `createController` factory.
 
-### Graspable Objects
+### Contact Parameters
 
-Objects need specific MuJoCo contact parameters to be picked up by grippers:
-
-```tsx
-sceneObjects: [{
-  name: 'cube',
-  type: 'box',
-  size: [0.025, 0.025, 0.025],
-  position: [0.4, 0, 0.025],
-  rgba: [0.9, 0.2, 0.15, 1],
-  mass: 0.05,
-  freejoint: true,
-  friction: '1.5 0.3 0.1',            // high sliding friction
-  solref: '0.01 1',                    // stiff contact solver
-  solimp: '0.95 0.99 0.001 0.5 2',    // tight impedance
-  condim: 4,                           // elliptic friction cone
-}]
-```
-
-Without `condim: 4` and high friction, objects slide out of the gripper when lifted. See [Graspable Objects](https://dadd.mintlify.app/guides/graspable-objects) for details.
+Objects that need stable contact (grasping, stacking, etc.) require tuned MuJoCo solver parameters — `friction`, `solref`, `solimp`, and `condim`. See [Contact Parameters](https://dadd.mintlify.app/guides/graspable-objects) for details.
 
 ### Click-to-Select
 

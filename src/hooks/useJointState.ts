@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useMujocoSim, useAfterPhysicsStep } from '../core/MujocoSimProvider';
+import { useMujoco, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
 import type { JointStateResult } from '../types';
 
@@ -19,7 +19,7 @@ import type { JointStateResult } from '../types';
  * For free joints, position is pos+quat (7), velocity is lin+ang vel (6).
  */
 export function useJointState(name: string): JointStateResult {
-  const { mjModelRef, mjDataRef, status } = useMujocoSim();
+  const { mjModelRef, mjDataRef, status } = useMujoco();
   const jointIdRef = useRef(-1);
   const qposAdrRef = useRef(0);
   const dofAdrRef = useRef(0);

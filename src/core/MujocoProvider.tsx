@@ -16,7 +16,7 @@ const MujocoContext = createContext<MujocoContextValue>({
 /**
  * Hook to access the MuJoCo WASM module.
  */
-export function useMujoco(): MujocoContextValue {
+export function useMujocoWasm(): MujocoContextValue {
   return useContext(MujocoContext);
 }
 

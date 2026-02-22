@@ -1,5 +1,5 @@
 ---
-title: "useMujocoSim"
+title: "useMujoco"
 description: "Access the simulation API and internal state"
 icon: "plug"
 ---
@@ -9,10 +9,10 @@ The primary hook for accessing the MuJoCo simulation API from any component insi
 ## Usage
 
 ```tsx
-import { useMujocoSim } from 'mujoco-react';
+import { useMujoco } from 'mujoco-react';
 
 function MyComponent() {
-  const { api, status } = useMujocoSim();
+  const { api, status } = useMujoco();
 
   if (!api) return null;
 
@@ -64,7 +64,7 @@ For advanced use cases, access the raw MuJoCo model and data objects:
 
 ```tsx
 function AdvancedComponent() {
-  const { mjModelRef, mjDataRef } = useMujocoSim();
+  const { mjModelRef, mjDataRef } = useMujoco();
 
   useFrame(() => {
     const model = mjModelRef.current;

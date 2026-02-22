@@ -6,7 +6,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useMujocoSim } from '../core/MujocoSimProvider';
+import { useMujoco } from '../core/MujocoSimProvider';
 import { findSiteByName } from '../core/SceneLoader';
 import type { SitePositionResult } from '../types';
 
@@ -18,7 +18,7 @@ const _mat4 = new THREE.Matrix4();
  * Refs are updated every frame without triggering React re-renders.
  */
 export function useSitePosition(siteName: string): SitePositionResult {
-  const { mjModelRef, mjDataRef, status } = useMujocoSim();
+  const { mjModelRef, mjDataRef, status } = useMujoco();
   const siteIdRef = useRef(-1);
   const positionRef = useRef(new THREE.Vector3());
   const quaternionRef = useRef(new THREE.Quaternion());

@@ -122,7 +122,7 @@ const count = api.getKeyframeCount(); // e.g., 3
 
 ```tsx
 function CheckpointControls() {
-  const { api } = useMujocoSim();
+  const { api } = useMujoco();
   const snapshots = useRef<StateSnapshot[]>([]);
 
   return (

@@ -6,7 +6,7 @@
  */
 
 import { useRef } from 'react';
-import { useMujocoSim, useBeforePhysicsStep } from '../core/MujocoSimProvider';
+import { useMujoco, useBeforePhysicsStep } from '../core/MujocoSimProvider';
 
 interface CtrlNoiseConfig {
   /** Exponential filter rate (0-1). Higher = faster noise changes. Default: 0.01. */
@@ -25,7 +25,7 @@ interface CtrlNoiseConfig {
  * data.ctrl[i] += noise[i]
  */
 export function useCtrlNoise(config: CtrlNoiseConfig = {}) {
-  const { mjModelRef } = useMujocoSim();
+  const { mjModelRef } = useMujoco();
   const configRef = useRef(config);
   configRef.current = config;
   const noiseRef = useRef<Float64Array | null>(null);

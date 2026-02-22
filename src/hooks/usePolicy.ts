@@ -6,7 +6,7 @@
  */
 
 import { useRef } from 'react';
-import { useMujocoSim, useBeforePhysicsStep } from '../core/MujocoSimProvider';
+import { useMujoco, useBeforePhysicsStep } from '../core/MujocoSimProvider';
 import type { PolicyConfig } from '../types';
 
 /**
@@ -20,7 +20,7 @@ import type { PolicyConfig } from '../types';
  * @returns { step, isRunning } control handles
  */
 export function usePolicy(config: PolicyConfig) {
-  const { mjModelRef } = useMujocoSim();
+  const { mjModelRef } = useMujoco();
   const lastActionTimeRef = useRef(0);
   const lastActionRef = useRef<Float32Array | Float64Array | number[] | null>(null);
   const isRunningRef = useRef(true);

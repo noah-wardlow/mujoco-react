@@ -7,7 +7,7 @@ import { PivotControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { useMujocoSim } from '../core/MujocoSimProvider';
+import { useMujoco } from '../core/MujocoSimProvider';
 import { useIk } from '../core/IkContext';
 import { findSiteByName } from '../core/SceneLoader';
 import type { IkGizmoProps } from '../types';
@@ -31,7 +31,7 @@ const _scale = new THREE.Vector3(1, 1, 1);
  *   When provided, the consumer handles what happens during drag.
  */
 export function IkGizmo({ siteName, scale = 0.18, onDrag }: IkGizmoProps) {
-  const { mjModelRef, mjDataRef, status } = useMujocoSim();
+  const { mjModelRef, mjDataRef, status } = useMujoco();
   const { ikTargetRef, siteIdRef, ikEnabledRef, setIkEnabled } = useIk();
 
   const wrapperRef = useRef<THREE.Group>(null);

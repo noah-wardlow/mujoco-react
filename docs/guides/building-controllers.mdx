@@ -239,7 +239,7 @@ Register a callback to reset your controller state when the simulation resets:
 
 ```tsx
 function MyControllerImpl({ config, children }) {
-  const { resetCallbacks } = useMujocoSim();
+  const { resetCallbacks } = useMujoco();
 
   useEffect(() => {
     const cb = () => { /* reset your state */ };

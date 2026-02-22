@@ -7,7 +7,7 @@
 
 import { useCallback, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useMujocoSim } from '../core/MujocoSimProvider';
+import { useMujoco } from '../core/MujocoSimProvider';
 
 interface TrajectoryPlayerOptions {
   fps?: number;
@@ -24,7 +24,7 @@ export function useTrajectoryPlayer(
   trajectory: number[][],
   options: TrajectoryPlayerOptions = {},
 ) {
-  const { mjModelRef, mjDataRef, mujocoRef, pausedRef } = useMujocoSim();
+  const { mjModelRef, mjDataRef, mujocoRef, pausedRef } = useMujoco();
   const fps = options.fps ?? 30;
   const loop = options.loop ?? false;
 

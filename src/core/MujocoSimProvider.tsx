@@ -96,15 +96,15 @@ export interface MujocoSimContextValue {
 
 const MujocoSimContext = createContext<MujocoSimContextValue | null>(null);
 
-export function useMujocoSim(): MujocoSimContextValue {
+export function useMujoco(): MujocoSimContextValue {
   const ctx = useContext(MujocoSimContext);
   if (!ctx)
-    throw new Error('useMujocoSim must be used inside <MujocoSimProvider>');
+    throw new Error('useMujoco must be used inside <MujocoSimProvider>');
   return ctx;
 }
 
 export function useBeforePhysicsStep(callback: PhysicsStepCallback) {
-  const { beforeStepCallbacks } = useMujocoSim();
+  const { beforeStepCallbacks } = useMujoco();
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
 
@@ -116,7 +116,7 @@ export function useBeforePhysicsStep(callback: PhysicsStepCallback) {
 }
 
 export function useAfterPhysicsStep(callback: PhysicsStepCallback) {
-  const { afterStepCallbacks } = useMujocoSim();
+  const { afterStepCallbacks } = useMujoco();
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
 

@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import { useMujocoSim } from '../core/MujocoSimProvider';
+import { useMujoco } from '../core/MujocoSimProvider';
 import { findActuatorByName } from '../core/SceneLoader';
 
 /**
@@ -17,7 +17,7 @@ import { findActuatorByName } from '../core/SceneLoader';
  * - `setValue` writes directly to `data.ctrl[actuatorId]`.
  */
 export function useCtrl(name: string): [React.RefObject<number>, (value: number) => void] {
-  const { mjModelRef, mjDataRef, status } = useMujocoSim();
+  const { mjModelRef, mjDataRef, status } = useMujoco();
   const actuatorIdRef = useRef(-1);
   const valueRef = useRef(0);
 

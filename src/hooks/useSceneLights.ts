@@ -10,10 +10,10 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useThree } from '@react-three/fiber';
-import { useMujocoSim } from '../core/MujocoSimProvider';
+import { useMujoco } from '../core/MujocoSimProvider';
 
 export function useSceneLights(intensity = 1.0) {
-  const { mjModelRef, status } = useMujocoSim();
+  const { mjModelRef, status } = useMujoco();
   const { scene } = useThree();
   const lightsRef = useRef<THREE.Light[]>([]);
   const targetsRef = useRef<THREE.Object3D[]>([]);

@@ -32,15 +32,15 @@ function App() {
   Called if the WASM module fails to load.
 </ParamField>
 
-## useMujoco Hook
+## useMujocoWasm Hook
 
 Access the WASM module status from any child component:
 
 ```tsx
-import { useMujoco } from 'mujoco-react';
+import { useMujocoWasm } from 'mujoco-react';
 
 function LoadingIndicator() {
-  const { mujoco, status, error } = useMujoco();
+  const { mujoco, status, error } = useMujocoWasm();
 
   if (status === 'pending') return <div>Loading WASM...</div>;
   if (status === 'error') return <div>Error: {error}</div>;

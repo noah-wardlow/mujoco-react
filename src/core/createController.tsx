@@ -37,7 +37,7 @@ export type ControllerComponent<TConfig> = React.FC<{
  * Factory that produces a typed controller component.
  *
  * Controllers are React components that plug into the MuJoCo simulation tree.
- * Inside `Impl`, use any hooks (`useMujocoSim`, `useBeforePhysicsStep`, etc.)
+ * Inside `Impl`, use any hooks (`useMujoco`, `useBeforePhysicsStep`, etc.)
  * to interact with the physics engine.
  *
  * @example

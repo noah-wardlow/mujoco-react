@@ -117,5 +117,5 @@ const apiRef = useRef<MujocoSimAPI>(null);
 ## Notes
 
 - Must be a child of `<MujocoProvider>`
-- Children can use all mujoco-react hooks (`useMujocoSim`, `useBeforePhysicsStep`, etc.)
+- Children can use all mujoco-react hooks (`useMujoco`, `useBeforePhysicsStep`, etc.)
 - The `config` prop is read on mount and when `api.loadScene()` is called — changing it after mount has no effect

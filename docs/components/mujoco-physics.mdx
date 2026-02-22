@@ -113,6 +113,6 @@ const apiRef = useRef<MujocoSimAPI>(null);
 ## Notes
 
 - Must be a child of `<MujocoProvider>` and inside an R3F `<Canvas>`
-- Children can use all mujoco-react hooks (`useMujocoSim`, `useBeforePhysicsStep`, etc.)
+- Children can use all mujoco-react hooks (`useMujoco`, `useBeforePhysicsStep`, etc.)
 - Components placed outside `<MujocoPhysics>` but inside `<Canvas>` won't have access to physics hooks
 - Renders nothing while WASM is loading or if loading fails (call `onError` to handle failures)

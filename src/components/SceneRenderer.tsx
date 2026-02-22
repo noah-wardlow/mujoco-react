@@ -10,14 +10,14 @@ import * as THREE from 'three';
 import { GeomBuilder } from '../rendering/GeomBuilder';
 import { MujocoModel } from '../types';
 import { getName } from '../core/SceneLoader';
-import { useMujocoSim } from '../core/MujocoSimProvider';
+import { useMujoco } from '../core/MujocoSimProvider';
 
 /**
  * SceneRenderer — creates and syncs MuJoCo body meshes every frame.
  * Accepts standard R3F group props (position, rotation, scale, visible, etc.).
  */
 export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
-  const { mjModelRef, mjDataRef, mujocoRef, onSelectionRef, status } = useMujocoSim();
+  const { mjModelRef, mjDataRef, mujocoRef, onSelectionRef, status } = useMujoco();
   const groupRef = useRef<THREE.Group>(null);
   const bodyRefs = useRef<(THREE.Group | null)[]>([]);
   const prevModelRef = useRef<MujocoModel | null>(null);

@@ -62,7 +62,7 @@
       {
         "tab": "Hooks",
         "pages": [
-          "hooks/use-mujoco-sim",
+          "hooks/use-mujoco",
           "hooks/use-before-physics-step",
           "hooks/use-after-physics-step",
           "hooks/use-ik",

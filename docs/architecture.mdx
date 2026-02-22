@@ -184,11 +184,11 @@ function App() {
 }
 ```
 
-### 2. `useMujocoSim()` hook (inside R3F)
+### 2. `useMujoco()` hook (inside R3F)
 
 ```tsx
 function MyComponent() {
-  const { api } = useMujocoSim();
+  const { api } = useMujoco();
 
   useEffect(() => {
     api.setSpeed(2.0);
@@ -199,5 +199,5 @@ function MyComponent() {
 ```
 
 <Warning>
-  `useMujocoSim()` can only be called from components that are children of `MujocoCanvas` or `MujocoPhysics`. Calling it outside will throw an error.
+  `useMujoco()` can only be called from components that are children of `MujocoCanvas` or `MujocoPhysics`. Calling it outside will throw an error.
 </Warning>

@@ -4,11 +4,11 @@
  */
 
 // Core
-export { MujocoProvider, useMujoco } from './core/MujocoProvider';
+export { MujocoProvider, useMujocoWasm } from './core/MujocoProvider';
 export { MujocoCanvas } from './core/MujocoCanvas';
 export { MujocoPhysics } from './core/MujocoPhysics';
 export type { MujocoPhysicsProps } from './core/MujocoPhysics';
-export { MujocoSimProvider, useMujocoSim, useBeforePhysicsStep, useAfterPhysicsStep } from './core/MujocoSimProvider';
+export { MujocoSimProvider, useMujoco, useBeforePhysicsStep, useAfterPhysicsStep } from './core/MujocoSimProvider';
 export {
   loadScene,
   getName,

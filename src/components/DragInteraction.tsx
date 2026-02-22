@@ -7,7 +7,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { useMujocoSim, useBeforePhysicsStep } from '../core/MujocoSimProvider';
+import { useMujoco, useBeforePhysicsStep } from '../core/MujocoSimProvider';
 import type { DragInteractionProps } from '../types';
 
 // Preallocated temps to avoid GC pressure
@@ -38,7 +38,7 @@ export function DragInteraction({
   showArrow = true,
   ...groupProps
 }: DragInteractionProps & Omit<ThreeElements['group'], 'ref'>) {
-  const { mjDataRef, mujocoRef, mjModelRef, status } = useMujocoSim();
+  const { mjDataRef, mujocoRef, mjModelRef, status } = useMujoco();
   const { gl, camera, scene, controls } = useThree();
 
   const draggingRef = useRef(false);

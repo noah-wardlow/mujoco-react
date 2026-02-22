@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useMujocoSim, useBeforePhysicsStep } from '../core/MujocoSimProvider';
+import { useMujoco, useBeforePhysicsStep } from '../core/MujocoSimProvider';
 import { findActuatorByName } from '../core/SceneLoader';
 import type { KeyboardTeleopConfig } from '../types';
 
@@ -19,7 +19,7 @@ import type { KeyboardTeleopConfig } from '../types';
  * - `set`: Set actuator to a fixed value while key is held
  */
 export function useKeyboardTeleop(config: KeyboardTeleopConfig) {
-  const { mjModelRef, mjDataRef, status } = useMujocoSim();
+  const { mjModelRef, mjDataRef, status } = useMujoco();
   const pressedRef = useRef(new Set<string>());
   const toggleStateRef = useRef(new Map<string, boolean>());
   const enabledRef = useRef(config.enabled ?? true);

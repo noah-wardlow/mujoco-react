@@ -4,7 +4,7 @@
  */
 
 import { forwardRef, useEffect } from 'react';
-import { useMujoco } from './MujocoProvider';
+import { useMujocoWasm } from './MujocoProvider';
 import { MujocoSimProvider } from './MujocoSimProvider';
 import type { MujocoSimAPI, SceneConfig } from '../types';
 
@@ -53,7 +53,7 @@ export interface MujocoPhysicsProps {
  */
 export const MujocoPhysics = forwardRef<MujocoSimAPI, MujocoPhysicsProps>(
   function MujocoPhysics({ onError, children, ...props }, ref) {
-    const { mujoco, status: wasmStatus, error: wasmError } = useMujoco();
+    const { mujoco, status: wasmStatus, error: wasmError } = useMujocoWasm();
 
     useEffect(() => {
       if (wasmStatus === 'error' && onError) {

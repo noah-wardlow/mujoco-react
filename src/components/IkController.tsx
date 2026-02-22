@@ -11,7 +11,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { createController } from '../core/createController';
 import { IkContext, type IkContextValue } from '../core/IkContext';
-import { useMujocoSim, useBeforePhysicsStep } from '../core/MujocoSimProvider';
+import { useMujoco, useBeforePhysicsStep } from '../core/MujocoSimProvider';
 import { GenericIK } from '../core/GenericIK';
 import { findSiteByName } from '../core/SceneLoader';
 import type { IkConfig, IKSolveFn, MujocoData } from '../types';
@@ -41,7 +41,7 @@ function IkControllerImpl({
   children?: React.ReactNode;
 }) {
   const { mjModelRef, mjDataRef, mujocoRef, configRef, resetCallbacks, status } =
-    useMujocoSim();
+    useMujoco();
 
   // All IK state lives here, NOT in the provider
   const ikEnabledRef = useRef(false);
