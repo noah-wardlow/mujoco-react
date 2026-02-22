@@ -573,11 +573,23 @@ const { step, isRunning } = usePolicy({
 Record and play back simulation trajectories:
 
 ```tsx
-const recorder = useTrajectoryRecorder({ fields: ["qpos", "qvel", "ctrl"] });
-// recorder.start(), recorder.stop(), recorder.downloadJSON(), recorder.downloadCSV()
+// Record
+const recorder = useTrajectoryRecorder({ fields: ["qpos", "ctrl"] });
+recorder.start();
+// ... interact with simulation ...
+recorder.stop();
 
-const player = useTrajectoryPlayer(trajectory, { fps: 30, loop: true });
-// player.play(), player.pause(), player.seek(frameIdx)
+// Play back recorded frames directly (no conversion needed)
+const player = useTrajectoryPlayer(recorder.frames, {
+  fps: 30,
+  speed: 1.0,        // 0.5x, 1x, 2x, etc.
+  loop: true,
+  mode: "kinematic",  // or "physics" to replay ctrl through the sim
+  onComplete: () => console.log("done"),
+});
+// player.play(), player.pause(), player.seek(42), player.setSpeed(2)
+// player.state → "idle" | "playing" | "paused" | "completed"
+// player.progress → 0-1
 ```
 
 ### `useVideoRecorder(config)`

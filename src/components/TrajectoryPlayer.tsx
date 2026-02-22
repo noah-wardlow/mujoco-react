@@ -17,14 +17,29 @@ import type { TrajectoryPlayerProps } from '../types';
 export function TrajectoryPlayer({
   trajectory,
   fps = 30,
+  speed = 1.0,
   loop = false,
   playing = false,
+  mode = 'kinematic',
   onFrame,
+  onComplete,
+  onStateChange,
 }: TrajectoryPlayerProps) {
-  const player = useTrajectoryPlayer(trajectory, { fps, loop });
+  const player = useTrajectoryPlayer(trajectory, {
+    fps,
+    speed,
+    loop,
+    mode,
+    onComplete,
+    onStateChange,
+  });
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
   const lastReportedFrameRef = useRef(-1);
+
+  useEffect(() => {
+    player.setSpeed(speed);
+  }, [speed, player]);
 
   useEffect(() => {
     if (playing) {
@@ -34,7 +49,6 @@ export function TrajectoryPlayer({
     }
   }, [playing, player]);
 
-  // Use useFrame instead of setInterval to sync with the render loop
   useFrame(() => {
     if (!onFrameRef.current) return;
     const currentFrame = player.frame;

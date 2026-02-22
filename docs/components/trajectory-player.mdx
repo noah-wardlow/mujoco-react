@@ -4,32 +4,37 @@ description: "Component for playing back recorded trajectories"
 icon: "play"
 ---
 
-Declarative component for playing back recorded qpos trajectories. Pauses the simulation and drives joint positions from recorded frames.
+Declarative component for playing back recorded trajectories. Wraps the `useTrajectoryPlayer` hook for prop-driven control.
 
 ## Usage
 
 ```tsx
-const trajectory = [[0, 0, 0, ...], [0.01, 0.02, ...], ...]; // Array of qpos arrays
-
 <MujocoCanvas config={config}>
   <TrajectoryPlayer
-    trajectory={trajectory}
+    trajectory={recorder.frames}
     fps={30}
+    speed={1.5}
     loop
     playing={isPlaying}
     onFrame={(idx) => console.log("Frame:", idx)}
+    onComplete={() => setIsPlaying(false)}
+    onStateChange={(state) => console.log(state)}
   />
 </MujocoCanvas>
 ```
 
 ## Props
 
-<ParamField body="trajectory" type="number[][]" required>
-  Array of qpos arrays. Each inner array is one frame of joint positions.
+<ParamField body="trajectory" type="TrajectoryFrame[] | number[][]" required>
+  Trajectory data. Accepts `TrajectoryFrame[]` from `useTrajectoryRecorder` directly, or `number[][]` where each inner array is one frame of joint positions.
 </ParamField>
 
 <ParamField body="fps" type="number" default="30">
   Playback frame rate.
+</ParamField>
+
+<ParamField body="speed" type="number" default="1.0">
+  Speed multiplier. `0.5` = half speed, `2` = double speed.
 </ParamField>
 
 <ParamField body="loop" type="boolean" default="false">
@@ -40,21 +45,33 @@ const trajectory = [[0, 0, 0, ...], [0.01, 0.02, ...], ...]; // Array of qpos ar
   Declarative play/pause control.
 </ParamField>
 
+<ParamField body="mode" type='"kinematic" | "physics"' default="kinematic">
+  Playback mode. `kinematic` pauses physics and drives qpos directly. `physics` keeps the simulation running and applies ctrl values from the trajectory.
+</ParamField>
+
 <ParamField body="onFrame" type="(frameIdx: number) => void">
   Called each time a new frame is displayed. Synced to the R3F render loop via `useFrame` for precise timing.
 </ParamField>
 
+<ParamField body="onComplete" type="() => void">
+  Called when playback reaches the end (non-looping only).
+</ParamField>
+
+<ParamField body="onStateChange" type="(state: PlaybackState) => void">
+  Called on every state transition (`idle`, `playing`, `paused`, `completed`).
+</ParamField>
+
 ## How It Works
 
-1. When `playing` becomes `true`, the simulation is paused
-2. Each render frame, the component advances the trajectory index based on elapsed time and `fps`
-3. The current frame's qpos values are written to `data.qpos`
-4. `mj_forward` is called to update positions without stepping physics
-5. When playback ends (or `playing` becomes `false`), simulation resumes
+1. When `playing` becomes `true`, playback starts (in kinematic mode, the simulation is paused)
+2. Each render frame, the component advances the trajectory index based on elapsed time, `fps`, and `speed`
+3. The current frame's qpos values are written to `data.qpos` (kinematic) or ctrl to `data.ctrl` (physics)
+4. `mj_forward` is called to update positions without stepping physics (kinematic mode only)
+5. When playback reaches the end, `onComplete` fires and state transitions to `completed`
 6. The `onFrame` callback is synced to R3F's `useFrame` loop, ensuring it fires in lockstep with rendering
 
 ## Notes
 
-- The simulation is paused during playback to prevent physics from interfering
-- Use `useTrajectoryRecorder` to capture trajectories, then play them back with this component
-- For hook-based control, see [`useTrajectoryPlayer`](/hooks/use-trajectory-player)
+- In kinematic mode, the simulation's previous pause state is restored on completion
+- Accepts `TrajectoryFrame[]` directly from `useTrajectoryRecorder` — no format conversion needed
+- For hook-based control with `play()`/`pause()`/`seek()`, see [`useTrajectoryPlayer`](/hooks/use-trajectory-player)

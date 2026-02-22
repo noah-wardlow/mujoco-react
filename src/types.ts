@@ -487,6 +487,8 @@ export interface TrajectoryData {
   fps: number;
 }
 
+export type PlaybackState = 'idle' | 'playing' | 'paused' | 'completed';
+
 // ---- Keyboard Teleop (spec 12.1) ----
 
 export interface KeyBinding {
@@ -540,12 +542,18 @@ export interface SceneLightsProps {
   intensity?: number;
 }
 
+export type TrajectoryInput = TrajectoryFrame[] | number[][];
+
 export interface TrajectoryPlayerProps {
-  trajectory: number[][];
+  trajectory: TrajectoryInput;
   fps?: number;
+  speed?: number;
   loop?: boolean;
   playing?: boolean;
+  mode?: 'kinematic' | 'physics';
   onFrame?: (frameIdx: number) => void;
+  onComplete?: () => void;
+  onStateChange?: (state: PlaybackState) => void;
 }
 
 export interface SelectionHighlightProps {

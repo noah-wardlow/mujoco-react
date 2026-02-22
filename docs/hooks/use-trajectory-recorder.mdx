@@ -86,4 +86,4 @@ interface TrajectoryFrame {
 - Recording happens in `useAfterPhysicsStep` — one frame per physics step
 - Each frame is a snapshot (arrays are copied, not referenced)
 - JSON export includes all recorded fields; CSV includes qpos only
-- For playback, use [`useTrajectoryPlayer`](/hooks/use-trajectory-player) or [`<TrajectoryPlayer>`](/components/trajectory-player)
+- For playback, pass `recorder.frames` directly to [`useTrajectoryPlayer`](/hooks/use-trajectory-player) or [`<TrajectoryPlayer>`](/components/trajectory-player) — no format conversion needed

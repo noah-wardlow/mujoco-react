@@ -95,6 +95,8 @@ export type {
   // Trajectory
   TrajectoryFrame,
   TrajectoryData,
+  TrajectoryInput,
+  PlaybackState,
   // Keyboard teleop
   KeyBinding,
   KeyboardTeleopConfig,

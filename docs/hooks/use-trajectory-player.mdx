@@ -4,25 +4,32 @@ description: "Play back recorded trajectories"
 icon: "play"
 ---
 
-Play back a recorded qpos trajectory, driving joint positions from recorded frames.
+Play back a recorded trajectory, driving joint positions from recorded frames. Accepts output from `useTrajectoryRecorder` directly, or raw qpos arrays.
 
 ## Signature
 
 ```tsx
 useTrajectoryPlayer(
-  trajectory: number[][],
+  trajectory: TrajectoryFrame[] | number[][],
   options?: {
     fps?: number;
+    speed?: number;
     loop?: boolean;
+    mode?: "kinematic" | "physics";
+    onComplete?: () => void;
+    onStateChange?: (state: PlaybackState) => void;
   }
 ): {
   play: () => void;
   pause: () => void;
   seek: (frame: number) => void;
   reset: () => void;
+  setSpeed: (speed: number) => void;
+  state: PlaybackState;
   frame: number;
   playing: boolean;
   totalFrames: number;
+  progress: number;
 }
 ```
 
@@ -34,13 +41,16 @@ import { useTrajectoryPlayer } from "mujoco-react";
 function PlaybackControls({ trajectory }) {
   const player = useTrajectoryPlayer(trajectory, {
     fps: 30,
+    speed: 1.0,
     loop: true,
+    onComplete: () => console.log("done"),
+    onStateChange: (state) => console.log(state),
   });
 
   return (
     <div>
       <button onClick={player.playing ? player.pause : player.play}>
-        {player.playing ? "Pause" : "Play"}
+        {player.state === "completed" ? "Replay" : player.playing ? "Pause" : "Play"}
       </button>
       <button onClick={player.reset}>Reset</button>
       <input
@@ -50,10 +60,32 @@ function PlaybackControls({ trajectory }) {
         value={player.frame}
         onChange={(e) => player.seek(Number(e.target.value))}
       />
-      <span>{player.frame} / {player.totalFrames}</span>
+      <span>{Math.round(player.progress * 100)}%</span>
+      <select onChange={(e) => player.setSpeed(Number(e.target.value))}>
+        <option value="0.5">0.5x</option>
+        <option value="1" selected>1x</option>
+        <option value="2">2x</option>
+      </select>
     </div>
   );
 }
+```
+
+## Record and Replay
+
+Record a trajectory with `useTrajectoryRecorder`, then play it back directly — no format conversion needed:
+
+```tsx
+const recorder = useTrajectoryRecorder({ fields: ["qpos", "ctrl"] });
+const player = useTrajectoryPlayer(recorder.frames, { fps: 30 });
+
+// Record
+recorder.start();
+// ... interact with simulation ...
+recorder.stop();
+
+// Play back
+player.play();
 ```
 
 ## Options
@@ -61,22 +93,57 @@ function PlaybackControls({ trajectory }) {
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `fps` | `number` | `30` | Playback frame rate |
+| `speed` | `number` | `1.0` | Speed multiplier (0.5 = half speed, 2 = double) |
 | `loop` | `boolean` | `false` | Loop when reaching the end |
+| `mode` | `"kinematic" \| "physics"` | `"kinematic"` | Playback mode (see below) |
+| `onComplete` | `() => void` | — | Called when playback reaches the end (non-looping) |
+| `onStateChange` | `(state: PlaybackState) => void` | — | Called on every state transition |
 
 ## Return Value
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `play` | `() => void` | Start playback |
+| `play` | `() => void` | Start or resume playback |
 | `pause` | `() => void` | Pause playback |
 | `seek` | `(frame: number) => void` | Jump to a specific frame |
-| `reset` | `() => void` | Reset to frame 0 |
+| `reset` | `() => void` | Reset to frame 0, return to `idle` state |
+| `setSpeed` | `(speed: number) => void` | Change playback speed at runtime |
+| `state` | `PlaybackState` | Current state: `"idle"`, `"playing"`, `"paused"`, or `"completed"` |
 | `frame` | `number` | Current frame index |
-| `playing` | `boolean` | Whether currently playing |
+| `playing` | `boolean` | Shorthand for `state === "playing"` |
 | `totalFrames` | `number` | Total number of frames in trajectory |
+| `progress` | `number` | Normalized progress from 0 to 1 |
+
+## State Machine
+
+```
+idle ──play──▸ playing ──pause──▸ paused
+                 │                  │
+                 │ (last frame)     │ play
+                 ▾                  │
+              completed ◂───────────┘
+                 │
+                 │ play (restarts from frame 0)
+                 ▾
+              playing
+
+           any ──reset──▸ idle
+```
+
+## Playback Modes
+
+### Kinematic (default)
+
+Pauses the simulation and writes `qpos` directly from the trajectory, calling `mj_forward` to update positions for rendering. No physics stepping occurs. The simulation resumes when playback completes or `reset()` is called.
+
+### Physics
+
+Keeps the simulation running and applies `ctrl` values from the trajectory each physics step via `useBeforePhysicsStep`. Frame advancement is based on simulation time (`data.time`) rather than wall-clock time. Use this mode to replay recorded control inputs through the physics engine, which is useful for comparing recorded vs. simulated behavior.
+
+Requires trajectory frames with `ctrl` data (use `useTrajectoryRecorder` with `fields: ["qpos", "ctrl"]`).
 
 ## Notes
 
-- The simulation is paused during playback
-- `data.qpos` is set from the trajectory each frame, then `mj_forward` is called
+- In kinematic mode, the simulation's previous pause state is restored on `reset()` or completion
+- The trajectory input accepts both `TrajectoryFrame[]` and `number[][]` — format is auto-detected
 - For a declarative component API, see [`<TrajectoryPlayer>`](/components/trajectory-player)
