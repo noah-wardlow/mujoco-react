@@ -1,3 +1,10 @@
+# [8.2.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.1.1...v8.2.0) (2026-02-24)
+
+
+### Features
+
+* export createControllerHook and document hook-based controller pattern ([1a3c336](https://github.com/noah-wardlow/mujoco-react/commit/1a3c336f439cca40204213f4d8923e2de5cf06f4))
+
 ## [8.1.1](https://github.com/noah-wardlow/mujoco-react/compare/v8.1.0...v8.1.1) (2026-02-24)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "mujoco-react",
-  "version": "8.1.1",
+  "version": "8.2.0",
   "description": "Composable React Three Fiber building blocks for MuJoCo WASM simulations",
   "type": "module",
   "main": "./dist/index.js",
