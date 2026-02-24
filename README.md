@@ -113,22 +113,45 @@ Drop it into the tree:
 </MujocoCanvas>
 ```
 
-The `createController<TConfig>()` factory adds typed config and default merging for reusable plugins:
+The `createControllerHook` factory produces a typed hook with config stabilization and default merging. Pass `null` to disable:
 
 ```tsx
-import { createController, useBeforePhysicsStep } from "mujoco-react";
+import { createControllerHook, useBeforePhysicsStep } from "mujoco-react";
 
-export const MyController = createController<{ gain: number }>(
-  { name: "MyController", defaultConfig: { gain: 1.0 } },
-  ({ config }) => {
+export const useMyController = createControllerHook<{ gain: number }, { value: number }>(
+  { name: "useMyController", defaultConfig: { gain: 1.0 } },
+  (config) => {
     useBeforePhysicsStep((_model, data) => {
+      if (!config) return;
       data.ctrl[0] = config.gain * Math.sin(data.time);
     });
-    return null;
+    if (!config) return null;
+    return { value: config.gain };
   },
 );
 
-// <MyController config={{ gain: 2.0 }} />
+// const result = useMyController({ gain: 2.0 });
+// const disabled = useMyController(null); // returns null
+```
+
+The `createController` factory is the component equivalent — same config stabilization, but returns a component that can render children:
+
+```tsx
+import { createController, useBeforePhysicsStep, Debug } from "mujoco-react";
+
+export const MyController = createController<{ gain: number }>(
+  { name: "MyController", defaultConfig: { gain: 1.0 } },
+  ({ config, children }) => {
+    useBeforePhysicsStep((_model, data) => {
+      data.ctrl[0] = config.gain * Math.sin(data.time);
+    });
+    return <>{children}</>;
+  },
+);
+
+// <MyController config={{ gain: 2.0 }}>
+//   <Debug showJoints />
+// </MyController>
 ```
 
 ## Architecture
@@ -729,7 +752,7 @@ The full API object available via `ref` or `useMujoco()` (when `isReady`):
 
 ### Building Controllers
 
-See [Building Controllers](https://dadd.mintlify.app/guides/building-controllers) for full patterns including config-driven controllers, IK gizmo coexistence, multi-arm support, and the `createController` factory.
+See [Building Controllers](https://dadd.mintlify.app/guides/building-controllers) for full patterns including config-driven controllers, IK gizmo coexistence, multi-arm support, and the `createControllerHook`/`createController` factories.
 
 ### Contact Parameters
 

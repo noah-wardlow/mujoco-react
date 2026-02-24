@@ -23,7 +23,7 @@ export {
 } from './core/SceneLoader';
 
 // Controller factory
-export { createController } from './core/createController';
+export { createController, createControllerHook } from './core/createController';
 export type { ControllerOptions, ControllerComponent } from './core/createController';
 
 // IK controller hook

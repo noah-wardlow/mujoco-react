@@ -182,21 +182,64 @@ function MyIKController({ targetRef }) {
 
 This gives you full access to model/data for whatever solver you want.
 
-## Pattern: Reusable Plugins with `createController`
+## Pattern: Reusable Plugins with `createControllerHook`
 
-For reusable controllers with typed config and default merging, use the `createController` factory. It handles config merging, display names, and metadata.
+For reusable controllers with typed config and default merging, use the `createControllerHook` factory. It stabilizes config references (so inline objects don't cause re-renders), merges defaults, and supports disabling via `null`.
 
 ```tsx
-import { createController, useBeforePhysicsStep } from "mujoco-react";
+import { createControllerHook, useBeforePhysicsStep } from "mujoco-react";
 
-// 1. Define your config type
 interface MyConfig {
   gain: number;
   actuatorIndex: number;
   frequency?: number;
 }
 
-// 2. Write the implementation component
+export const useMyController = createControllerHook<MyConfig, { amplitude: number }>(
+  { name: "useMyController", defaultConfig: { gain: 1.0, frequency: 1.0 } },
+  (config) => {
+    const amplitudeRef = useRef(0);
+
+    useBeforePhysicsStep((_model, data) => {
+      if (!config) return;
+      const freq = config.frequency ?? 1.0;
+      amplitudeRef.current = config.gain * Math.sin(data.time * freq);
+      data.ctrl[config.actuatorIndex] = amplitudeRef.current;
+    });
+
+    if (!config) return null;
+    return { amplitude: amplitudeRef.current };
+  },
+);
+
+// const result = useMyController({ gain: 2.0, actuatorIndex: 0 });
+// const disabled = useMyController(null); // returns null, no-ops
+```
+
+### `createControllerHook` API
+
+```ts
+function createControllerHook<TConfig, TValue>(
+  options: { name: string; defaultConfig?: Partial<TConfig> },
+  useImpl: (config: TConfig | null) => TValue | null,
+): (config: TConfig | null) => TValue | null;
+```
+
+Pass `null` to disable the controller without breaking the rules of hooks — `useImpl` is always called, it just receives `null` and should no-op.
+
+## Pattern: Reusable Plugins with `createController`
+
+The `createController` factory is the component equivalent — same config stabilization and default merging, but returns a component that can render children:
+
+```tsx
+import { createController, useBeforePhysicsStep } from "mujoco-react";
+
+interface MyConfig {
+  gain: number;
+  actuatorIndex: number;
+  frequency?: number;
+}
+
 function MyControllerImpl({ config, children }: { config: MyConfig; children?: React.ReactNode }) {
   useBeforePhysicsStep((_model, data) => {
     const freq = config.frequency ?? 1.0;
@@ -205,13 +248,14 @@ function MyControllerImpl({ config, children }: { config: MyConfig; children?: R
   return <>{children}</>;
 }
 
-// 3. Create the controller with the factory
 export const MyController = createController<MyConfig>(
   { name: "MyController", defaultConfig: { gain: 1.0, frequency: 1.0 } },
   MyControllerImpl,
 );
 
-// Usage: <MyController config={{ gain: 2.0, actuatorIndex: 0 }} />
+// <MyController config={{ gain: 2.0, actuatorIndex: 0 }}>
+//   <Debug showJoints />
+// </MyController>
 ```
 
 ### `createController` API
