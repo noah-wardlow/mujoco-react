@@ -1,3 +1,10 @@
+## [8.2.1](https://github.com/noah-wardlow/mujoco-react/compare/v8.2.0...v8.2.1) (2026-02-24)
+
+
+### Bug Fixes
+
+* update npm package README with simplified controller examples ([9bb031f](https://github.com/noah-wardlow/mujoco-react/commit/9bb031f7cdcbfbf2fd6a898fec27db8e7a6eca30))
+
 # [8.2.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.1.1...v8.2.0) (2026-02-24)
 
 
