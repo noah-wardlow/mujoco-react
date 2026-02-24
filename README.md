@@ -4,7 +4,7 @@
 
 # mujoco-react
 
-> **Beta** — This library is under active development. The API may change between minor versions until 1.0.
+> **Beta** — This library is under active development. The API may change between minor versions until 10.0.
 
 Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper around [mujoco-js](https://www.npmjs.com/package/mujoco-js). Load any MuJoCo model, step physics, render bodies, and write controllers as React components.
 
