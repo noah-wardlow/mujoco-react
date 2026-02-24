@@ -87,43 +87,37 @@ function MyComponent() {
 
 ## Writing a Controller
 
-A controller is a hook that uses handle-based access for type-safe actuator and sensor control:
+A controller is a hook that reads sensors and writes actuators each physics step:
 
 ```tsx
-import { createControllerHook, useCtrl, useSensor, useBeforePhysicsStep } from "mujoco-react";
+import { useCtrl, useSensor, useBeforePhysicsStep } from "mujoco-react";
 
-export const useMyController = createControllerHook<{ gain: number }, { amplitude: number }>(
-  { name: "useMyController", defaultConfig: { gain: 1.0 } },
-  (config) => {
-    const shoulder = useCtrl("shoulder");
-    const elbow = useCtrl("elbow");
-    const force = useSensor("force_sensor");
+function useMyController(gain: number) {
+  const shoulder = useCtrl("shoulder");
+  const elbow = useCtrl("elbow");
+  const force = useSensor("force_sensor");
 
-    useBeforePhysicsStep(() => {
-      if (!config) return;
-      shoulder.write(config.gain * Math.sin(Date.now() / 1000));
-      elbow.write(force.read()[0] * -0.5);
-    });
-
-    return config ? { amplitude: shoulder.read() } : null;
-  },
-);
-
-// const result = useMyController({ gain: 2.0 });
-// const disabled = useMyController(null); // returns null, no-ops
+  useBeforePhysicsStep(() => {
+    shoulder.write(gain * Math.sin(Date.now() / 1000));
+    elbow.write(force.read()[0] * -0.5);
+  });
+}
 ```
 
-For controllers that render children (debug overlays, context providers, etc.), use the component factory:
+For reusable controllers with typed config, default merging, and children, use the `createController` factory:
 
 ```tsx
-import { createController, useBeforePhysicsStep } from "mujoco-react";
+import { createController, useCtrl, useBeforePhysicsStep } from "mujoco-react";
 
 export const MyController = createController<{ gain: number }>(
   { name: "MyController", defaultConfig: { gain: 1.0 } },
   ({ config, children }) => {
-    useBeforePhysicsStep((_model, data) => {
-      data.ctrl[0] = config.gain * Math.sin(data.time);
+    const shoulder = useCtrl("shoulder");
+
+    useBeforePhysicsStep(() => {
+      shoulder.write(config.gain * Math.sin(Date.now() / 1000));
     });
+
     return <>{children}</>;
   },
 );
@@ -132,6 +126,8 @@ export const MyController = createController<{ gain: number }>(
 //   <Debug showJoints />
 // </MyController>
 ```
+
+A `createControllerHook` factory is also available for the hook equivalent — see the [Building Controllers](https://dadd.mintlify.app/guides/building-controllers) guide.
 
 ## Architecture
 
