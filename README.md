@@ -87,57 +87,36 @@ function MyComponent() {
 
 ## Writing a Controller
 
-A controller is a React component that uses handle-based hooks for type-safe actuator and sensor access:
+A controller is a hook that uses handle-based access for type-safe actuator and sensor control:
 
 ```tsx
-import { useCtrl, useSensor, useBeforePhysicsStep } from "mujoco-react";
+import { createControllerHook, useCtrl, useSensor, useBeforePhysicsStep } from "mujoco-react";
 
-function MyController() {
-  const shoulder = useCtrl("shoulder");
-  const elbow = useCtrl("elbow");
-  const force = useSensor("force_sensor");
-
-  useBeforePhysicsStep(() => {
-    shoulder.write(Math.sin(Date.now() / 1000));
-    elbow.write(force.read()[0] * -0.5);
-  });
-  return null;
-}
-```
-
-Drop it into the tree:
-
-```tsx
-<MujocoCanvas config={config}>
-  <MyController />
-</MujocoCanvas>
-```
-
-The `createControllerHook` factory produces a typed hook with config stabilization and default merging. Pass `null` to disable:
-
-```tsx
-import { createControllerHook, useBeforePhysicsStep } from "mujoco-react";
-
-export const useMyController = createControllerHook<{ gain: number }, { value: number }>(
+export const useMyController = createControllerHook<{ gain: number }, { amplitude: number }>(
   { name: "useMyController", defaultConfig: { gain: 1.0 } },
   (config) => {
-    useBeforePhysicsStep((_model, data) => {
+    const shoulder = useCtrl("shoulder");
+    const elbow = useCtrl("elbow");
+    const force = useSensor("force_sensor");
+
+    useBeforePhysicsStep(() => {
       if (!config) return;
-      data.ctrl[0] = config.gain * Math.sin(data.time);
+      shoulder.write(config.gain * Math.sin(Date.now() / 1000));
+      elbow.write(force.read()[0] * -0.5);
     });
-    if (!config) return null;
-    return { value: config.gain };
+
+    return config ? { amplitude: shoulder.read() } : null;
   },
 );
 
 // const result = useMyController({ gain: 2.0 });
-// const disabled = useMyController(null); // returns null
+// const disabled = useMyController(null); // returns null, no-ops
 ```
 
-The `createController` factory is the component equivalent — same config stabilization, but returns a component that can render children:
+For controllers that render children (debug overlays, context providers, etc.), use the component factory:
 
 ```tsx
-import { createController, useBeforePhysicsStep, Debug } from "mujoco-react";
+import { createController, useBeforePhysicsStep } from "mujoco-react";
 
 export const MyController = createController<{ gain: number }>(
   { name: "MyController", defaultConfig: { gain: 1.0 } },
