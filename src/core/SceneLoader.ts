@@ -137,6 +137,17 @@ function sceneObjectToXml(obj: SceneObject): string {
   return `<body name="${obj.name}" pos="${pos}">${joint}<geom type="${obj.type}" size="${size}" rgba="${rgba}" contype="1" conaffinity="1"${mass}${friction}${solref}${solimp}${condim}/></body>`;
 }
 
+/** Create virtual directory structure for a file path. */
+function ensureDir(mujoco: MujocoModule, fname: string) {
+  const dirParts = fname.split('/');
+  dirParts.pop();
+  let currentPath = '/working';
+  for (const part of dirParts) {
+    currentPath += '/' + part;
+    try { mujoco.FS.mkdir(currentPath); } catch { /* ignore */ }
+  }
+}
+
 interface LoadResult {
   mjModel: MujocoModel;
   mjData: MujocoData;
@@ -157,14 +168,21 @@ export async function loadScene(
   const baseUrl = config.src.endsWith('/') ? config.src : config.src + '/';
 
   const downloaded = new Set<string>();
-  const queue: string[] = [config.sceneFile];
+  const xmlQueue: string[] = [config.sceneFile];
+  const assetFiles: string[] = [];
   const parser = new DOMParser();
 
-  // 2. Download all model files
-  while (queue.length > 0) {
-    const fname = queue.shift()!;
+  // 2a. Download XML files sequentially (to discover dependencies)
+  while (xmlQueue.length > 0) {
+    const fname = xmlQueue.shift()!;
     if (downloaded.has(fname)) continue;
     downloaded.add(fname);
+
+    if (!fname.endsWith('.xml')) {
+      // Non-XML discovered during XML scan — collect for parallel download
+      assetFiles.push(fname);
+      continue;
+    }
 
     onProgress?.(`Downloading ${fname}...`);
 
@@ -174,61 +192,69 @@ export async function loadScene(
       continue;
     }
 
-    // Create virtual directory structure
-    const dirParts = fname.split('/');
-    dirParts.pop();
-    let currentPath = '/working';
-    for (const part of dirParts) {
-      currentPath += '/' + part;
-      try { mujoco.FS.mkdir(currentPath); } catch { /* ignore */ }
-    }
+    let text = await res.text();
 
-    if (fname.endsWith('.xml')) {
-      let text = await res.text();
-
-      // 3. Apply XML patches from config
-      for (const patch of config.xmlPatches ?? []) {
-        if (fname.endsWith(patch.target) || fname === patch.target) {
-          if (patch.replace) {
-            const [from, to] = patch.replace;
-            if (text.includes(from)) {
-              text = text.replace(from, to);
-            } else {
-              const preview = from.length > 80 ? `${from.slice(0, 80)}...` : from;
-              console.warn(`XML patch replace pattern not found in ${fname}: "${preview}"`);
-            }
+    // 3. Apply XML patches from config
+    for (const patch of config.xmlPatches ?? []) {
+      if (fname.endsWith(patch.target) || fname === patch.target) {
+        if (patch.replace) {
+          const [from, to] = patch.replace;
+          if (text.includes(from)) {
+            text = text.replace(from, to);
+          } else {
+            const preview = from.length > 80 ? `${from.slice(0, 80)}...` : from;
+            console.warn(`XML patch replace pattern not found in ${fname}: "${preview}"`);
           }
-          if (patch.inject && patch.injectAfter) {
-            const idx = text.indexOf(patch.injectAfter);
-            if (idx !== -1) {
-              // Find the end of the opening tag (next '>') after the match
-              const tagEnd = text.indexOf('>', idx + patch.injectAfter.length);
-              if (tagEnd !== -1) {
-                text = text.slice(0, tagEnd + 1) + patch.inject + text.slice(tagEnd + 1);
-              } else {
-                console.warn(`XML patch inject failed in ${fname}: could not find tag end after "${patch.injectAfter}"`);
-              }
+        }
+        if (patch.inject && patch.injectAfter) {
+          const idx = text.indexOf(patch.injectAfter);
+          if (idx !== -1) {
+            const tagEnd = text.indexOf('>', idx + patch.injectAfter.length);
+            if (tagEnd !== -1) {
+              text = text.slice(0, tagEnd + 1) + patch.inject + text.slice(tagEnd + 1);
             } else {
-              const preview = patch.injectAfter.length > 80
-                ? `${patch.injectAfter.slice(0, 80)}...`
-                : patch.injectAfter;
-              console.warn(`XML patch inject anchor not found in ${fname}: "${preview}"`);
+              console.warn(`XML patch inject failed in ${fname}: could not find tag end after "${patch.injectAfter}"`);
             }
+          } else {
+            const preview = patch.injectAfter.length > 80
+              ? `${patch.injectAfter.slice(0, 80)}...`
+              : patch.injectAfter;
+            console.warn(`XML patch inject anchor not found in ${fname}: "${preview}"`);
           }
         }
       }
+    }
 
-      // 4. Inject scene objects into the scene file
-      if (fname === config.sceneFile && config.sceneObjects?.length) {
-        const xml = config.sceneObjects.map((obj) => sceneObjectToXml(obj)).join('');
-        text = text.replace('</worldbody>', xml + '</worldbody>');
-      }
+    // 4. Inject scene objects into the scene file
+    if (fname === config.sceneFile && config.sceneObjects?.length) {
+      const xml = config.sceneObjects.map((obj) => sceneObjectToXml(obj)).join('');
+      text = text.replace('</worldbody>', xml + '</worldbody>');
+    }
 
-      mujoco.FS.writeFile(`/working/${fname}`, text);
-      scanDependencies(text, fname, parser, downloaded, queue);
-    } else {
-      const buffer = new Uint8Array(await res.arrayBuffer());
-      mujoco.FS.writeFile(`/working/${fname}`, buffer);
+    ensureDir(mujoco, fname);
+    mujoco.FS.writeFile(`/working/${fname}`, text);
+    scanDependencies(text, fname, parser, downloaded, xmlQueue);
+  }
+
+  // 2b. Download all binary assets (meshes, textures) in parallel
+  if (assetFiles.length > 0) {
+    onProgress?.(`Downloading ${assetFiles.length} assets...`);
+
+    const results = await Promise.all(
+      assetFiles.map(async (fname) => {
+        const res = await fetch(baseUrl + fname);
+        if (!res.ok) {
+          console.warn(`Failed to fetch ${fname}: ${res.status} ${res.statusText}`);
+          return null;
+        }
+        return { fname, buffer: new Uint8Array(await res.arrayBuffer()) };
+      })
+    );
+
+    for (const result of results) {
+      if (!result) continue;
+      ensureDir(mujoco, result.fname);
+      mujoco.FS.writeFile(`/working/${result.fname}`, result.buffer);
     }
   }
 
