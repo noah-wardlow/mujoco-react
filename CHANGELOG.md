@@ -1,3 +1,10 @@
+## [8.1.1](https://github.com/noah-wardlow/mujoco-react/compare/v8.1.0...v8.1.1) (2026-02-24)
+
+
+### Bug Fixes
+
+* parallelize asset downloads in scene loader for faster initial load ([16115f6](https://github.com/noah-wardlow/mujoco-react/commit/16115f6d83a60c4c0f83388c5cbe6816fa51ec39))
+
 # [8.1.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.0.0...v8.1.0) (2026-02-22)
 
 
