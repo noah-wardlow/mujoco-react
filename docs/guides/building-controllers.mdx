@@ -29,7 +29,7 @@ Drop it into your scene as a child of `<MujocoCanvas>`:
 
 ```tsx
 function FrankaScene() {
-  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp" });
   return (
     <>
       {ik && <IkGizmo controller={ik} />}
@@ -142,7 +142,7 @@ Three options for IK:
 The default `useIkController()` uses Damped Least-Squares:
 
 ```tsx
-const ik = useIkController({ siteName: "tcp", numJoints: 7 });
+const ik = useIkController({ siteName: "tcp" });
 return ik ? <IkGizmo controller={ik} /> : null;
 ```
 
@@ -157,7 +157,7 @@ const myIK: IKSolveFn = (pos, quat, currentQ) => {
   return myAnalyticalSolver(pos, currentQ); // return joint angles or null
 };
 
-const ik = useIkController({ siteName: "tcp", numJoints: 7, ikSolveFn: myIK });
+const ik = useIkController({ siteName: "tcp", ikSolveFn: myIK });
 return ik ? <IkGizmo controller={ik} /> : null;
 ```
 

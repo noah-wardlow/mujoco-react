@@ -32,6 +32,50 @@ function App() {
   Called if the WASM module fails to load.
 </ParamField>
 
+<ParamField body="wasmUrl" type="string">
+  Custom URL for the single-threaded `.wasm` asset.
+</ParamField>
+
+<ParamField body="mtWasmUrl" type="string">
+  Custom URL for the multi-threaded `.wasm` asset.
+</ParamField>
+
+<ParamField body="threadedLoader" type="(options?) => Promise<unknown>">
+  Optional loader imported from `@mujoco/mujoco/mt`. It is supplied by apps that opt into threaded WASM.
+</ParamField>
+
+<ParamField body="wasmVariant" type='"single" | "threaded" | "auto"'>
+  MuJoCo WASM build to load. Defaults to `"single"`. `"auto"` selects the threaded build only when `threadedLoader` and `mtWasmUrl` are provided and the page is cross-origin isolated.
+</ParamField>
+
+<ParamField body="timeout" type="number">
+  WASM initialization timeout in milliseconds.
+</ParamField>
+
+## Threaded WASM
+
+The official `@mujoco/mujoco` package includes a multi-threaded WASM build in addition to the default single-threaded build. Import it only in apps that opt into it:
+
+```tsx
+import loadMujocoMt from "@mujoco/mujoco/mt";
+import mtWasmUrl from "@mujoco/mujoco/mt/mujoco.wasm?url";
+
+<MujocoProvider
+  wasmVariant="auto"
+  threadedLoader={loadMujocoMt}
+  mtWasmUrl={mtWasmUrl}
+>
+  <MujocoCanvas config={config} />
+</MujocoProvider>
+```
+
+Forced threaded mode requires browser cross-origin isolation headers:
+
+```txt
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
 ## useMujocoWasm Hook
 
 Access the WASM module status from any child component:
@@ -42,7 +86,7 @@ import { useMujocoWasm } from "mujoco-react";
 function LoadingIndicator() {
   const { mujoco, status, error } = useMujocoWasm();
 
-  if (status === "pending") return <div>Loading WASM...</div>;
+  if (status === "loading") return <div>Loading WASM...</div>;
   if (status === "error") return <div>Error: {error}</div>;
   // mujoco is now available
   return null;
@@ -53,8 +97,8 @@ function LoadingIndicator() {
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `mujoco` | `MujocoModule \| null` | The raw WASM module, or `null` while pending |
-| `status` | `'pending' \| 'error'` | Current lifecycle state (absent once loaded) |
+| `mujoco` | `MujocoModule \| null` | The raw WASM module, or `null` while loading |
+| `status` | `'loading' \| 'ready' \| 'error'` | Current lifecycle state |
 | `error` | `string \| null` | Error message if loading failed |
 
 ## Notes

@@ -12,7 +12,7 @@ A draggable 3D gizmo (powered by drei's PivotControls) that drives inverse kinem
 import { useIkController, IkGizmo } from "mujoco-react";
 
 function MyScene() {
-  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp" });
 
   return ik ? <IkGizmo controller={ik} /> : null;
 }
@@ -78,7 +78,7 @@ Override the site tracked by this gizmo (defaults to the controller's `siteName`
 Use the controller value from `useIkController()`:
 
 ```tsx
-const ik = useIkController({ siteName: "tcp", numJoints: 7 });
+const ik = useIkController({ siteName: "tcp" });
 
 // Animate the gizmo to a position over 500ms
 ik?.moveTarget(new THREE.Vector3(0.5, 0, 0.3), 500);
@@ -93,5 +93,5 @@ ik?.setIkEnabled(true);
 ## Notes
 
 - Requires a `controller` prop from `useIkController()`
-- The IK solver respects `numJoints` from the controller config
+- The IK solver uses the controller's inferred or explicit joint/actuator selection
 - Disable IK with `controller.setIkEnabled(false)` when using custom control (e.g., `useBeforePhysicsStep`)

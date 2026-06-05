@@ -12,7 +12,7 @@ Hook that sets up IK control for a MuJoCo site. Pass `null` to disable IK (safe 
 import { useIkController, IkGizmo } from "mujoco-react";
 
 function MyScene({ hasIk }: { hasIk: boolean }) {
-  const ik = useIkController(hasIk ? { siteName: "tcp", numJoints: 7 } : null);
+  const ik = useIkController(hasIk ? { siteName: "tcp" } : null);
 
   return ik ? <IkGizmo controller={ik} /> : null;
 }
@@ -27,7 +27,7 @@ const myIK: IKSolveFn = (pos, quat, currentQ) => {
   return myAnalyticalSolver(pos, currentQ);
 };
 
-const ik = useIkController({ siteName: "tcp", numJoints: 7, ikSolveFn: myIK });
+const ik = useIkController({ siteName: "tcp", ikSolveFn: myIK });
 ```
 
 ## Config
@@ -37,10 +37,21 @@ Pass an `IkConfig` object or `null`:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `siteName` | `string` | **required** | MuJoCo site to track |
-| `numJoints` | `number` | **required** | Number of joints for IK |
+| `joints` | `string \| string[] \| RegExp \| (joint) => boolean` | inferred | Explicit hinge/slide joints for IK |
+| `actuators` | `string \| string[] \| RegExp \| (actuator) => boolean` | inferred | Explicit actuators for IK output |
+| `numJoints` | `number` | legacy only | Contiguous qpos/ctrl count from older examples |
 | `ikSolveFn` | `IKSolveFn` | built-in DLS | Custom solver function |
 | `damping` | `number` | `0.01` | DLS damping |
 | `maxIterations` | `number` | `50` | Max solver iterations |
+
+By default, `useIkController` infers scalar hinge/slide joints by walking from the site body toward the model root. For nonstandard actuator layouts, pass explicit ordered names or a selector:
+
+```tsx
+const ik = useIkController({
+  siteName: "tcp",
+  actuators: /^actuator/,
+});
+```
 
 ## Return Value
 
@@ -85,7 +96,7 @@ A common pattern is disabling IK when keyboard control takes over. Pass the `ik`
 
 ```tsx
 function MyScene() {
-  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp" });
 
   return (
     <>
@@ -119,7 +130,7 @@ The gizmo re-enables IK automatically when dragged.
 
 ```tsx
 function WaypointFollower({ waypoints }: { waypoints: THREE.Vector3[] }) {
-  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp" });
   const [index, setIndex] = useState(0);
 
   useEffect(() => {

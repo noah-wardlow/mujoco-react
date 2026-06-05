@@ -5,6 +5,7 @@
 
 // Core
 export { MujocoProvider, useMujocoWasm } from './core/MujocoProvider';
+export type { MujocoLoader, MujocoLoaderOptions, MujocoProviderProps, MujocoWasmVariant } from './core/MujocoProvider';
 export { MujocoCanvas } from './core/MujocoCanvas';
 export { MujocoPhysics } from './core/MujocoPhysics';
 export type { MujocoPhysicsProps } from './core/MujocoPhysics';
@@ -20,6 +21,10 @@ export {
   findGeomByName,
   findSensorByName,
   findTendonByName,
+  getActuatedJoints,
+  getControlMap,
+  resolveControlGroup,
+  createContiguousControlGroup,
 } from './core/SceneLoader';
 
 // Controller factory
@@ -82,6 +87,11 @@ export type {
   // Model introspection
   BodyInfo,
   JointInfo,
+  ActuatedJointInfo,
+  ControlJointInfo,
+  ControlGroupInfo,
+  ControlGroupSelector,
+  ResourceSelector,
   GeomInfo,
   SiteInfo,
   ActuatorInfo,

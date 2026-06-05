@@ -37,7 +37,7 @@ const config: SceneConfig = {
 };
 
 function Scene() {
-  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp" });
   return (
     <>
       <OrbitControls enableDamping makeDefault />
@@ -124,43 +124,56 @@ function useSpringForce(bodyId: number, target: [number, number, number], stiffn
 
 The `api.applyForce(bodyName, force)` convenience method also works for one-off interactions (e.g. button clicks) but does a name lookup each call.
 
-### WebSocket Joint Control
+### WebSocket Control
 
-Stream joint commands over a WebSocket and send simulation state back:
+Stream actuator commands over a WebSocket and send simulation state back. Use a schema validator such as Zod at this boundary because socket messages are untrusted app input (`npm install zod` for this example):
 
 ```tsx
 import { useEffect, useRef } from "react";
+import { z } from "zod";
 import { useMujoco, useBeforePhysicsStep, useAfterPhysicsStep } from "mujoco-react";
 
-function useWebSocketJoints(url: string) {
-  const { api } = useMujoco();
+const CtrlCommand = z.object({
+  type: z.literal("ctrl_command"),
+  ctrl: z.array(z.number()),
+});
+
+type CtrlCommand = z.infer<typeof CtrlCommand>;
+
+function parseSocketMessage(data: string): CtrlCommand | null {
+  try {
+    const parsed = CtrlCommand.safeParse(JSON.parse(data));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function useWebSocketControls(url: string) {
   const wsRef = useRef<WebSocket | null>(null);
-  const latestJointsRef = useRef<number[] | null>(null);
+  const latestCommandRef = useRef<CtrlCommand | null>(null);
 
   useEffect(() => {
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
     ws.onmessage = (evt) => {
-      const msg = JSON.parse(evt.data);
-      if (msg.type === "joint_command") {
-        latestJointsRef.current = msg.qpos;
-      }
+      latestCommandRef.current = parseSocketMessage(evt.data);
     };
 
     return () => ws.close();
   }, [url]);
 
-  // Apply incoming joint positions each physics step
+  // Apply incoming actuator controls each physics step.
   useBeforePhysicsStep((model, data) => {
-    const joints = latestJointsRef.current;
-    if (!joints) return;
-    for (let i = 0; i < Math.min(joints.length, model.nu); i++) {
-      data.ctrl[i] = joints[i];
+    const command = latestCommandRef.current;
+    if (!command) return;
+    for (let i = 0; i < Math.min(command.ctrl.length, model.nu); i++) {
+      data.ctrl[i] = command.ctrl[i];
     }
   });
 
-  // Send sensor feedback back after physics
+  // Send simulation feedback back after physics.
   useAfterPhysicsStep((model, data) => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -227,7 +240,7 @@ const myIK: IKSolveFn = (pos, quat, currentQ) => {
   return myAnalyticalSolver(pos, currentQ); // return joint angles or null
 };
 
-const ik = useIkController({ siteName: "tcp", numJoints: 7, ikSolveFn: myIK });
+const ik = useIkController({ siteName: "tcp", ikSolveFn: myIK });
 ```
 
 ### `useIkController(config | null)`
@@ -235,14 +248,16 @@ const ik = useIkController({ siteName: "tcp", numJoints: 7, ikSolveFn: myIK });
 Hook for interactive end-effector control. Pass `null` to disable IK (safe to call unconditionally):
 
 ```tsx
-const ik = useIkController({ siteName: "tcp", numJoints: 7 });
+const ik = useIkController({ siteName: "tcp" });
 return ik ? <IkGizmo controller={ik} /> : null;
 ```
 
 | Config | Type | Default | Description |
 |--------|------|---------|-------------|
 | `siteName` | `string` | **required** | MuJoCo site to track |
-| `numJoints` | `number` | **required** | Number of joints for IK |
+| `joints` | `string \| string[] \| RegExp \| (joint) => boolean` | inferred | Explicit hinge/slide joints for IK |
+| `actuators` | `string \| string[] \| RegExp \| (actuator) => boolean` | inferred | Explicit actuators for IK output |
+| `numJoints` | `number` | legacy only | Contiguous qpos/ctrl count from older examples |
 | `ikSolveFn` | `IKSolveFn` | built-in DLS | Custom solver function |
 | `damping` | `number` | `0.01` | DLS damping |
 | `maxIterations` | `number` | `50` | Max solver iterations |
@@ -250,6 +265,20 @@ return ik ? <IkGizmo controller={ik} /> : null;
 Returns `IkContextValue | null` with methods like `setIkEnabled`, `moveTarget`, `syncTargetToSite`, `solveIK`, and `getGizmoStats`.
 
 Pass the returned value to `<IkGizmo controller={ik} />` or to your own controller as a prop.
+
+By default the controller infers scalar hinge/slide joints by walking from the site body toward the model root. For robots where the MJCF control layout is not a simple chain, pass explicit names:
+
+```tsx
+const leftArmIk = useIkController({
+  siteName: "left_tcp",
+  joints: ["left_shoulder", "left_elbow", "left_wrist"],
+});
+
+const gripperIk = useIkController({
+  siteName: "tcp",
+  actuators: /^actuator/,
+});
+```
 
 ## Type-Safe Resource Names
 
@@ -334,7 +363,28 @@ Loads the MuJoCo WASM module. Wrap your entire app in this.
 | Prop | Type | Description |
 |------|------|-------------|
 | `wasmUrl` | `string?` | Custom WASM URL override |
+| `mtWasmUrl` | `string?` | Custom multi-threaded WASM URL override |
+| `threadedLoader` | `(options?) => Promise<unknown>` | Optional loader imported from `@mujoco/mujoco/mt` |
+| `wasmVariant` | `"single" \| "threaded" \| "auto"` | MuJoCo WASM build. Defaults to `"single"` |
+| `timeout` | `number` | WASM load timeout in ms |
 | `onError` | `(error: Error) => void` | Called if WASM fails to load |
+
+The official `@mujoco/mujoco` package also ships a multi-threaded WASM build. Import it only in apps that opt into it:
+
+```tsx
+import loadMujocoMt from "@mujoco/mujoco/mt";
+import mtWasmUrl from "@mujoco/mujoco/mt/mujoco.wasm?url";
+
+<MujocoProvider
+  wasmVariant="auto"
+  threadedLoader={loadMujocoMt}
+  mtWasmUrl={mtWasmUrl}
+>
+  <App />
+</MujocoProvider>
+```
+
+`"auto"` uses the threaded build only when `threadedLoader` and `mtWasmUrl` are provided and `globalThis.crossOriginIsolated` is true. Forced `"threaded"` mode requires `threadedLoader`, `mtWasmUrl`, `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`.
 
 ### `<MujocoCanvas>`
 

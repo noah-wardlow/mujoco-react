@@ -3,8 +3,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MujocoData, MujocoModel, MujocoModule } from '../types';
+import type {
+  ActuatedJointInfo,
+  ActuatorInfo,
+  ControlGroupInfo,
+  ControlGroupSelector,
+  ControlJointInfo,
+  JointInfo,
+  MujocoData,
+  MujocoModel,
+  MujocoModule,
+  ResourceSelector,
+} from '../types';
 import { SceneConfig, SceneObject, XmlPatch } from '../types';
+
+const JOINT_TYPE_NAMES: Record<number, string> = {
+  0: 'free',
+  1: 'ball',
+  2: 'slide',
+  3: 'hinge',
+};
 
 /**
  * Reads a null-terminated C string from MuJoCo's WASM memory.
@@ -118,6 +136,330 @@ export function getActuatedScalarQposAdr(mjModel: MujocoModel, actuatorId: numbe
   if (jntType !== 2 && jntType !== 3) return -1; // slide=2, hinge=3
 
   return mjModel.jnt_qposadr[jointId];
+}
+
+function getScalarJointDim(jointType: number): 0 | 1 {
+  return jointType === 2 || jointType === 3 ? 1 : 0;
+}
+
+function unlimitedRange(): [number, number] {
+  return [-Infinity, Infinity];
+}
+
+function isScalarJoint(mjModel: MujocoModel, jointId: number): boolean {
+  return jointId >= 0 && jointId < mjModel.njnt && getScalarJointDim(mjModel.jnt_type[jointId]) === 1;
+}
+
+function getActuatorJointId(mjModel: MujocoModel, actuatorId: number): number {
+  if (actuatorId < 0 || actuatorId >= mjModel.nu) return -1;
+  const trnType = mjModel.actuator_trntype?.[actuatorId];
+  if (trnType !== undefined && trnType !== 0 && trnType !== 1) return -1;
+  const jointId = mjModel.actuator_trnid[2 * actuatorId];
+  return isScalarJoint(mjModel, jointId) ? jointId : -1;
+}
+
+function getJointInfo(mjModel: MujocoModel, jointId: number): JointInfo {
+  const type = mjModel.jnt_type[jointId];
+  const range: [number, number] = [mjModel.jnt_range[2 * jointId], mjModel.jnt_range[2 * jointId + 1]];
+  return {
+    id: jointId,
+    name: getName(mjModel, mjModel.name_jntadr[jointId]),
+    type,
+    typeName: JOINT_TYPE_NAMES[type] ?? `unknown(${type})`,
+    range,
+    limited: range[0] < range[1],
+    bodyId: mjModel.jnt_bodyid[jointId],
+    qposAdr: mjModel.jnt_qposadr[jointId],
+    dofAdr: mjModel.jnt_dofadr[jointId],
+  };
+}
+
+function getActuatorInfo(mjModel: MujocoModel, actuatorId: number): ActuatorInfo {
+  const hasRange = mjModel.actuator_ctrlrange[2 * actuatorId] < mjModel.actuator_ctrlrange[2 * actuatorId + 1];
+  return {
+    id: actuatorId,
+    name: getName(mjModel, mjModel.name_actuatoradr[actuatorId]),
+    range: hasRange
+      ? [mjModel.actuator_ctrlrange[2 * actuatorId], mjModel.actuator_ctrlrange[2 * actuatorId + 1]]
+      : unlimitedRange(),
+  };
+}
+
+function includesResourceName(names: readonly string[], name: string): boolean {
+  return names.includes(name);
+}
+
+function matchesSelector<TInfo extends { name: string }, TName extends string>(
+  info: TInfo,
+  selector: ResourceSelector<TInfo, TName>
+): boolean {
+  if (typeof selector === 'string') return info.name === selector;
+  if (selector instanceof RegExp) return selector.test(info.name);
+  if (Array.isArray(selector)) return includesResourceName(selector, info.name);
+  if (typeof selector === 'function') return selector(info);
+  return false;
+}
+
+function orderedJointIdsFromSelector(
+  mjModel: MujocoModel,
+  selector: ResourceSelector<JointInfo, string>
+): number[] {
+  if (typeof selector === 'string') {
+    const id = findJointByName(mjModel, selector);
+    return id >= 0 && isScalarJoint(mjModel, id) ? [id] : [];
+  }
+  if (Array.isArray(selector)) {
+    return selector
+      .map((name) => findJointByName(mjModel, name))
+      .filter((id) => id >= 0 && isScalarJoint(mjModel, id));
+  }
+  const ids: number[] = [];
+  for (let i = 0; i < mjModel.njnt; i++) {
+    if (!isScalarJoint(mjModel, i)) continue;
+    const info = getJointInfo(mjModel, i);
+    if (matchesSelector(info, selector)) ids.push(i);
+  }
+  return ids;
+}
+
+function orderedActuatorIdsFromSelector(
+  mjModel: MujocoModel,
+  selector: ResourceSelector<ActuatorInfo, string>
+): number[] {
+  if (typeof selector === 'string') {
+    const id = findActuatorByName(mjModel, selector);
+    return id >= 0 && getActuatorJointId(mjModel, id) >= 0 ? [id] : [];
+  }
+  if (Array.isArray(selector)) {
+    return selector
+      .map((name) => findActuatorByName(mjModel, name))
+      .filter((id) => id >= 0 && getActuatorJointId(mjModel, id) >= 0);
+  }
+  const ids: number[] = [];
+  for (let i = 0; i < mjModel.nu; i++) {
+    if (getActuatorJointId(mjModel, i) < 0) continue;
+    const info = getActuatorInfo(mjModel, i);
+    if (matchesSelector(info, selector)) ids.push(i);
+  }
+  return ids;
+}
+
+function inferScalarJointChain(mjModel: MujocoModel, bodyId: number): number[] {
+  if (bodyId < 0 || bodyId >= mjModel.nbody) return [];
+  const chainByBody: number[][] = [];
+  let current = bodyId;
+  const seen = new Set<number>();
+
+  while (current >= 0 && current < mjModel.nbody && !seen.has(current)) {
+    seen.add(current);
+    const joints: number[] = [];
+    const jointCount = mjModel.body_jntnum[current] ?? 0;
+    const jointStart = mjModel.body_jntadr[current] ?? -1;
+    for (let i = 0; i < jointCount; i++) {
+      const jointId = jointStart + i;
+      if (isScalarJoint(mjModel, jointId)) joints.push(jointId);
+    }
+    if (joints.length) chainByBody.push(joints);
+    const parent = mjModel.body_parentid[current];
+    if (parent === current) break;
+    current = parent;
+  }
+
+  return chainByBody.reverse().flat();
+}
+
+function unique(values: number[]): number[] {
+  const seen = new Set<number>();
+  const result: number[] = [];
+  for (const value of values) {
+    if (seen.has(value)) continue;
+    seen.add(value);
+    result.push(value);
+  }
+  return result;
+}
+
+function findActuatorForJoint(mjModel: MujocoModel, jointId: number, preferredActuatorIds?: number[]): number {
+  const search = preferredActuatorIds ?? Array.from({ length: mjModel.nu }, (_, i) => i);
+  for (const actuatorId of search) {
+    if (getActuatorJointId(mjModel, actuatorId) === jointId) return actuatorId;
+  }
+  return -1;
+}
+
+function buildControlGroup(
+  mjModel: MujocoModel,
+  jointIds: number[],
+  preferredActuatorIds?: number[]
+): ControlGroupInfo | null {
+  const ids = unique(jointIds).filter((id) => isScalarJoint(mjModel, id));
+  if (!ids.length) return null;
+
+  const joints: ControlJointInfo[] = [];
+  const actuators: ActuatorInfo[] = [];
+  const qposAdr: number[] = [];
+  const dofAdr: number[] = [];
+  const ctrlAdr: number[] = [];
+
+  for (const jointId of ids) {
+    const actuatorId = findActuatorForJoint(mjModel, jointId, preferredActuatorIds);
+    const joint = getJointInfo(mjModel, jointId);
+    qposAdr.push(joint.qposAdr);
+    dofAdr.push(joint.dofAdr);
+
+    if (actuatorId >= 0) {
+      const actuator = getActuatorInfo(mjModel, actuatorId);
+      actuators.push(actuator);
+      ctrlAdr.push(actuatorId);
+      joints.push({
+        ...joint,
+        actuatorId,
+        actuatorName: actuator.name,
+        ctrlAdr: actuatorId,
+        ctrlRange: actuator.range,
+      });
+    } else {
+      joints.push({
+        ...joint,
+        actuatorId: null,
+        actuatorName: null,
+        ctrlAdr: null,
+        ctrlRange: null,
+      });
+    }
+  }
+
+  return {
+    joints,
+    actuators,
+    qposAdr,
+    dofAdr,
+    ctrlAdr,
+    readQpos(data: MujocoData) {
+      return new Float64Array(qposAdr.map((adr) => data.qpos[adr] ?? 0));
+    },
+    readCtrl(data: MujocoData) {
+      return new Float64Array(joints.map((joint) => joint.ctrlAdr === null ? 0 : data.ctrl[joint.ctrlAdr] ?? 0));
+    },
+    writeQpos(data: MujocoData, values: ArrayLike<number>) {
+      for (let i = 0; i < Math.min(values.length, qposAdr.length); i++) {
+        data.qpos[qposAdr[i]] = values[i];
+      }
+    },
+    writeCtrl(data: MujocoData, values: ArrayLike<number>) {
+      for (let i = 0; i < Math.min(values.length, joints.length); i++) {
+        const adr = joints[i].ctrlAdr;
+        if (adr !== null) data.ctrl[adr] = values[i];
+      }
+    },
+  };
+}
+
+export function getActuatedJoints(mjModel: MujocoModel): ActuatedJointInfo[] {
+  const result: ActuatedJointInfo[] = [];
+  for (let actuatorId = 0; actuatorId < mjModel.nu; actuatorId++) {
+    const jointId = getActuatorJointId(mjModel, actuatorId);
+    if (jointId < 0) continue;
+    const actuator = getActuatorInfo(mjModel, actuatorId);
+    result.push({
+      ...getJointInfo(mjModel, jointId),
+      actuatorId,
+      actuatorName: actuator.name,
+      ctrlAdr: actuatorId,
+      ctrlRange: actuator.range,
+    });
+  }
+  return result;
+}
+
+export function getControlMap(mjModel: MujocoModel): ControlGroupInfo {
+  const actuatorIds = Array.from({ length: mjModel.nu }, (_, i) => i)
+    .filter((id) => getActuatorJointId(mjModel, id) >= 0);
+  const jointIds = actuatorIds.map((id) => getActuatorJointId(mjModel, id));
+  return buildControlGroup(mjModel, jointIds, actuatorIds) ?? createContiguousControlGroup(mjModel, 0);
+}
+
+export function resolveControlGroup(
+  mjModel: MujocoModel,
+  selector: ControlGroupSelector
+): ControlGroupInfo | null {
+  if (selector.actuators) {
+    const actuatorIds = orderedActuatorIdsFromSelector(mjModel, selector.actuators);
+    const jointIds = actuatorIds.map((id) => getActuatorJointId(mjModel, id));
+    return buildControlGroup(mjModel, jointIds, actuatorIds);
+  }
+
+  if (selector.joints) {
+    return buildControlGroup(mjModel, orderedJointIdsFromSelector(mjModel, selector.joints));
+  }
+
+  if (selector.siteName) {
+    const siteId = findSiteByName(mjModel, selector.siteName);
+    const bodyId = siteId >= 0 ? (mjModel.site_bodyid?.[siteId] ?? -1) : -1;
+    return buildControlGroup(mjModel, inferScalarJointChain(mjModel, bodyId));
+  }
+
+  if (selector.bodyName) {
+    return buildControlGroup(mjModel, inferScalarJointChain(mjModel, findBodyByName(mjModel, selector.bodyName)));
+  }
+
+  return getControlMap(mjModel);
+}
+
+export function createContiguousControlGroup(mjModel: MujocoModel, count: number): ControlGroupInfo {
+  const n = Math.max(0, Math.min(count, mjModel.nq, mjModel.nu));
+  const joints: ControlJointInfo[] = [];
+  const actuators: ActuatorInfo[] = [];
+  const qposAdr: number[] = [];
+  const dofAdr: number[] = [];
+  const ctrlAdr: number[] = [];
+
+  for (let i = 0; i < n; i++) {
+    qposAdr.push(i);
+    dofAdr.push(i);
+    ctrlAdr.push(i);
+    const jointId = Array.from({ length: mjModel.njnt }, (_, id) => id)
+      .find((id) => mjModel.jnt_qposadr[id] === i);
+    const actuator = getActuatorInfo(mjModel, i);
+    actuators.push(actuator);
+    joints.push({
+      ...(jointId !== undefined ? getJointInfo(mjModel, jointId) : {
+        id: i,
+        name: `qpos${i}`,
+        type: 3,
+        typeName: 'hinge',
+        range: unlimitedRange(),
+        limited: false,
+        bodyId: -1,
+        qposAdr: i,
+        dofAdr: i,
+      }),
+      actuatorId: i,
+      actuatorName: actuator.name,
+      ctrlAdr: i,
+      ctrlRange: actuator.range,
+    });
+  }
+
+  return {
+    joints,
+    actuators,
+    qposAdr,
+    dofAdr,
+    ctrlAdr,
+    readQpos(data: MujocoData) {
+      return new Float64Array(qposAdr.map((adr) => data.qpos[adr] ?? 0));
+    },
+    readCtrl(data: MujocoData) {
+      return new Float64Array(ctrlAdr.map((adr) => data.ctrl[adr] ?? 0));
+    },
+    writeQpos(data: MujocoData, values: ArrayLike<number>) {
+      for (let i = 0; i < Math.min(values.length, qposAdr.length); i++) data.qpos[qposAdr[i]] = values[i];
+    },
+    writeCtrl(data: MujocoData, values: ArrayLike<number>) {
+      for (let i = 0; i < Math.min(values.length, ctrlAdr.length); i++) data.ctrl[ctrlAdr[i]] = values[i];
+    },
+  };
 }
 
 /**

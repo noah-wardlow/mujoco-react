@@ -344,11 +344,27 @@ export interface SceneConfig {
 
 // ---- IK Controller Config ----
 
+export type ResourceSelector<TInfo, TName extends string = string> =
+  | TName
+  | readonly TName[]
+  | RegExp
+  | ((info: TInfo) => boolean);
+
 export interface IkConfig {
   /** MuJoCo site name for IK target. */
   siteName: Sites;
-  /** Number of joints to solve for. */
-  numJoints: number;
+  /**
+   * Explicit joints for IK. When omitted, the controller infers scalar hinge/slide
+   * joints by walking from the site body to the model root.
+   */
+  joints?: ResourceSelector<JointInfo, Joints>;
+  /** Explicit actuators for IK control output. */
+  actuators?: ResourceSelector<ActuatorInfo, Actuators>;
+  /**
+   * Number of joints to solve for, assuming legacy contiguous qpos/ctrl layout
+   * starting at index 0. Prefer inferred IK or `joints`/`actuators`.
+   */
+  numJoints?: number;
   /** Custom IK solver. When omitted, uses built-in Damped Least-Squares solver. */
   ikSolveFn?: IKSolveFn;
   /** DLS damping. Default: 0.01. */
@@ -390,8 +406,16 @@ export interface PhysicsConfig {
 export type IKSolveFn = (
   pos: THREE.Vector3,
   quat: THREE.Quaternion,
-  currentQ: number[]
+  currentQ: number[],
+  context?: IKSolveContext
 ) => number[] | null;
+
+export interface IKSolveContext {
+  model: MujocoModel;
+  data: MujocoData;
+  siteId: number;
+  controlGroup: ControlGroupInfo;
+}
 
 // ---- Callbacks ----
 
@@ -451,6 +475,48 @@ export interface ActuatorInfo {
   id: number;
   name: string;
   range: [number, number];
+}
+
+export interface ActuatedJointInfo extends JointInfo {
+  actuatorId: number;
+  actuatorName: string;
+  ctrlAdr: number;
+  ctrlRange: [number, number];
+}
+
+export interface ControlJointInfo extends JointInfo {
+  actuatorId: number | null;
+  actuatorName: string | null;
+  ctrlAdr: number | null;
+  ctrlRange: [number, number] | null;
+}
+
+export interface ControlGroupSelector {
+  /** Infer a kinematic chain from a MuJoCo site. */
+  siteName?: Sites;
+  /** Infer a kinematic chain from a body. */
+  bodyName?: Bodies;
+  /** Select joints by name, names, regex, or predicate. */
+  joints?: ResourceSelector<JointInfo, Joints>;
+  /** Select actuators by name, names, regex, or predicate. */
+  actuators?: ResourceSelector<ActuatorInfo, Actuators>;
+}
+
+export interface ControlGroupInfo {
+  /** Joints in solve/control order. */
+  joints: ControlJointInfo[];
+  /** Actuators in control output order. */
+  actuators: ActuatorInfo[];
+  /** qpos addresses for scalar hinge/slide joints. */
+  qposAdr: number[];
+  /** dof addresses for scalar hinge/slide joints. */
+  dofAdr: number[];
+  /** ctrl addresses matching writable actuators. */
+  ctrlAdr: number[];
+  readQpos(data: MujocoData): Float64Array;
+  readCtrl(data: MujocoData): Float64Array;
+  writeQpos(data: MujocoData, values: ArrayLike<number>): void;
+  writeCtrl(data: MujocoData, values: ArrayLike<number>): void;
 }
 
 export interface SensorInfo {
@@ -629,6 +695,9 @@ export interface MujocoSimAPI {
   // Actuator / control (spec 3.1)
   setCtrl(nameOrValues: Actuators | Record<Actuators, number>, value?: number): void;
   getCtrl(): Float64Array;
+  getControlMap(): ControlGroupInfo;
+  getActuatedJoints(): ActuatedJointInfo[];
+  resolveControlGroup(selector: ControlGroupSelector): ControlGroupInfo | null;
 
   // Force application (spec 8.1)
   applyForce(bodyName: Bodies, force: THREE.Vector3, point?: THREE.Vector3): void;

@@ -9,8 +9,8 @@ import * as THREE from 'three';
 import { createControllerHook } from '../core/createController';
 import { useMujocoContext, useBeforePhysicsStep } from '../core/MujocoSimProvider';
 import { GenericIK } from '../core/GenericIK';
-import { findSiteByName } from '../core/SceneLoader';
-import type { IkConfig, IkContextValue, IKSolveFn, MujocoData } from '../types';
+import { createContiguousControlGroup, findSiteByName, resolveControlGroup } from '../core/SceneLoader';
+import type { ControlGroupInfo, IkConfig, IkContextValue, IKSolveFn, MujocoData } from '../types';
 
 // Preallocated temp for syncGizmoToSite
 const _syncMat4 = new THREE.Matrix4();
@@ -40,6 +40,7 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
     const ikCalculatingRef = useRef(false);
     const ikTargetRef = useRef<THREE.Group>(new THREE.Group());
     const siteIdRef = useRef(-1);
+    const controlGroupRef = useRef<ControlGroupInfo | null>(null);
     const genericIkRef = useRef<GenericIK>(new GenericIK(mujocoRef.current));
     const firstIkEnableRef = useRef(true);
     const needsInitialSync = useRef(true);
@@ -54,23 +55,32 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
       duration: 1000,
     });
 
-    // Resolve site ID when model loads or config changes
+    // Resolve site ID and model-aware control group when model loads or config changes.
     useEffect(() => {
       if (!config) {
         siteIdRef.current = -1;
+        controlGroupRef.current = null;
         return;
       }
       const model = mjModelRef.current;
       if (!model || status !== 'ready') {
         siteIdRef.current = -1;
+        controlGroupRef.current = null;
         return;
       }
       siteIdRef.current = findSiteByName(model, config.siteName);
+      controlGroupRef.current = config.numJoints !== undefined
+        ? createContiguousControlGroup(model, config.numJoints)
+        : resolveControlGroup(model, {
+            siteName: config.siteName,
+            joints: config.joints,
+            actuators: config.actuators,
+          });
       const data = mjDataRef.current;
       if (data && ikTargetRef.current) {
         syncGizmoToSite(data, siteIdRef.current, ikTargetRef.current);
       }
-    }, [config?.siteName, status, mjModelRef, mjDataRef, config]);
+    }, [config?.siteName, config?.numJoints, config?.joints, config?.actuators, status, mjModelRef, mjDataRef, config]);
 
     // IK solve function
     const ikSolveFn = useCallback(
@@ -79,9 +89,10 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
         if (config.ikSolveFn) return config.ikSolveFn(pos, quat, currentQ);
         const model = mjModelRef.current;
         const data = mjDataRef.current;
-        if (!model || !data || siteIdRef.current === -1) return null;
+        const controlGroup = controlGroupRef.current;
+        if (!model || !data || !controlGroup || siteIdRef.current === -1) return null;
         return genericIkRef.current.solve(
-          model, data, siteIdRef.current, config.numJoints,
+          model, data, siteIdRef.current, controlGroup.qposAdr,
           pos, quat, currentQ,
           { damping: config.damping, maxIterations: config.maxIterations },
         );
@@ -126,12 +137,20 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
       if (!target) return;
 
       ikCalculatingRef.current = true;
-      const numJoints = config.numJoints;
-      const currentQ: number[] = [];
-      for (let i = 0; i < numJoints; i++) currentQ.push(data.qpos[i]);
-      const solution = ikSolveFnRef.current(target.position, target.quaternion, currentQ);
+      const controlGroup = controlGroupRef.current;
+      if (!controlGroup) return;
+
+      const currentQ = Array.from(controlGroup.readQpos(data));
+      const solution = config.ikSolveFn
+        ? config.ikSolveFn(target.position, target.quaternion, currentQ, {
+            model,
+            data,
+            siteId: siteIdRef.current,
+            controlGroup,
+          })
+        : ikSolveFnRef.current(target.position, target.quaternion, currentQ);
       if (solution) {
-        for (let i = 0; i < numJoints; i++) data.ctrl[i] = solution[i];
+        controlGroup.writeCtrl(data, solution);
       }
     });
 

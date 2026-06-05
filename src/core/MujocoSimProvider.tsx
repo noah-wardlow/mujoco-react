@@ -17,8 +17,11 @@ import * as THREE from 'three';
 import { MujocoData, MujocoModel, MujocoModule, getContact, withContacts } from '../types';
 import { SceneRenderer } from '../components/SceneRenderer';
 import {
+  ActuatedJointInfo,
   ActuatorInfo,
   BodyInfo,
+  ControlGroupInfo,
+  ControlGroupSelector,
   ContactInfo,
   GeomInfo,
   JointInfo,
@@ -40,7 +43,10 @@ import {
   findSensorByName,
   findActuatorByName,
   getActuatedScalarQposAdr,
+  getActuatedJoints as getActuatedJointsFromModel,
+  getControlMap as getControlMapFromModel,
   getName,
+  resolveControlGroup as resolveControlGroupFromModel,
 } from './SceneLoader';
 
 // ---- Joint type names ----
@@ -64,6 +70,24 @@ const SENSOR_TYPE_NAMES: Record<number, string> = {
   42: 'contact', 43: 'e_potential', 44: 'e_kinetic',
   45: 'clock', 46: 'tactile', 47: 'plugin', 48: 'user',
 };
+
+const EMPTY_CONTROL_GROUP: ControlGroupInfo = {
+  joints: [],
+  actuators: [],
+  qposAdr: [],
+  dofAdr: [],
+  ctrlAdr: [],
+  readQpos: () => new Float64Array(0),
+  readCtrl: () => new Float64Array(0),
+  writeQpos: () => {},
+  writeCtrl: () => {},
+};
+
+function isMutableApiRef(
+  ref: React.ForwardedRef<MujocoSimAPI>
+): ref is React.MutableRefObject<MujocoSimAPI | null> {
+  return typeof ref === 'object' && ref !== null && 'current' in ref;
+}
 
 // Preallocated force/torque temps for applyForce/applyTorque
 const _applyForce = new Float64Array(3);
@@ -329,8 +353,8 @@ export function MujocoSimProvider({
       if (externalApiRef) {
         if (typeof externalApiRef === 'function') {
           externalApiRef(api);
-        } else {
-          (externalApiRef as React.MutableRefObject<MujocoSimAPI | null>).current = api;
+        } else if (isMutableApiRef(externalApiRef)) {
+          externalApiRef.current = api;
         }
       }
     }
@@ -614,14 +638,14 @@ export function MujocoSimProvider({
     const result: JointInfo[] = [];
     for (let i = 0; i < model.njnt; i++) {
       const type = model.jnt_type[i];
-      const limited = model.jnt_limited ? model.jnt_limited[i] !== 0 : false;
+      const range: [number, number] = [model.jnt_range[2 * i], model.jnt_range[2 * i + 1]];
       result.push({
         id: i,
         name: getName(model, model.name_jntadr[i]),
         type,
         typeName: JOINT_TYPE_NAMES[type] ?? `unknown(${type})`,
-        range: [model.jnt_range[2 * i], model.jnt_range[2 * i + 1]],
-        limited,
+        range,
+        limited: range[0] < range[1],
         bodyId: model.jnt_bodyid[i],
         qposAdr: model.jnt_qposadr[i],
         dofAdr: model.jnt_dofadr[i],
@@ -677,6 +701,21 @@ export function MujocoSimProvider({
       });
     }
     return result;
+  }, []);
+
+  const getControlMapApi = useCallback((): ControlGroupInfo => {
+    const model = mjModelRef.current;
+    return model ? getControlMapFromModel(model) : EMPTY_CONTROL_GROUP;
+  }, []);
+
+  const getActuatedJointsApi = useCallback((): ActuatedJointInfo[] => {
+    const model = mjModelRef.current;
+    return model ? getActuatedJointsFromModel(model) : [];
+  }, []);
+
+  const resolveControlGroupApi = useCallback((selector: ControlGroupSelector): ControlGroupInfo | null => {
+    const model = mjModelRef.current;
+    return model ? resolveControlGroupFromModel(model, selector) : null;
   }, []);
 
   const getSensors = useCallback((): SensorInfo[] => {
@@ -939,6 +978,9 @@ export function MujocoSimProvider({
       getQvel,
       setCtrl,
       getCtrl,
+      getControlMap: getControlMapApi,
+      getActuatedJoints: getActuatedJointsApi,
+      resolveControlGroup: resolveControlGroupApi,
       applyForce,
       applyTorque: applyTorqueApi,
       setExternalForce,
@@ -970,6 +1012,7 @@ export function MujocoSimProvider({
       status, config, reset, setSpeed, togglePause, setPaused, step,
       getTime, getTimestep, applyKeyframe, saveState, restoreState,
       setQpos, setQvel, getQpos, getQvel, setCtrl, getCtrl,
+      getControlMapApi, getActuatedJointsApi, resolveControlGroupApi,
       applyForce, applyTorqueApi, setExternalForce, applyGeneralizedForce,
       getSensorData, getContacts, getBodies, getJoints, getGeoms, getSites,
       getActuatorsApi, getSensors, getModelOption, setGravity, setTimestepApi,

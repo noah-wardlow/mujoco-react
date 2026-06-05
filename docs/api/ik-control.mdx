@@ -12,7 +12,7 @@ IK is provided by the `useIkController()` hook — it is not part of the core `M
 import { useIkController, IkGizmo } from "mujoco-react";
 
 function MyScene() {
-  const ik = useIkController({ siteName: "tcp", numJoints: 7 });
+  const ik = useIkController({ siteName: "tcp" });
 
   return (
     <>
@@ -101,6 +101,28 @@ const ik = useIkController(hasIk ? ikConfig : null);
 // ik is null when hasIk is false
 ```
 
+## Joint and Actuator Selection
+
+The default config is model-aware:
+
+```tsx
+const ik = useIkController({ siteName: "tcp" });
+```
+
+The controller finds the site body and infers scalar hinge/slide joints by walking toward the model root. For nonstandard MJCFs, multi-arm scenes, or actuator orders that do not match qpos order, pass explicit selectors:
+
+```tsx
+const ik = useIkController({
+  siteName: "tcp",
+  joints: ["shoulder", "elbow", "wrist"],
+});
+
+const pandaIk = useIkController({
+  siteName: "tcp",
+  actuators: /^actuator/,
+});
+```
+
 ## Custom IK Solver
 
 Pass `ikSolveFn` to the config to replace the built-in solver:
@@ -113,7 +135,7 @@ const myIK: IKSolveFn = (pos, quat, currentQ) => {
   return solution;
 };
 
-const ik = useIkController({ siteName: "tcp", numJoints: 7, ikSolveFn: myIK });
+const ik = useIkController({ siteName: "tcp", ikSolveFn: myIK });
 ```
 
 **When to use a custom solver:**

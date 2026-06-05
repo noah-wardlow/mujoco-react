@@ -41,10 +41,10 @@ export class GenericIK {
      * @param model       MuJoCo model
      * @param data        MuJoCo data (qpos will be temporarily modified, then restored)
      * @param siteId      Index of the end-effector site to control
-     * @param numJoints   Number of arm joints (assumes qpos[0..numJoints-1])
+     * @param qposAdr     qpos addresses for scalar joints in solve order
      * @param targetPos   Target position in world frame
      * @param targetQuat  Target orientation in world frame
-     * @param currentQ    Current joint angles (length = numJoints)
+     * @param currentQ    Current joint angles matching qposAdr order
      * @param opts        Optional solver parameters
      * @returns Joint angles array, or null if solver diverged
      */
@@ -52,14 +52,14 @@ export class GenericIK {
         model: MujocoModel,
         data: MujocoData,
         siteId: number,
-        numJoints: number,
+        qposAdr: ArrayLike<number>,
         targetPos: THREE.Vector3,
         targetQuat: THREE.Quaternion,
-        currentQ: number[],
+        currentQ: ArrayLike<number>,
         opts?: Partial<GenericIKOptions>
     ): number[] | null {
         const o = { ...DEFAULTS, ...opts };
-        const n = numJoints;
+        const n = qposAdr.length;
 
         // Save full qpos so we can restore after solving
         const savedQpos = new Float64Array(data.qpos.length);
@@ -86,9 +86,11 @@ export class GenericIK {
         let bestQ: number[] | null = null;
         let bestErr = Infinity;
 
+        if (n === 0) return null;
+
         for (let iter = 0; iter < o.maxIterations; iter++) {
             // Set joints and run FK
-            for (let i = 0; i < n; i++) data.qpos[i] = q[i];
+            for (let i = 0; i < n; i++) data.qpos[qposAdr[i]] = q[i];
             this.mujoco.mj_forward(model, data);
 
             // Read current site pose
@@ -130,8 +132,9 @@ export class GenericIK {
 
             // Compute Jacobian via finite differences
             for (let j = 0; j < n; j++) {
-                const saved = data.qpos[j];
-                data.qpos[j] = q[j] + o.epsilon;
+                const adr = qposAdr[j];
+                const saved = data.qpos[adr];
+                data.qpos[adr] = q[j] + o.epsilon;
                 this.mujoco.mj_forward(model, data);
 
                 for (let i = 0; i < 3; i++) pertSitePos[i] = sp[off3 + i];
@@ -150,11 +153,11 @@ export class GenericIK {
                 J[5 * n + j] = (dRot[2] / o.epsilon) * o.rotWeight;
 
                 // Restore joint
-                data.qpos[j] = saved;
+                data.qpos[adr] = saved;
             }
 
             // Restore base FK state for next iteration
-            for (let i = 0; i < n; i++) data.qpos[i] = q[i];
+            for (let i = 0; i < n; i++) data.qpos[qposAdr[i]] = q[i];
 
             // Damped least squares: Δq = Jᵀ (J Jᵀ + λI)⁻¹ error
             // 1. Compute JJᵀ (6×6)

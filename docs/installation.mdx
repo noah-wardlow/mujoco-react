@@ -59,6 +59,30 @@ const MujocoApp = dynamic(() => import("./MujocoApp"), { ssr: false });
 
 Works out of the box. No additional configuration needed.
 
+### Multi-Threaded WASM
+
+`MujocoProvider` defaults to the single-threaded official MuJoCo WASM build. To opt into the official multi-threaded build:
+
+```tsx
+import loadMujocoMt from "@mujoco/mujoco/mt";
+import mtWasmUrl from "@mujoco/mujoco/mt/mujoco.wasm?url";
+
+<MujocoProvider
+  wasmVariant="auto"
+  threadedLoader={loadMujocoMt}
+  mtWasmUrl={mtWasmUrl}
+>
+  <App />
+</MujocoProvider>
+```
+
+`"auto"` only loads the threaded build when `threadedLoader` and `mtWasmUrl` are provided and the browser reports `globalThis.crossOriginIsolated === true`. If you force `wasmVariant="threaded"`, your dev server and production host must send:
+
+```txt
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
 ## Verify Installation
 
 ```tsx

@@ -114,6 +114,68 @@ interface ActuatorInfo {
 }
 ```
 
+## getActuatedJoints()
+
+Get scalar hinge/slide joints that are directly driven by actuators.
+
+```tsx
+const actuated = api.getActuatedJoints();
+actuated.forEach(j => {
+  console.log(`${j.name} <= ${j.actuatorName} ctrl[${j.ctrlAdr}]`);
+});
+```
+
+**Returns:** `ActuatedJointInfo[]`
+
+```tsx
+interface ActuatedJointInfo extends JointInfo {
+  actuatorId: number;
+  actuatorName: string;
+  ctrlAdr: number;
+  ctrlRange: [number, number];
+}
+```
+
+## getControlMap()
+
+Get a writable control group for all directly actuated scalar joints.
+
+```tsx
+const group = api.getControlMap();
+const q = group.readQpos(data);
+group.writeCtrl(data, q);
+```
+
+**Returns:** `ControlGroupInfo`
+
+```tsx
+interface ControlGroupInfo {
+  joints: ControlJointInfo[];
+  actuators: ActuatorInfo[];
+  qposAdr: number[];
+  dofAdr: number[];
+  ctrlAdr: number[];
+  readQpos(data: MujocoData): Float64Array;
+  readCtrl(data: MujocoData): Float64Array;
+  writeQpos(data: MujocoData, values: ArrayLike<number>): void;
+  writeCtrl(data: MujocoData, values: ArrayLike<number>): void;
+}
+```
+
+## resolveControlGroup(selector)
+
+Resolve the same mapping for a site, body, joint selector, or actuator selector.
+
+```tsx
+const arm = api.resolveControlGroup({ siteName: "tcp" });
+const named = api.resolveControlGroup({
+  joints: ["shoulder", "elbow", "wrist"],
+});
+const panda = api.resolveControlGroup({ actuators: /^actuator/ });
+```
+
+Use this when a model's actuator order does not match qpos order, or when a scene contains multiple robots.
+
 ## getSensors()
 
 Get all sensors in the model.
