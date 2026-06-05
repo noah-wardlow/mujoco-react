@@ -61,7 +61,7 @@ export class GeomBuilder {
         const MG = this.mujoco.mjtGeom; // Short alias for MuJoCo Geometry Types enum
         let geo: THREE.BufferGeometry | null = null;
 
-        // The '.value ?? MG.XYZ' pattern handles slightly different versions of the mujoco-js bindings.
+        // The '.value ?? MG.XYZ' pattern handles slightly different MuJoCo WASM binding versions.
         const getVal = (v: unknown) => (v as { value: number })?.value ?? v;
 
         if (type === getVal(MG.mjGEOM_PLANE)) {

@@ -153,6 +153,16 @@ interface LoadResult {
   mjData: MujocoData;
 }
 
+function loadModelFromPath(mujoco: MujocoModule, path: string): MujocoModel {
+  if (mujoco.MjModel.from_xml_path) {
+    return mujoco.MjModel.from_xml_path(path);
+  }
+  if (mujoco.MjModel.loadFromXML) {
+    return mujoco.MjModel.loadFromXML(path);
+  }
+  throw new Error('MuJoCo WASM module does not expose an XML path loader');
+}
+
 /**
  * Config-driven scene loader — replaces the old RobotLoader + patchSingleRobot approach.
  */
@@ -260,7 +270,7 @@ export async function loadScene(
 
   // 5. Load model
   onProgress?.('Loading model...');
-  const mjModel = mujoco.MjModel.loadFromXML(`/working/${config.sceneFile}`);
+  const mjModel = loadModelFromPath(mujoco, `/working/${config.sceneFile}`);
   const mjData = new mujoco.MjData(mjModel);
 
   // 6. Set initial pose — set both ctrl and qpos so robot starts at home.

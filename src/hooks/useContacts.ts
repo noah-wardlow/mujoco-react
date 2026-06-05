@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useMujocoContext, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import { findBodyByName, getName } from '../core/SceneLoader';
-import { getContact } from '../types';
+import { getContact, withContacts } from '../types';
 import type { Bodies, ContactInfo, MujocoModel } from '../types';
 
 // Cache geom names per model to avoid cross-model id collisions.
@@ -77,24 +77,26 @@ export function useContacts(
     const contacts: ContactInfo[] = [];
     const filterBody = bodyIdRef.current;
 
-    for (let i = 0; i < ncon; i++) {
-      const c = getContact(data, i);
-      if (!c) break;
-      // Filter by body if specified
-      if (filterBody >= 0) {
-        const b1 = model.geom_bodyid[c.geom1];
-        const b2 = model.geom_bodyid[c.geom2];
-        if (b1 !== filterBody && b2 !== filterBody) continue;
+    withContacts(data, (contactArray) => {
+      for (let i = 0; i < ncon; i++) {
+        const c = getContact(contactArray, i);
+        if (!c) break;
+        // Filter by body if specified
+        if (filterBody >= 0) {
+          const b1 = model.geom_bodyid[c.geom1];
+          const b2 = model.geom_bodyid[c.geom2];
+          if (b1 !== filterBody && b2 !== filterBody) continue;
+        }
+        contacts.push({
+          geom1: c.geom1,
+          geom1Name: getGeomNameCached(model, c.geom1),
+          geom2: c.geom2,
+          geom2Name: getGeomNameCached(model, c.geom2),
+          pos: [c.pos[0], c.pos[1], c.pos[2]],
+          depth: c.dist,
+        });
       }
-      contacts.push({
-        geom1: c.geom1,
-        geom1Name: getGeomNameCached(model, c.geom1),
-        geom2: c.geom2,
-        geom2Name: getGeomNameCached(model, c.geom2),
-        pos: [c.pos[0], c.pos[1], c.pos[2]],
-        depth: c.dist,
-      });
-    }
+    });
     contactsRef.current = contacts;
     callbackRef.current?.(contacts);
   });

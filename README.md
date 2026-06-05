@@ -6,7 +6,7 @@
 
 > **Beta** — This library is under active development. The API may change between minor versions until 10.0.
 
-Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper around [mujoco-js](https://www.npmjs.com/package/mujoco-js). Load any MuJoCo model, step physics, render bodies, and write controllers as React components.
+Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper around the official [@mujoco/mujoco](https://www.npmjs.com/package/@mujoco/mujoco) WASM bindings. Load any MuJoCo model, step physics, render bodies, and write controllers as React components.
 
 [![npm](https://img.shields.io/npm/v/mujoco-react)](https://www.npmjs.com/package/mujoco-react)
 
@@ -100,6 +100,78 @@ function useMyController(gain: number) {
   useBeforePhysicsStep(() => {
     shoulder.write(gain * Math.sin(Date.now() / 1000));
     elbow.write(force.read()[0] * -0.5);
+  });
+}
+```
+
+### Applying Forces
+
+Write directly to `xfrc_applied` in a physics callback for per-frame forces. The layout is `[torque_x, torque_y, torque_z, force_x, force_y, force_z]` per body:
+
+```tsx
+import { useBeforePhysicsStep } from "mujoco-react";
+
+function useSpringForce(bodyId: number, target: [number, number, number], stiffness = 100) {
+  useBeforePhysicsStep((_model, data) => {
+    const i3 = bodyId * 3;
+    const i6 = bodyId * 6;
+    data.xfrc_applied[i6 + 3] = (target[0] - data.xpos[i3]) * stiffness;
+    data.xfrc_applied[i6 + 4] = (target[1] - data.xpos[i3 + 1]) * stiffness;
+    data.xfrc_applied[i6 + 5] = (target[2] - data.xpos[i3 + 2]) * stiffness;
+  });
+}
+```
+
+The `api.applyForce(bodyName, force)` convenience method also works for one-off interactions (e.g. button clicks) but does a name lookup each call.
+
+### WebSocket Joint Control
+
+Stream joint commands over a WebSocket and send simulation state back:
+
+```tsx
+import { useEffect, useRef } from "react";
+import { useMujoco, useBeforePhysicsStep, useAfterPhysicsStep } from "mujoco-react";
+
+function useWebSocketJoints(url: string) {
+  const { api } = useMujoco();
+  const wsRef = useRef<WebSocket | null>(null);
+  const latestJointsRef = useRef<number[] | null>(null);
+
+  useEffect(() => {
+    const ws = new WebSocket(url);
+    wsRef.current = ws;
+
+    ws.onmessage = (evt) => {
+      const msg = JSON.parse(evt.data);
+      if (msg.type === "joint_command") {
+        latestJointsRef.current = msg.qpos;
+      }
+    };
+
+    return () => ws.close();
+  }, [url]);
+
+  // Apply incoming joint positions each physics step
+  useBeforePhysicsStep((model, data) => {
+    const joints = latestJointsRef.current;
+    if (!joints) return;
+    for (let i = 0; i < Math.min(joints.length, model.nu); i++) {
+      data.ctrl[i] = joints[i];
+    }
+  });
+
+  // Send sensor feedback back after physics
+  useAfterPhysicsStep((model, data) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    ws.send(JSON.stringify({
+      type: "feedback",
+      time: data.time,
+      qpos: Array.from(data.qpos),
+      qvel: Array.from(data.qvel),
+      sensordata: Array.from(data.sensordata),
+    }));
   });
 }
 ```
@@ -445,7 +517,7 @@ import { useMujocoWasm } from "mujoco-react";
 const { mujoco, status } = useMujocoWasm();
 
 if (mujoco) {
-  const model = mujoco.MjModel.loadFromXML("/path/to/scene.xml");
+  const model = mujoco.MjModel.from_xml_path("/path/to/scene.xml");
   const data = new mujoco.MjData(model);
   mujoco.mj_step(model, data);
   console.log(data.qpos);  // joint positions after one step
@@ -769,7 +841,7 @@ Features planned but not yet implemented:
 | **Web Worker physics** | P2 | Run `mj_step` off main thread via SharedArrayBuffer |
 | **Register codegen** | P2 | CLI to auto-generate `Register` type augmentation from MJCF XML |
 
-### WASM Limitations (mujoco-js 0.0.7)
+### WASM Limitations (@mujoco/mujoco)
 
 These MuJoCo features are not yet exposed in the WASM binding:
 

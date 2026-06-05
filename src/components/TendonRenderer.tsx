@@ -7,7 +7,7 @@
  * WASM fields used: model.ntendon, model.ten_wrapadr, model.ten_wrapnum
  * data.wrap_xpos, data.ten_wrapadr (runtime)
  *
- * Note: ten_rgba and ten_width are NOT available in mujoco-js 0.0.7.
+ * Note: ten_rgba and ten_width may not be available in all MuJoCo WASM builds.
  * Tendons use a default color and width.
  */
 

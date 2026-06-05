@@ -13,6 +13,7 @@ export default defineConfig({
     'three',
     '@react-three/fiber',
     '@react-three/drei',
+    '@mujoco/mujoco',
   ],
   treeshake: true,
 });

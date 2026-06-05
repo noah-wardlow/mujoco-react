@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import loadMujoco from 'mujoco-js';
+import loadMujoco from '@mujoco/mujoco';
+import defaultMujocoWasmUrl from '@mujoco/mujoco/mujoco.wasm?url';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { MujocoModule, MujocoContextValue } from '../types';
 
@@ -42,7 +43,7 @@ export function MujocoProvider({ wasmUrl, timeout = 30000, children, onError }: 
     isMounted.current = true;
 
     const wasmPromise = loadMujoco({
-      ...(wasmUrl ? { locateFile: (path: string) => path.endsWith('.wasm') ? wasmUrl : path } : {}),
+      locateFile: (path: string) => path.endsWith('.wasm') ? (wasmUrl ?? defaultMujocoWasmUrl) : path,
       printErr: (text: string) => {
         if (text.includes('Aborted') && isMounted.current) {
           setError('Simulation crashed. Reload page.');

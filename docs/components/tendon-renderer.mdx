@@ -36,6 +36,6 @@ Renders MuJoCo tendons as smooth tube geometry. Useful for visualizing tendon-dr
 ## Notes
 
 - Requires tendons defined in the MJCF model
-- `ten_rgba` and `ten_width` are not available in mujoco-js 0.0.7 — defaults are used instead
+- `ten_rgba` and `ten_width` may not be available in the active MuJoCo WASM binding — defaults are used instead
 - If the model has no tendons, this component renders nothing
 - Meshes and material are created once and reused — only geometry is rebuilt per frame

@@ -7,18 +7,19 @@ icon: "download"
 ## Install
 
 ```bash
-npm install mujoco-react mujoco-js @react-three/fiber @react-three/drei three
+npm install mujoco-react @react-three/fiber @react-three/drei three
 ```
 
 ### Peer Dependencies
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `mujoco-js` | `>=0.0.7` | MuJoCo WASM module (physics engine) |
 | `@react-three/fiber` | `>=8` | React renderer for Three.js |
 | `@react-three/drei` | `>=9` | R3F helpers (PivotControls, etc.) |
 | `three` | `>=0.150` | 3D rendering |
 | `react` | `>=18` | React |
+
+`@mujoco/mujoco` is installed by `mujoco-react` as the underlying MuJoCo WASM engine.
 
 ### TypeScript
 
@@ -32,7 +33,7 @@ mujoco-react ships with full TypeScript types. No `@types/` package needed for t
 
 ### Vite (Recommended)
 
-mujoco-js includes a WASM binary embedded in its JS bundle. No special WASM configuration is needed — it works out of the box with Vite:
+`@mujoco/mujoco` ships a `.wasm` asset. Vite serves package WASM assets correctly with the standard React setup:
 
 ```ts
 // vite.config.ts
@@ -46,7 +47,7 @@ export default defineConfig({
 
 ### Next.js
 
-Since mujoco-js uses WASM, it must run client-side only:
+Since MuJoCo uses WASM and browser APIs, it must run client-side only:
 
 ```tsx
 import dynamic from "next/dynamic";

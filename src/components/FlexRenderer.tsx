@@ -39,7 +39,7 @@ export function FlexRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
       const positions = new Float32Array(vertNum * 3);
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-      // Note: flex_faceadr/flex_facenum/flex_face are NOT available in mujoco-js WASM.
+      // Note: flex_faceadr/flex_facenum/flex_face may not be available in all MuJoCo WASM builds.
       // Without face data we render as a point cloud. If future WASM versions expose
       // face arrays, index-based triangle rendering can be added here.
 

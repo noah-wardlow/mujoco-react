@@ -27,7 +27,7 @@ Renders MuJoCo flex (deformable) bodies. Currently renders as a point cloud sinc
 ## Limitations
 
 <Warning>
-  `flex_face` (triangle indices) is not available in mujoco-js 0.0.7. Flex bodies render as point clouds instead of solid meshes. This will be resolved when the binding adds face data support.
+  `flex_face` (triangle indices) may not be available in the active MuJoCo WASM binding. Flex bodies render as point clouds instead of solid meshes until face data is exposed.
 </Warning>
 
 ## Notes

@@ -55,17 +55,30 @@ export interface MujocoContact {
  */
 export interface MujocoContactArray {
   get(i: number): MujocoContact | undefined;
+  delete?: () => void;
 }
 
 /**
- * Read a single contact from the WASM contact array.
+ * Read a single contact from an already-acquired WASM contact array.
  * Returns undefined if the access fails (WASM heap issue, bad index, etc.).
  */
-export function getContact(data: MujocoData, i: number): MujocoContact | undefined {
+export function getContact(contacts: MujocoContactArray, i: number): MujocoContact | undefined {
   try {
-    return data.contact.get(i);
+    return contacts.get(i);
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Access the current contact vector and release the copied WASM handle afterwards.
+ */
+export function withContacts<T>(data: MujocoData, read: (contacts: MujocoContactArray) => T): T {
+  const contacts = data.contact;
+  try {
+    return read(contacts);
+  } finally {
+    contacts.delete?.();
   }
 }
 
@@ -249,7 +262,12 @@ export interface MujocoData {
  * Minimal interface for the MuJoCo WASM Module.
  */
 export interface MujocoModule {
-  MjModel: { loadFromXML: (path: string) => MujocoModel; [key: string]: unknown };
+  MjModel: {
+    from_xml_path?: (path: string) => MujocoModel;
+    from_xml_string?: (xml: string, vfs?: unknown) => MujocoModel;
+    loadFromXML?: (path: string) => MujocoModel;
+    [key: string]: unknown;
+  };
   MjData: new (model: MujocoModel) => MujocoData;
   MjvOption: new () => { delete: () => void; [key: string]: unknown };
   mj_forward: (m: MujocoModel, d: MujocoData) => void;

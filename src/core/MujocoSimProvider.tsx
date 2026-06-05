@@ -14,7 +14,7 @@ import {
   useState,
 } from 'react';
 import * as THREE from 'three';
-import { MujocoData, MujocoModel, MujocoModule, getContact } from '../types';
+import { MujocoData, MujocoModel, MujocoModule, getContact, withContacts } from '../types';
 import { SceneRenderer } from '../components/SceneRenderer';
 import {
   ActuatorInfo,
@@ -576,18 +576,20 @@ export function MujocoSimProvider({
     if (!model || !data) return [];
     const contacts: ContactInfo[] = [];
     const ncon = data.ncon;
-    for (let i = 0; i < ncon; i++) {
-      const c = getContact(data, i);
-      if (!c) break;
-      contacts.push({
-        geom1: c.geom1,
-        geom1Name: getName(model, model.name_geomadr[c.geom1]),
-        geom2: c.geom2,
-        geom2Name: getName(model, model.name_geomadr[c.geom2]),
-        pos: [c.pos[0], c.pos[1], c.pos[2]],
-        depth: c.dist,
-      });
-    }
+    withContacts(data, (contactArray) => {
+      for (let i = 0; i < ncon; i++) {
+        const c = getContact(contactArray, i);
+        if (!c) break;
+        contacts.push({
+          geom1: c.geom1,
+          geom1Name: getName(model, model.name_geomadr[c.geom1]),
+          geom2: c.geom2,
+          geom2Name: getName(model, model.name_geomadr[c.geom2]),
+          pos: [c.pos[0], c.pos[1], c.pos[2]],
+          depth: c.dist,
+        });
+      }
+    });
     return contacts;
   }, []);
 

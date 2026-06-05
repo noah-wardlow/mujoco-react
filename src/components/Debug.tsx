@@ -11,7 +11,7 @@ import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMujocoContext } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
-import { getContact } from '../types';
+import { getContact, withContacts } from '../types';
 import type { DebugProps } from '../types';
 
 const JOINT_COLORS: Record<number, number> = {
@@ -330,22 +330,24 @@ export function Debug({
     const ncon = data.ncon;
     let arrowIdx = 0;
 
-    for (let i = 0; i < Math.min(ncon, MAX_CONTACT_ARROWS); i++) {
-      const c = getContact(data, i);
-      if (!c) break;
-      _contactPos.set(c.pos[0], c.pos[1], c.pos[2]);
-      _contactNormal.set(c.frame[0], c.frame[1], c.frame[2]);
-      const force = Math.abs(c.dist) * 100;
-      const length = Math.min(force * 0.01, 0.1);
-      if (length > 0.001 && arrowIdx < pool.length) {
-        const arrow = pool[arrowIdx];
-        arrow.position.copy(_contactPos);
-        arrow.setDirection(_contactNormal);
-        arrow.setLength(length, length * 0.3, length * 0.15);
-        arrow.visible = true;
-        arrowIdx++;
+    withContacts(data, (contactArray) => {
+      for (let i = 0; i < Math.min(ncon, MAX_CONTACT_ARROWS); i++) {
+        const c = getContact(contactArray, i);
+        if (!c) break;
+        _contactPos.set(c.pos[0], c.pos[1], c.pos[2]);
+        _contactNormal.set(c.frame[0], c.frame[1], c.frame[2]);
+        const force = Math.abs(c.dist) * 100;
+        const length = Math.min(force * 0.01, 0.1);
+        if (length > 0.001 && arrowIdx < pool.length) {
+          const arrow = pool[arrowIdx];
+          arrow.position.copy(_contactPos);
+          arrow.setDirection(_contactNormal);
+          arrow.setLength(length, length * 0.3, length * 0.15);
+          arrow.visible = true;
+          arrowIdx++;
+        }
       }
-    }
+    });
 
     // Hide unused arrows
     for (let i = arrowIdx; i < pool.length; i++) {

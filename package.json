@@ -48,7 +48,7 @@
     "three": ">=0.160.0"
   },
   "dependencies": {
-    "mujoco-js": "0.0.7"
+    "@mujoco/mujoco": "^3.9.0"
   },
   "devDependencies": {
     "@react-three/drei": "^10.7.7",

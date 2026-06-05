@@ -1,12 +1,12 @@
 ---
 title: "Introduction"
-description: "Composable React Three Fiber wrapper around mujoco-js"
+description: "Composable React Three Fiber wrapper around MuJoCo WASM"
 icon: "rocket"
 ---
 
 # mujoco-react
 
-**mujoco-react** is a composable [React Three Fiber](https://r3f.docs.pmnd.rs/) wrapper around [mujoco-js](https://www.npmjs.com/package/mujoco-js). It provides components for loading models, stepping physics, and rendering bodies. Controllers like IK are opt-in plugins.
+**mujoco-react** is a composable [React Three Fiber](https://r3f.docs.pmnd.rs/) wrapper around the official [@mujoco/mujoco](https://www.npmjs.com/package/@mujoco/mujoco) WASM bindings. It provides components for loading models, stepping physics, and rendering bodies. Controllers like IK are opt-in plugins.
 
 <CardGroup cols={2}>
   <Card title="Composable" icon="puzzle-piece">
@@ -26,7 +26,7 @@ icon: "rocket"
 ## Quick Start
 
 ```bash
-npm install mujoco-react mujoco-js @react-three/fiber @react-three/drei three
+npm install mujoco-react @react-three/fiber @react-three/drei three
 ```
 
 ```tsx
