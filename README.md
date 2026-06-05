@@ -18,113 +18,89 @@ Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper a
 npm install mujoco-react three @react-three/fiber @react-three/drei
 ```
 
-## Quick Start
+## Load a Model
 
 ```tsx
-import {
-  MujocoProvider,
-  MujocoCanvas,
-  useIkController,
-  IkGizmo,
-} from "mujoco-react";
+import { MujocoProvider, MujocoCanvas } from "mujoco-react";
 import type { SceneConfig } from "mujoco-react";
-import { OrbitControls } from "@react-three/drei";
 
-const config: SceneConfig = {
+const panda: SceneConfig = {
   src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
   sceneFile: "scene.xml",
   homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
 };
 
-function Scene() {
-  const ik = useIkController({ siteName: "tcp" });
-  return (
-    <>
-      <OrbitControls enableDamping makeDefault />
-      {ik && <IkGizmo controller={ik} />}
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[1, 2, 5]} intensity={1.2} castShadow />
-    </>
-  );
-}
-
-function App() {
+export function App() {
   return (
     <MujocoProvider>
       <MujocoCanvas
-        config={config}
+        config={panda}
         camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
-        shadows
         style={{ width: "100%", height: "100vh" }}
-      >
-        <Scene />
-      </MujocoCanvas>
+      />
     </MujocoProvider>
   );
 }
 ```
 
-## `useMujoco()`
-
-Inside `<MujocoCanvas>` or `<MujocoPhysics>`, `useMujoco()` gives you the simulation API, refs to the live model/data, and status:
+## Add Scene Tools
 
 ```tsx
-import { useMujoco } from "mujoco-react";
+import { OrbitControls } from "@react-three/drei";
+import { IkGizmo, useIkController } from "mujoco-react";
 
-function MyComponent() {
-  const { isPending, isError, error, api, mjModelRef } = useMujoco();
-
-  if (isPending) return <span>Loading...</span>;
-  if (isError) return <span>Error: {error}</span>;
+function PandaTools() {
+  const ik = useIkController({ siteName: "tcp" });
 
   return (
-    <button onClick={() => api.reset()}>
-      Reset ({mjModelRef.current?.nq} joints)
-    </button>
+    <>
+      <OrbitControls makeDefault />
+      {ik && <IkGizmo controller={ik} />}
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[1, 2, 5]} intensity={1.2} />
+    </>
   );
 }
 ```
 
-## Writing a Controller
-
-A controller is a hook that reads sensors and writes actuators each physics step:
+Use it as a child of `<MujocoCanvas>`:
 
 ```tsx
-import { useCtrl, useSensor, useBeforePhysicsStep } from "mujoco-react";
-
-function useMyController(gain: number) {
-  const shoulder = useCtrl("shoulder");
-  const elbow = useCtrl("elbow");
-  const force = useSensor("force_sensor");
-
-  useBeforePhysicsStep(() => {
-    shoulder.write(gain * Math.sin(Date.now() / 1000));
-    elbow.write(force.read()[0] * -0.5);
-  });
-}
+<MujocoCanvas config={panda}>
+  <PandaTools />
+</MujocoCanvas>
 ```
 
-### Applying Forces
-
-Write directly to `xfrc_applied` in a physics callback for per-frame forces. The layout is `[torque_x, torque_y, torque_z, force_x, force_y, force_z]` per body:
+## Write Controllers
 
 ```tsx
 import { useBeforePhysicsStep } from "mujoco-react";
 
-function useSpringForce(bodyId: number, target: [number, number, number], stiffness = 100) {
+function MyController() {
   useBeforePhysicsStep((_model, data) => {
-    const i3 = bodyId * 3;
-    const i6 = bodyId * 6;
-    data.xfrc_applied[i6 + 3] = (target[0] - data.xpos[i3]) * stiffness;
-    data.xfrc_applied[i6 + 4] = (target[1] - data.xpos[i3 + 1]) * stiffness;
-    data.xfrc_applied[i6 + 5] = (target[2] - data.xpos[i3 + 2]) * stiffness;
+    data.ctrl[0] = Math.sin(data.time);
   });
+
+  return null;
 }
 ```
 
-The `api.applyForce(bodyName, force)` convenience method also works for one-off interactions (e.g. button clicks) but does a name lookup each call.
+Controllers are just React children that read sensors, write `data.ctrl`, apply forces, or call the `MujocoSimAPI` at physics-step time.
 
-### WebSocket Control
+## Use the Sim API
+
+```tsx
+import { useMujoco } from "mujoco-react";
+
+function ResetButton() {
+  const sim = useMujoco();
+  if (!sim.isReady) return null;
+
+  return <button onClick={() => sim.api.reset()}>Reset</button>;
+}
+```
+
+## WebSocket Control
 
 Stream actuator commands over a WebSocket and send simulation state back. Use a schema validator such as Zod at this boundary because socket messages are untrusted app input (`npm install zod` for this example):
 
