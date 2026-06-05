@@ -1,3 +1,10 @@
+# [8.7.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.6.0...v8.7.0) (2026-06-05)
+
+
+### Features
+
+* add per-robot register type generation ([a09a12f](https://github.com/noah-wardlow/mujoco-react/commit/a09a12f6038ab3467dea4c7cc454fa657e64c418))
+
 # [8.6.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.5.0...v8.6.0) (2026-06-05)
 
 
