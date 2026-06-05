@@ -1,3 +1,10 @@
+## [8.3.1](https://github.com/noah-wardlow/mujoco-react/compare/v8.3.0...v8.3.1) (2026-06-05)
+
+
+### Bug Fixes
+
+* normalize npm repository metadata ([dab8213](https://github.com/noah-wardlow/mujoco-react/commit/dab8213178ec6d25c2170612c1ef9662110b438c))
+
 # [8.3.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.2.1...v8.3.0) (2026-06-05)
 
 
