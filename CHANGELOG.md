@@ -1,3 +1,10 @@
+## [8.4.1](https://github.com/noah-wardlow/mujoco-react/compare/v8.4.0...v8.4.1) (2026-06-05)
+
+
+### Bug Fixes
+
+* simplify readme opening examples ([0fca2f6](https://github.com/noah-wardlow/mujoco-react/commit/0fca2f675c0e97c5156edc1527225839bd809aab))
+
 # [8.4.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.3.3...v8.4.0) (2026-06-05)
 
 
