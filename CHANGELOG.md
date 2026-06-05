@@ -1,3 +1,10 @@
+# [8.6.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.5.0...v8.6.0) (2026-06-05)
+
+
+### Features
+
+* add local loading and vite codegen ([3d4e125](https://github.com/noah-wardlow/mujoco-react/commit/3d4e125098ad303ddb98e15026c80967d0db0cd3))
+
 # [8.5.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.4.2...v8.5.0) (2026-06-05)
 
 
