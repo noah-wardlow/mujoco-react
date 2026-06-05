@@ -1,3 +1,10 @@
+## [8.4.2](https://github.com/noah-wardlow/mujoco-react/compare/v8.4.1...v8.4.2) (2026-06-05)
+
+
+### Bug Fixes
+
+* reduce websocket readme boilerplate ([77cd6da](https://github.com/noah-wardlow/mujoco-react/commit/77cd6da1cb95bff38a7e6e5044409189748039fb))
+
 ## [8.4.1](https://github.com/noah-wardlow/mujoco-react/compare/v8.4.0...v8.4.1) (2026-06-05)
 
 
