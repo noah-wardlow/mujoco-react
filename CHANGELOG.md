@@ -1,3 +1,10 @@
+# [8.4.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.3.3...v8.4.0) (2026-06-05)
+
+
+### Features
+
+* improve wasm controls and ik mapping ([ab171e8](https://github.com/noah-wardlow/mujoco-react/commit/ab171e8f4fc525e01f8b56cf98888825ee290488))
+
 ## [8.3.3](https://github.com/noah-wardlow/mujoco-react/compare/v8.3.2...v8.3.3) (2026-06-05)
 
 
