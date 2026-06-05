@@ -6,13 +6,14 @@ import { generateMujocoRegister } from '../dist/vite.js';
 const usage = `
 Usage:
   mujoco-react codegen <scene.xml> [...more.xml] [--out src/mujoco-register.gen.d.ts] [--watch]
+  mujoco-react codegen franka=models/panda/scene.xml spot=models/spot/scene.xml
 
 Vite users usually do not need this command. Prefer:
 
   import { mujocoReact } from "mujoco-react/vite";
 
   export default defineConfig({
-    plugins: [mujocoReact({ models: "models/panda/scene.xml" })],
+    plugins: [mujocoReact({ models: { franka: "models/panda/scene.xml" } })],
   });
 `;
 
@@ -39,6 +40,7 @@ const models = commandArgs.filter((arg, index) => {
   const previous = commandArgs[index - 1];
   return previous !== '--out' && previous !== '--module';
 });
+const modelInput = parseModels(models);
 
 if (!models.length) {
   console.error(usage.trim());
@@ -69,7 +71,7 @@ if (shouldWatch) {
 
 async function generate() {
   const result = await generateMujocoRegister({
-    models,
+    models: modelInput,
     out,
     moduleName,
     root: process.cwd(),
@@ -77,6 +79,16 @@ async function generate() {
   watchedFiles = result.files;
   const total = Object.values(result.counts).reduce((sum, count) => sum + count, 0);
   console.log(`[mujoco-react] generated ${path.relative(process.cwd(), result.out)} (${total} names)`);
+}
+
+function parseModels(values) {
+  if (values.every((value) => value.includes('='))) {
+    return Object.fromEntries(values.map((value) => {
+      const index = value.indexOf('=');
+      return [value.slice(0, index), value.slice(index + 1)];
+    }));
+  }
+  return values;
 }
 
 function valueAfter(values, flag) {

@@ -17,6 +17,13 @@ import * as THREE from 'three';
  * ```ts
  * declare module 'mujoco-react' {
  *   interface Register {
+ *     robots: {
+ *       panda: {
+ *         actuators: 'joint1' | 'joint2' | 'gripper';
+ *         sensors: 'force_sensor' | 'torque_sensor';
+ *         bodies: 'link0' | 'link1' | 'hand';
+ *       };
+ *     };
  *     actuators: 'joint1' | 'joint2' | 'gripper';
  *     sensors: 'force_sensor' | 'torque_sensor';
  *     bodies: 'link0' | 'link1' | 'hand';
@@ -27,6 +34,26 @@ import * as THREE from 'three';
  * When no augmentation is declared, all names fall back to `string`.
  */
 export interface Register {}
+
+export type RegisteredRobotMap = Register extends { robots: infer T extends Record<string, Record<string, string>> }
+  ? T
+  : never;
+export type Robots = [RegisteredRobotMap] extends [never] ? string : Extract<keyof RegisteredRobotMap, string>;
+export type RobotResource<TRobot extends string, TKey extends string> =
+  [RegisteredRobotMap] extends [never]
+    ? string
+    : TRobot extends keyof RegisteredRobotMap
+      ? TKey extends keyof RegisteredRobotMap[TRobot]
+        ? RegisteredRobotMap[TRobot][TKey]
+        : string
+      : never;
+export type RobotActuators<TRobot extends string> = RobotResource<TRobot, 'actuators'>;
+export type RobotSensors<TRobot extends string> = RobotResource<TRobot, 'sensors'>;
+export type RobotBodies<TRobot extends string> = RobotResource<TRobot, 'bodies'>;
+export type RobotJoints<TRobot extends string> = RobotResource<TRobot, 'joints'>;
+export type RobotSites<TRobot extends string> = RobotResource<TRobot, 'sites'>;
+export type RobotGeoms<TRobot extends string> = RobotResource<TRobot, 'geoms'>;
+export type RobotKeyframes<TRobot extends string> = RobotResource<TRobot, 'keyframes'>;
 
 export type Actuators = Register extends { actuators: infer T extends string } ? T : string;
 export type Sensors = Register extends { sensors: infer T extends string } ? T : string;
