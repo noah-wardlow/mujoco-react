@@ -1,3 +1,10 @@
+## [8.3.3](https://github.com/noah-wardlow/mujoco-react/compare/v8.3.2...v8.3.3) (2026-06-05)
+
+
+### Bug Fixes
+
+* sync package lock release version ([c973642](https://github.com/noah-wardlow/mujoco-react/commit/c9736427ffc5c80d70b605a180788b6691d9e523))
+
 ## [8.3.2](https://github.com/noah-wardlow/mujoco-react/compare/v8.3.1...v8.3.2) (2026-06-05)
 
 
