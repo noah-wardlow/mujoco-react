@@ -1,3 +1,10 @@
+# [8.5.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.4.2...v8.5.0) (2026-06-05)
+
+
+### Features
+
+* add observation builder utilities ([3d5a12a](https://github.com/noah-wardlow/mujoco-react/commit/3d5a12af263609f9c84c71c57f7624669e5b6a80))
+
 ## [8.4.2](https://github.com/noah-wardlow/mujoco-react/compare/v8.4.1...v8.4.2) (2026-06-05)
 
 
