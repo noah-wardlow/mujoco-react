@@ -109,32 +109,28 @@ import { useEffect, useRef } from "react";
 import { z } from "zod";
 import { useMujoco, useBeforePhysicsStep, useAfterPhysicsStep } from "mujoco-react";
 
-const CtrlCommand = z.object({
+const CtrlCommand = z.preprocess((data) => {
+  try {
+    return typeof data === "string" ? JSON.parse(data) : data;
+  } catch {
+    return undefined;
+  }
+}, z.object({
   type: z.literal("ctrl_command"),
   ctrl: z.array(z.number()),
-});
-
-type CtrlCommand = z.infer<typeof CtrlCommand>;
-
-function parseSocketMessage(data: string): CtrlCommand | null {
-  try {
-    const parsed = CtrlCommand.safeParse(JSON.parse(data));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
-}
+}));
 
 function useWebSocketControls(url: string) {
   const wsRef = useRef<WebSocket | null>(null);
-  const latestCommandRef = useRef<CtrlCommand | null>(null);
+  const latestCtrlRef = useRef<number[] | null>(null);
 
   useEffect(() => {
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
     ws.onmessage = (evt) => {
-      latestCommandRef.current = parseSocketMessage(evt.data);
+      const command = CtrlCommand.safeParse(evt.data);
+      if (command.success) latestCtrlRef.current = command.data.ctrl;
     };
 
     return () => ws.close();
@@ -142,10 +138,10 @@ function useWebSocketControls(url: string) {
 
   // Apply incoming actuator controls each physics step.
   useBeforePhysicsStep((model, data) => {
-    const command = latestCommandRef.current;
-    if (!command) return;
-    for (let i = 0; i < Math.min(command.ctrl.length, model.nu); i++) {
-      data.ctrl[i] = command.ctrl[i];
+    const ctrl = latestCtrlRef.current;
+    if (!ctrl) return;
+    for (let i = 0; i < Math.min(ctrl.length, model.nu); i++) {
+      data.ctrl[i] = ctrl[i];
     }
   });
 
