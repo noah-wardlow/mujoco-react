@@ -1,3 +1,10 @@
+## [8.3.2](https://github.com/noah-wardlow/mujoco-react/compare/v8.3.1...v8.3.2) (2026-06-05)
+
+
+### Bug Fixes
+
+* use npm token for node auth ([02ef269](https://github.com/noah-wardlow/mujoco-react/commit/02ef26913a204802a0d6fe450a7d3e3291e7d8ad))
+
 ## [8.3.1](https://github.com/noah-wardlow/mujoco-react/compare/v8.3.0...v8.3.1) (2026-06-05)
 
 
