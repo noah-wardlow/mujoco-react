@@ -1,0 +1,88 @@
+---
+title: "useObservation"
+description: "Build policy-ready observation vectors from live MuJoCo state"
+icon: "chart-line"
+---
+
+Build flat observation vectors for controllers, telemetry, and RL policies without hard-coding offsets.
+
+## Signature
+
+```tsx
+const obs = useObservation({
+  qpos: true,
+  qvel: true,
+  ctrl: true,
+  sensors: ["imu_gyro", "imu_accel"],
+  sites: ["tcp"],
+  projectedGravity: "torso",
+});
+
+obs.read(): {
+  values: Float32Array | Float64Array;
+  layout: { name: string; start: number; size: number }[];
+}
+```
+
+## Usage
+
+```tsx
+import { useObservation, usePolicy } from "mujoco-react";
+
+function PolicyDriver({ policy }) {
+  const obs = useObservation({
+    qpos: true,
+    qvel: true,
+    sensors: ["imu_gyro", "imu_accel"],
+    projectedGravity: "torso",
+  });
+
+  usePolicy({
+    frequency: 50,
+    onObservation: () => obs.readValues(),
+    onAction: (observation, model, data) => {
+      const action = policy.predict(observation);
+      for (let i = 0; i < Math.min(model.nu, action.length); i++) {
+        data.ctrl[i] = action[i];
+      }
+    },
+  });
+
+  return null;
+}
+```
+
+## Config
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `time` | `boolean` | Include scalar simulation time |
+| `qpos` | `boolean` | Include all joint positions |
+| `qvel` | `boolean` | Include all joint velocities |
+| `ctrl` | `boolean` | Include all actuator controls |
+| `act` | `boolean` | Include all actuator activation values |
+| `sensordata` | `boolean` | Include all raw sensor data |
+| `sensors` | `string[]` | Include named sensor values in order |
+| `sites` | `string[]` | Include named site world positions in order |
+| `projectedGravity` | `string \| string[]` | Include world gravity projected into each named body's local frame |
+| `output` | `"float32" \| "float64"` | Output vector type. Defaults to `Float32Array` |
+
+## `buildObservation`
+
+Use the pure helper when you already have `model` and `data` inside a physics callback:
+
+```tsx
+import { buildObservation, useBeforePhysicsStep } from "mujoco-react";
+
+useBeforePhysicsStep((model, data) => {
+  const obs = buildObservation(model, data, {
+    qpos: true,
+    qvel: true,
+    projectedGravity: "torso",
+  });
+
+  console.log(obs.values, obs.layout);
+});
+```
+
+Missing named resources are skipped. Use the returned `layout` as the source of truth for the vector generated from the current model.

@@ -595,6 +595,51 @@ export interface PolicyConfig {
   onAction: (action: Float32Array | Float64Array | number[], model: MujocoModel, data: MujocoData) => void;
 }
 
+// ---- Observation Builder ----
+
+export type ObservationOutput = 'float32' | 'float64';
+
+export interface ObservationConfig {
+  /** Include scalar simulation time. */
+  time?: boolean;
+  /** Include all qpos values. */
+  qpos?: boolean;
+  /** Include all qvel values. */
+  qvel?: boolean;
+  /** Include all ctrl values. */
+  ctrl?: boolean;
+  /** Include all actuator activation values. */
+  act?: boolean;
+  /** Include all raw sensordata values. */
+  sensordata?: boolean;
+  /** Include named sensor values in the configured order. */
+  sensors?: readonly Sensors[];
+  /** Include named site world positions in the configured order. */
+  sites?: readonly Sites[];
+  /** Include world gravity projected into each named body's local frame. */
+  projectedGravity?: Bodies | readonly Bodies[];
+  /** Output array type. Defaults to Float32Array. */
+  output?: ObservationOutput;
+}
+
+export interface ObservationLayoutItem {
+  name: string;
+  start: number;
+  size: number;
+}
+
+export interface ObservationResult {
+  values: Float32Array | Float64Array;
+  layout: ObservationLayoutItem[];
+}
+
+export interface ObservationHandle {
+  /** Read a fresh observation from the current live MuJoCo model/data refs. */
+  read(): ObservationResult;
+  /** Read just the vector values for policy inference. */
+  readValues(): Float32Array | Float64Array;
+}
+
 // ---- Debug Component (spec 6.1) ----
 
 export interface DebugProps {

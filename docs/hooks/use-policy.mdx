@@ -11,8 +11,8 @@ Run a policy inference loop at a fixed frequency (decimation), independent of th
 ```tsx
 usePolicy(config: {
   frequency: number;
-  onObservation: (model: MujocoModel, data: MujocoData) => Float32Array;
-  onAction: (obs: Float32Array, model: MujocoModel, data: MujocoData) => void;
+  onObservation: (model: MujocoModel, data: MujocoData) => Float32Array | Float64Array | number[];
+  onAction: (obs: Float32Array | Float64Array | number[], model: MujocoModel, data: MujocoData) => void;
 }): {
   start: () => void;
   stop: () => void;
@@ -24,18 +24,18 @@ usePolicy(config: {
 ## Usage
 
 ```tsx
-import { usePolicy } from "mujoco-react";
+import { buildObservation, usePolicy } from "mujoco-react";
 
 function PolicyRunner({ model: nnModel }) {
   const policy = usePolicy({
     frequency: 50, // 50 Hz policy rate
 
     onObservation: (model, data) => {
-      // Build observation vector
-      const obs = new Float32Array(model.nq + model.nv);
-      for (let i = 0; i < model.nq; i++) obs[i] = data.qpos[i];
-      for (let i = 0; i < model.nv; i++) obs[model.nq + i] = data.qvel[i];
-      return obs;
+      return buildObservation(model, data, {
+        qpos: true,
+        qvel: true,
+        projectedGravity: "torso",
+      }).values;
     },
 
     onAction: (obs, model, data) => {
@@ -61,7 +61,7 @@ function PolicyRunner({ model: nnModel }) {
 | Field | Type | Description |
 |-------|------|-------------|
 | `frequency` | `number` | Policy inference rate in Hz |
-| `onObservation` | `(model, data) => Float32Array` | Build observation vector from simulation state |
+| `onObservation` | `(model, data) => Float32Array \| Float64Array \| number[]` | Build observation vector from simulation state |
 | `onAction` | `(obs, model, data) => void` | Run inference, write actions to `data.ctrl` |
 
 ## Return Value
@@ -71,7 +71,7 @@ function PolicyRunner({ model: nnModel }) {
 | `start` | `() => void` | Start the policy loop |
 | `stop` | `() => void` | Stop the policy loop |
 | `isRunning` | `boolean` | Whether the policy is currently active |
-| `lastObservation` | `Float32Array \| null` | Most recent observation vector |
+| `lastObservation` | `Float32Array \| Float64Array \| number[] \| null` | Most recent observation vector |
 
 ## How It Works
 
@@ -96,9 +96,10 @@ function TFPolicy() {
   const policy = usePolicy({
     frequency: 50,
     onObservation: (model, data) => {
-      const obs = new Float32Array(48);
-      // ... fill observation
-      return obs;
+      return buildObservation(model, data, {
+        qpos: true,
+        qvel: true,
+      }).values;
     },
     onAction: (obs, model, data) => {
       if (!modelRef.current) return;

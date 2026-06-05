@@ -100,6 +100,58 @@ function ResetButton() {
 }
 ```
 
+## Map Controls to Joints
+
+Use control groups when a robot's actuator order does not match a simple `qpos[0..n]` layout:
+
+```tsx
+import { useRef } from "react";
+import { resolveControlGroup, useBeforePhysicsStep } from "mujoco-react";
+import type { ControlGroupInfo } from "mujoco-react";
+
+function HoldTcpPose() {
+  const armRef = useRef<ControlGroupInfo | null>(null);
+
+  useBeforePhysicsStep((model, data) => {
+    armRef.current ??= resolveControlGroup(model, { siteName: "tcp" });
+    if (!armRef.current) return;
+
+    armRef.current.writeCtrl(data, armRef.current.readQpos(data));
+  });
+
+  return null;
+}
+```
+
+`resolveControlGroup()` accepts `{ siteName }`, `{ bodyName }`, `{ joints }`, or `{ actuators }`. Selectors can be a name, ordered name array, regex, or predicate.
+
+## Build Observations
+
+Build policy-ready observation vectors from common MuJoCo state without hard-coding offsets:
+
+```tsx
+import { buildObservation, useBeforePhysicsStep } from "mujoco-react";
+
+function PolicyDriver() {
+  useBeforePhysicsStep((model, data) => {
+    const obs = buildObservation(model, data, {
+      qpos: true,
+      qvel: true,
+      ctrl: true,
+      sensors: ["imu_gyro", "imu_accel"],
+      sites: ["tcp"],
+      projectedGravity: "torso",
+    });
+
+    runPolicy(obs.values, obs.layout);
+  });
+
+  return null;
+}
+```
+
+Use `output: "float64"` when a downstream model expects double precision. Named resources are skipped when absent, so `obs.layout` is the source of truth for the current model.
+
 ## WebSocket Control
 
 Stream actuator commands over a WebSocket and send simulation state back. Use a schema validator such as Zod at this boundary because socket messages are untrusted app input (`npm install zod` for this example):
@@ -655,12 +707,18 @@ useGamepad({
 Framework-agnostic decimation loop for RL policies:
 
 ```tsx
-const { step, isRunning } = usePolicy({
+const obs = useObservation({ qpos: true, qvel: true, projectedGravity: "torso" });
+
+const policy = usePolicy({
   frequency: 50,
-  onObservation: (model, data) => buildObs(model, data),
+  onObservation: () => obs.readValues(),
   onAction: (action, model, data) => applyAction(action, data),
 });
 ```
+
+### `buildObservation(model, data, config)` / `useObservation(config)`
+
+Build a flat `Float32Array` or `Float64Array` plus a layout map from qpos, qvel, ctrl, actuator activations, sensordata, named sensors, named site positions, and projected gravity.
 
 ### `useTrajectoryRecorder(config)` / `useTrajectoryPlayer(trajectory, config)`
 
@@ -766,7 +824,11 @@ The full API object available via `ref` or `useMujoco()` (when `isReady`):
 | `setQpos(values)` / `getQpos()` | Direct qpos access |
 | `setQvel(values)` / `getQvel()` | Direct qvel access |
 | `setCtrl(nameOrValues, value?)` | Set control by name or batch |
-| `getCtrl(name?)` | Get control values |
+| `getCtrl()` | Get all control values |
+| `getControlMap()` | Map directly actuated scalar joints to qpos/dof/ctrl addresses |
+| `getActuatedJoints()` | List scalar hinge/slide joints with matching actuators |
+| `resolveControlGroup(selector)` | Resolve qpos/ctrl mapping from a site, body, joint selector, or actuator selector |
+| `buildObservation(model, data, config)` | Build policy-ready observation vectors with layout metadata |
 | `applyKeyframe(nameOrIndex)` | Apply a keyframe |
 | `getKeyframeNames()` / `getKeyframeCount()` | Keyframe introspection |
 
@@ -857,7 +919,6 @@ Features planned but not yet implemented:
 | **User-uploaded model loading** | P2 | `loadFromFiles(FileList)` -- detect meshdir, write to VFS |
 | **URDF loading** | P2 | Load URDF models via MuJoCo's built-in URDF compiler |
 | **XML mutation / recompile** | P1 | `addBody()`, `removeBody()`, `recompile()` for runtime XML editing |
-| **Observation builder utilities** | P2 | Helpers for projected gravity, joint positions/velocities for RL |
 | **Physics interpolation** | P1 | Smooth rendering between physics ticks for very high refresh displays |
 | **Instanced geom rendering** | P2 | `<InstancedGeomRenderer />` for particle/granular sims |
 | **Web Worker physics** | P2 | Run `mj_step` off main thread via SharedArrayBuffer |

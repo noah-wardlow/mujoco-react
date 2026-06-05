@@ -26,6 +26,7 @@ export {
   resolveControlGroup,
   createContiguousControlGroup,
 } from './core/SceneLoader';
+export { buildObservation } from './core/ObservationBuilder';
 
 // Controller factory
 export { createController, createControllerHook } from './core/createController';
@@ -57,6 +58,7 @@ export { useCtrl } from './hooks/useCtrl';
 export { useContacts, useContactEvents } from './hooks/useContacts';
 export { useKeyboardTeleop } from './hooks/useKeyboardTeleop';
 export { usePolicy } from './hooks/usePolicy';
+export { useObservation } from './hooks/useObservation';
 export { useTrajectoryPlayer } from './hooks/useTrajectoryPlayer';
 export { useTrajectoryRecorder } from './hooks/useTrajectoryRecorder';
 export { useGamepad } from './hooks/useGamepad';
@@ -112,6 +114,12 @@ export type {
   KeyboardTeleopConfig,
   // Policy
   PolicyConfig,
+  // Observations
+  ObservationConfig,
+  ObservationHandle,
+  ObservationLayoutItem,
+  ObservationOutput,
+  ObservationResult,
   // Component props
   BodyProps,
   IkGizmoProps,

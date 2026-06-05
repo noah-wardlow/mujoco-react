@@ -78,6 +78,7 @@
           "hooks/use-gamepad",
           "hooks/use-actuators",
           "hooks/use-policy",
+          "hooks/use-observation",
           "hooks/use-trajectory-recorder",
           "hooks/use-trajectory-player",
           "hooks/use-video-recorder",
