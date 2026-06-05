@@ -22,8 +22,8 @@ icon: "map"
   <Card title="Offscreen rendering" icon="camera">
     Headless canvas rendering for automated data collection, CI testing, and server-side image generation.
   </Card>
-  <Card title="URDF import" icon="file-import">
-    Load robots from URDF files (with automatic MJCF conversion) for ROS ecosystem compatibility.
+  <Card title="URDF examples" icon="file-import">
+    Expand tested URDF examples and compatibility notes now that local file loading uses MuJoCo's compiler path.
   </Card>
   <Card title="Multiplayer sync" icon="users">
     WebSocket-based state synchronization for collaborative simulation viewing and multi-operator teleoperation.
@@ -47,7 +47,7 @@ These are limitations of the underlying `@mujoco/mujoco` WASM bindings, not mujo
 
 - **WASM memory**: Large models (100+ bodies) may approach browser WASM memory limits
 - **Contact reads**: Accessing `data.contact` with high `ncon` can cause OOM — always check `data.ncon` first
-- **Single thread**: Physics runs on the main thread (Web Worker support planned)
+- **Single thread**: Physics runs on the main thread. Web Worker support is planned.
 - **No GPU compute**: MuJoCo's GPU pipeline is not available in WASM
 
 ### Architecture Notes

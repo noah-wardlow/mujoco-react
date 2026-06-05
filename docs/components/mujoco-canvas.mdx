@@ -85,6 +85,10 @@ function App() {
   Number of physics substeps per frame for improved stability.
 </ParamField>
 
+<ParamField body="interpolate" type="boolean" default="false">
+  Smooth rendered body poses between fixed physics steps. Useful for high-refresh displays.
+</ParamField>
+
 ### R3F Canvas Props
 
 All standard `@react-three/fiber` Canvas props are passed through:

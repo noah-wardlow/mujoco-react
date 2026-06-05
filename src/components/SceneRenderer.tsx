@@ -17,7 +17,16 @@ import { useMujocoContext } from '../core/MujocoSimProvider';
  * Accepts standard R3F group props (position, rotation, scale, visible, etc.).
  */
 export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
-  const { mjModelRef, mjDataRef, mujocoRef, onSelectionRef, hiddenBodiesRef, status } = useMujocoContext();
+  const {
+    mjModelRef,
+    mjDataRef,
+    mujocoRef,
+    onSelectionRef,
+    hiddenBodiesRef,
+    interpolateRef,
+    interpolationStateRef,
+    status,
+  } = useMujocoContext();
   const groupRef = useRef<THREE.Group>(null);
   const bodyRefs = useRef<(THREE.Group | null)[]>([]);
   const prevModelRef = useRef<MujocoModel | null>(null);
@@ -70,20 +79,47 @@ export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
     const data = mjDataRef.current;
     if (!data) return;
     const bodies = bodyRefs.current;
+    const interpolation = interpolationStateRef.current;
+    const useInterpolation = interpolateRef.current && interpolation.valid;
+
     for (let i = 0; i < bodies.length; i++) {
       const ref = bodies[i];
       if (!ref) continue;
-      ref.position.set(
-        data.xpos[i * 3],
-        data.xpos[i * 3 + 1],
-        data.xpos[i * 3 + 2]
-      );
-      ref.quaternion.set(
-        data.xquat[i * 4 + 1],
-        data.xquat[i * 4 + 2],
-        data.xquat[i * 4 + 3],
-        data.xquat[i * 4]
-      );
+      if (useInterpolation) {
+        const alpha = interpolation.alpha;
+        const i3 = i * 3;
+        ref.position.set(
+          THREE.MathUtils.lerp(interpolation.previousXpos[i3], interpolation.currentXpos[i3], alpha),
+          THREE.MathUtils.lerp(interpolation.previousXpos[i3 + 1], interpolation.currentXpos[i3 + 1], alpha),
+          THREE.MathUtils.lerp(interpolation.previousXpos[i3 + 2], interpolation.currentXpos[i3 + 2], alpha)
+        );
+        const i4 = i * 4;
+        _previousQuat.set(
+          interpolation.previousXquat[i4 + 1],
+          interpolation.previousXquat[i4 + 2],
+          interpolation.previousXquat[i4 + 3],
+          interpolation.previousXquat[i4]
+        );
+        _currentQuat.set(
+          interpolation.currentXquat[i4 + 1],
+          interpolation.currentXquat[i4 + 2],
+          interpolation.currentXquat[i4 + 3],
+          interpolation.currentXquat[i4]
+        );
+        ref.quaternion.copy(_previousQuat).slerp(_currentQuat, alpha);
+      } else {
+        ref.position.set(
+          data.xpos[i * 3],
+          data.xpos[i * 3 + 1],
+          data.xpos[i * 3 + 2]
+        );
+        ref.quaternion.set(
+          data.xquat[i * 4 + 1],
+          data.xquat[i * 4 + 2],
+          data.xquat[i * 4 + 3],
+          data.xquat[i * 4]
+        );
+      }
     }
   });
 
@@ -110,3 +146,6 @@ export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
     />
   );
 }
+
+const _previousQuat = new THREE.Quaternion();
+const _currentQuat = new THREE.Quaternion();

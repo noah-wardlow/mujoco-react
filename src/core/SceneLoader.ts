@@ -10,6 +10,8 @@ import type {
   ControlGroupSelector,
   ControlJointInfo,
   JointInfo,
+  LoadFromFilesOptions,
+  LocalMujocoFile,
   MujocoData,
   MujocoModel,
   MujocoModule,
@@ -505,6 +507,170 @@ function loadModelFromPath(mujoco: MujocoModule, path: string): MujocoModel {
   throw new Error('MuJoCo WASM module does not expose an XML path loader');
 }
 
+function isModelTextFile(fname: string): boolean {
+  const lower = fname.toLowerCase();
+  return lower.endsWith('.xml') || lower.endsWith('.urdf') || lower.endsWith('.mjcf');
+}
+
+function normalizeVfsPath(path: string): string {
+  const parts = path.replace(/\\/g, '/').split('/');
+  const norm: string[] = [];
+  for (const part of parts) {
+    if (!part || part === '.') continue;
+    if (part === '..') norm.pop();
+    else norm.push(part);
+  }
+  return norm.join('/');
+}
+
+function localFilePath(file: LocalMujocoFile): string {
+  return normalizeVfsPath(file.webkitRelativePath || file.name);
+}
+
+function inferSceneFile(files: readonly LocalMujocoFile[], options?: LoadFromFilesOptions): string {
+  if (options?.sceneFile) return normalizeVfsPath(options.sceneFile);
+
+  const paths = files.map(localFilePath);
+  const preferred = ['scene.xml', 'model.xml', 'robot.xml', 'scene.urdf', 'model.urdf', 'robot.urdf'];
+  for (const name of preferred) {
+    const match = paths.find((path) => path.endsWith(name));
+    if (match) return match;
+  }
+
+  const firstModel = paths.find(isModelTextFile);
+  if (!firstModel) throw new Error('No MJCF XML or URDF file found in FileList');
+  return firstModel;
+}
+
+export function createSceneConfigFromFiles(
+  files: FileList | readonly LocalMujocoFile[],
+  options: LoadFromFilesOptions = {}
+): SceneConfig {
+  const fileArray = Array.from(files) as LocalMujocoFile[];
+  return {
+    src: '',
+    sceneFile: inferSceneFile(fileArray, options),
+    files: fileArray,
+    homeJoints: options.homeJoints,
+    xmlPatches: options.xmlPatches,
+    sceneObjects: options.sceneObjects,
+    onReset: options.onReset,
+  };
+}
+
+function applyXmlPatches(text: string, fname: string, config: SceneConfig): string {
+  let result = text;
+  for (const patch of config.xmlPatches ?? []) {
+    if (fname.endsWith(patch.target) || fname === patch.target) {
+      if (patch.replace) {
+        const [from, to] = patch.replace;
+        if (result.includes(from)) {
+          result = result.replace(from, to);
+        } else {
+          const preview = from.length > 80 ? `${from.slice(0, 80)}...` : from;
+          console.warn(`XML patch replace pattern not found in ${fname}: "${preview}"`);
+        }
+      }
+      if (patch.inject && patch.injectAfter) {
+        const idx = result.indexOf(patch.injectAfter);
+        if (idx !== -1) {
+          const tagEnd = result.indexOf('>', idx + patch.injectAfter.length);
+          if (tagEnd !== -1) {
+            result = result.slice(0, tagEnd + 1) + patch.inject + result.slice(tagEnd + 1);
+          } else {
+            console.warn(`XML patch inject failed in ${fname}: could not find tag end after "${patch.injectAfter}"`);
+          }
+        } else {
+          const preview = patch.injectAfter.length > 80
+            ? `${patch.injectAfter.slice(0, 80)}...`
+            : patch.injectAfter;
+          console.warn(`XML patch inject anchor not found in ${fname}: "${preview}"`);
+        }
+      }
+    }
+  }
+
+  if (fname === config.sceneFile && config.sceneObjects?.length && result.includes('</worldbody>')) {
+    const xml = config.sceneObjects.map((obj) => sceneObjectToXml(obj)).join('');
+    result = result.replace('</worldbody>', xml + '</worldbody>');
+  }
+
+  return result;
+}
+
+async function loadSceneFromFiles(
+  mujoco: MujocoModule,
+  config: SceneConfig,
+  onProgress?: (msg: string) => void
+): Promise<LoadResult> {
+  const files = config.files ?? [];
+  if (!files.length) throw new Error('loadFromFiles requires at least one File');
+
+  try { mujoco.FS.unmount('/working'); } catch { /* ignore */ }
+  try { mujoco.FS.mkdir('/working'); } catch { /* ignore */ }
+
+  const parser = new DOMParser();
+  const byPath = new Map<string, LocalMujocoFile>();
+  const byBasename = new Map<string, LocalMujocoFile>();
+  const written = new Set<string>();
+  const textByPath = new Map<string, string>();
+
+  for (const file of files) {
+    const path = localFilePath(file);
+    byPath.set(path, file);
+    byBasename.set(path.split('/').pop() ?? path, file);
+  }
+
+  for (const [path, file] of byPath) {
+    onProgress?.(`Reading ${path}...`);
+    ensureDir(mujoco, path);
+    if (isModelTextFile(path)) {
+      const text = applyXmlPatches(await file.text(), path, config);
+      textByPath.set(path, text);
+      mujoco.FS.writeFile(`/working/${path}`, text);
+    } else {
+      mujoco.FS.writeFile(`/working/${path}`, new Uint8Array(await file.arrayBuffer()));
+    }
+    written.add(path);
+  }
+
+  for (const [path, text] of textByPath) {
+    const deps = collectDependencyPaths(text, path, parser);
+    for (const dep of deps) {
+      if (written.has(dep)) continue;
+      const file = byPath.get(dep) ?? byBasename.get(dep.split('/').pop() ?? dep);
+      if (!file) continue;
+      ensureDir(mujoco, dep);
+      if (isModelTextFile(dep)) {
+        mujoco.FS.writeFile(`/working/${dep}`, applyXmlPatches(await file.text(), dep, config));
+      } else {
+        mujoco.FS.writeFile(`/working/${dep}`, new Uint8Array(await file.arrayBuffer()));
+      }
+      written.add(dep);
+    }
+  }
+
+  onProgress?.('Loading model...');
+  const mjModel = loadModelFromPath(mujoco, `/working/${config.sceneFile}`);
+  const mjData = new mujoco.MjData(mjModel);
+  applyInitialPose(mjModel, mjData, config);
+  mujoco.mj_forward(mjModel, mjData);
+
+  return { mjModel, mjData };
+}
+
+function applyInitialPose(mjModel: MujocoModel, mjData: MujocoData, config: SceneConfig) {
+  if (!config.homeJoints) return;
+  const homeCount = Math.min(config.homeJoints.length, Math.max(mjModel.nu, mjModel.nq));
+  for (let i = 0; i < homeCount; i++) {
+    if (i < mjModel.nu) mjData.ctrl[i] = config.homeJoints[i];
+    if (i < mjModel.nq) {
+      const qposAdr = i < mjModel.nu ? getActuatedScalarQposAdr(mjModel, i) : -1;
+      mjData.qpos[qposAdr !== -1 ? qposAdr : i] = config.homeJoints[i];
+    }
+  }
+}
+
 /**
  * Config-driven scene loader — replaces the old RobotLoader + patchSingleRobot approach.
  */
@@ -513,6 +679,10 @@ export async function loadScene(
   config: SceneConfig,
   onProgress?: (msg: string) => void
 ): Promise<LoadResult> {
+  if (config.files?.length) {
+    return loadSceneFromFiles(mujoco, config, onProgress);
+  }
+
   // 1. Clean up virtual filesystem
   try { mujoco.FS.unmount('/working'); } catch { /* ignore */ }
   try { mujoco.FS.mkdir('/working'); } catch { /* ignore */ }
@@ -530,7 +700,7 @@ export async function loadScene(
     if (downloaded.has(fname)) continue;
     downloaded.add(fname);
 
-    if (!fname.endsWith('.xml')) {
+    if (!isModelTextFile(fname)) {
       // Non-XML discovered during XML scan — collect for parallel download
       assetFiles.push(fname);
       continue;
@@ -544,44 +714,7 @@ export async function loadScene(
       continue;
     }
 
-    let text = await res.text();
-
-    // 3. Apply XML patches from config
-    for (const patch of config.xmlPatches ?? []) {
-      if (fname.endsWith(patch.target) || fname === patch.target) {
-        if (patch.replace) {
-          const [from, to] = patch.replace;
-          if (text.includes(from)) {
-            text = text.replace(from, to);
-          } else {
-            const preview = from.length > 80 ? `${from.slice(0, 80)}...` : from;
-            console.warn(`XML patch replace pattern not found in ${fname}: "${preview}"`);
-          }
-        }
-        if (patch.inject && patch.injectAfter) {
-          const idx = text.indexOf(patch.injectAfter);
-          if (idx !== -1) {
-            const tagEnd = text.indexOf('>', idx + patch.injectAfter.length);
-            if (tagEnd !== -1) {
-              text = text.slice(0, tagEnd + 1) + patch.inject + text.slice(tagEnd + 1);
-            } else {
-              console.warn(`XML patch inject failed in ${fname}: could not find tag end after "${patch.injectAfter}"`);
-            }
-          } else {
-            const preview = patch.injectAfter.length > 80
-              ? `${patch.injectAfter.slice(0, 80)}...`
-              : patch.injectAfter;
-            console.warn(`XML patch inject anchor not found in ${fname}: "${preview}"`);
-          }
-        }
-      }
-    }
-
-    // 4. Inject scene objects into the scene file
-    if (fname === config.sceneFile && config.sceneObjects?.length) {
-      const xml = config.sceneObjects.map((obj) => sceneObjectToXml(obj)).join('');
-      text = text.replace('</worldbody>', xml + '</worldbody>');
-    }
+    const text = applyXmlPatches(await res.text(), fname, config);
 
     ensureDir(mujoco, fname);
     mujoco.FS.writeFile(`/working/${fname}`, text);
@@ -617,16 +750,7 @@ export async function loadScene(
 
   // 6. Set initial pose — set both ctrl and qpos so robot starts at home.
   //    If homeJoints is not provided, keep raw MuJoCo defaults.
-  if (config.homeJoints) {
-    const homeCount = Math.min(config.homeJoints.length, mjModel.nu);
-    for (let i = 0; i < homeCount; i++) {
-      mjData.ctrl[i] = config.homeJoints[i];
-      const qposAdr = getActuatedScalarQposAdr(mjModel, i);
-      if (qposAdr !== -1) {
-        mjData.qpos[qposAdr] = config.homeJoints[i];
-      }
-    }
-  }
+  applyInitialPose(mjModel, mjData, config);
 
   mujoco.mj_forward(mjModel, mjData);
 
@@ -643,6 +767,16 @@ function scanDependencies(
   downloaded: Set<string>,
   queue: string[]
 ) {
+  for (const fullPath of collectDependencyPaths(xmlString, currentFile, parser)) {
+    if (!downloaded.has(fullPath)) queue.push(fullPath);
+  }
+}
+
+function collectDependencyPaths(
+  xmlString: string,
+  currentFile: string,
+  parser: DOMParser
+): string[] {
   const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
 
   const compiler = xmlDoc.querySelector('compiler');
@@ -653,9 +787,11 @@ function scanDependencies(
     ? currentFile.substring(0, currentFile.lastIndexOf('/') + 1)
     : '';
 
-  xmlDoc.querySelectorAll('[file]').forEach((el) => {
-    const fileAttr = el.getAttribute('file');
+  const paths: string[] = [];
+  xmlDoc.querySelectorAll('[file], [filename]').forEach((el) => {
+    const fileAttr = el.getAttribute('file') ?? el.getAttribute('filename');
     if (!fileAttr) return;
+    if (/^[a-z]+:\/\//i.test(fileAttr) || fileAttr.startsWith('package://')) return;
 
     let prefix = '';
     if (el.tagName.toLowerCase() === 'mesh') {
@@ -664,15 +800,9 @@ function scanDependencies(
       prefix = textureDir ? textureDir + '/' : '';
     }
 
-    let fullPath = (currentDir + prefix + fileAttr).replace(/\/\//g, '/');
-    const parts = fullPath.split('/');
-    const norm: string[] = [];
-    for (const p of parts) {
-      if (p === '..') norm.pop();
-      else if (p !== '.') norm.push(p);
-    }
-    fullPath = norm.join('/');
+    const fullPath = normalizeVfsPath(currentDir + prefix + fileAttr);
 
-    if (!downloaded.has(fullPath)) queue.push(fullPath);
+    paths.push(fullPath);
   });
+  return paths;
 }

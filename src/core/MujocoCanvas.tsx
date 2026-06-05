@@ -30,6 +30,7 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
       substeps,
       paused,
       speed,
+      interpolate,
       children,
       ...canvasProps
     },
@@ -62,6 +63,7 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
           substeps={substeps}
           paused={paused}
           speed={speed}
+          interpolate={interpolate}
         >
           {children}
         </MujocoSimProvider>

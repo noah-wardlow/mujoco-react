@@ -13,9 +13,20 @@
         "default": "./dist/index.js"
       }
     },
+    "./vite": {
+      "import": {
+        "types": "./dist/vite.d.ts",
+        "default": "./dist/vite.js"
+      }
+    },
     "./package.json": "./package.json"
   },
+  "bin": {
+    "mujoco-react": "./bin/mujoco-react.mjs",
+    "mujoco-react-codegen": "./bin/mujoco-react-codegen.mjs"
+  },
   "files": [
+    "bin",
     "dist",
     "src"
   ],
@@ -55,6 +66,7 @@
     "@react-three/fiber": "^9.5.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
+    "@types/node": "^25.9.1",
     "@types/react": "^19.0.0",
     "@types/three": "^0.181.0",
     "react": "^19.2.0",

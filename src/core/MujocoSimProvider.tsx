@@ -25,6 +25,8 @@ import {
   ContactInfo,
   GeomInfo,
   JointInfo,
+  LoadFromFilesOptions,
+  LocalMujocoFile,
   ModelOptions,
   MujocoSimAPI,
   PhysicsStepCallback,
@@ -34,9 +36,11 @@ import {
   SensorInfo,
   SiteInfo,
   StateSnapshot,
+  XmlPatch,
 } from '../types';
 import {
   loadScene,
+  createSceneConfigFromFiles,
   findKeyframeByName,
   findBodyByName,
   findGeomByName,
@@ -110,6 +114,8 @@ export interface MujocoSimContextValue {
   pausedRef: React.RefObject<boolean>;
   speedRef: React.RefObject<number>;
   substepsRef: React.RefObject<number>;
+  interpolateRef: React.RefObject<boolean>;
+  interpolationStateRef: React.RefObject<BodyInterpolationState>;
   onSelectionRef: React.RefObject<
     ((bodyId: number, name: string) => void) | undefined
   >;
@@ -121,6 +127,15 @@ export interface MujocoSimContextValue {
   hiddenBodiesRef: React.RefObject<Set<string>>;
   requestBodyReload: () => void;
   status: 'loading' | 'ready' | 'error';
+}
+
+export interface BodyInterpolationState {
+  alpha: number;
+  previousXpos: Float64Array;
+  previousXquat: Float64Array;
+  currentXpos: Float64Array;
+  currentXquat: Float64Array;
+  valid: boolean;
 }
 
 const MujocoSimContext = createContext<MujocoSimContextValue | null>(null);
@@ -214,6 +229,7 @@ interface MujocoSimProviderProps {
   substeps?: number;
   paused?: boolean;
   speed?: number;
+  interpolate?: boolean;
   children: React.ReactNode;
 }
 
@@ -230,6 +246,7 @@ export function MujocoSimProvider({
   substeps,
   paused,
   speed,
+  interpolate,
   children,
 }: MujocoSimProviderProps) {
   const { gl, camera } = useThree();
@@ -243,6 +260,16 @@ export function MujocoSimProvider({
   const pausedRef = useRef(paused ?? false);
   const speedRef = useRef(speed ?? 1);
   const substepsRef = useRef(substeps ?? 1);
+  const interpolateRef = useRef(interpolate ?? false);
+  const interpolationStateRef = useRef<BodyInterpolationState>({
+    alpha: 1,
+    previousXpos: new Float64Array(0),
+    previousXquat: new Float64Array(0),
+    currentXpos: new Float64Array(0),
+    currentXquat: new Float64Array(0),
+    valid: false,
+  });
+  const physicsAccumulatorRef = useRef(0);
   const stepsToRunRef = useRef(0);
   const loadGenRef = useRef(0);
 
@@ -259,12 +286,13 @@ export function MujocoSimProvider({
   const hiddenBodiesRef = useRef(new Set<string>());
   const bodyReloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  configRef.current = config;
+  useEffect(() => { configRef.current = config; }, [config]);
 
   // Sync declarative props to refs
   useEffect(() => { pausedRef.current = paused ?? false; }, [paused]);
   useEffect(() => { speedRef.current = speed ?? 1; }, [speed]);
   useEffect(() => { substepsRef.current = substeps ?? 1; }, [substeps]);
+  useEffect(() => { interpolateRef.current = interpolate ?? false; }, [interpolate]);
 
   // Sync gravity prop
   useEffect(() => {
@@ -312,6 +340,8 @@ export function MujocoSimProvider({
 
         mjModelRef.current = result.mjModel;
         mjDataRef.current = result.mjData;
+        physicsAccumulatorRef.current = 0;
+        interpolationStateRef.current.valid = false;
 
         // Apply declarative physics props after load
         if (gravity && result.mjModel.opt?.gravity) {
@@ -340,6 +370,8 @@ export function MujocoSimProvider({
       mjDataRef.current?.delete();
       mjModelRef.current = null;
       mjDataRef.current = null;
+      physicsAccumulatorRef.current = 0;
+      interpolationStateRef.current.valid = false;
       try { mujoco.FS.unmount('/working'); } catch { /* ignore */ }
     };
   }, [mujoco, config]);
@@ -380,21 +412,62 @@ export function MujocoSimProvider({
       cb(model, data);
     }
 
-    // Step physics with substeps
     const numSubsteps = substepsRef.current;
-    if (stepsToRunRef.current > 0) {
+    if (!interpolateRef.current) {
+      // Step physics with substeps
+      if (stepsToRunRef.current > 0) {
+        for (let s = 0; s < stepsToRunRef.current; s++) {
+          mujoco.mj_step(model, data);
+        }
+        stepsToRunRef.current = 0;
+      } else {
+        const startSimTime = data.time;
+        const clampedDelta = Math.min(delta, 1 / 15); // cap to avoid spiral of death
+        const frameTime = clampedDelta * speedRef.current;
+        while (data.time - startSimTime < frameTime) {
+          for (let s = 0; s < numSubsteps; s++) {
+            mujoco.mj_step(model, data);
+          }
+        }
+      }
+    } else if (stepsToRunRef.current > 0) {
+      ensureInterpolationBuffers(model);
+      copyBodyPose(data, interpolationStateRef.current.previousXpos, interpolationStateRef.current.previousXquat);
       for (let s = 0; s < stepsToRunRef.current; s++) {
         mujoco.mj_step(model, data);
       }
+      copyBodyPose(data, interpolationStateRef.current.currentXpos, interpolationStateRef.current.currentXquat);
+      interpolationStateRef.current.alpha = 1;
+      interpolationStateRef.current.valid = true;
       stepsToRunRef.current = 0;
     } else {
-      const startSimTime = data.time;
+      ensureInterpolationBuffers(model);
       const clampedDelta = Math.min(delta, 1 / 15); // cap to avoid spiral of death
-      const frameTime = clampedDelta * speedRef.current;
-      while (data.time - startSimTime < frameTime) {
+      physicsAccumulatorRef.current += clampedDelta * speedRef.current;
+      const stepDt = Math.max((model.opt?.timestep ?? 0.002) * Math.max(1, numSubsteps), 1e-6);
+      let stepped = false;
+
+      while (physicsAccumulatorRef.current >= stepDt) {
+        copyBodyPose(data, interpolationStateRef.current.previousXpos, interpolationStateRef.current.previousXquat);
         for (let s = 0; s < numSubsteps; s++) {
           mujoco.mj_step(model, data);
         }
+        copyBodyPose(data, interpolationStateRef.current.currentXpos, interpolationStateRef.current.currentXquat);
+        physicsAccumulatorRef.current -= stepDt;
+        stepped = true;
+      }
+
+      if (!interpolationStateRef.current.valid) {
+        copyBodyPose(data, interpolationStateRef.current.previousXpos, interpolationStateRef.current.previousXquat);
+        copyBodyPose(data, interpolationStateRef.current.currentXpos, interpolationStateRef.current.currentXquat);
+      }
+
+      interpolationStateRef.current.alpha = Math.min(Math.max(physicsAccumulatorRef.current / stepDt, 0), 1);
+      interpolationStateRef.current.valid = true;
+
+      if (!stepped) {
+        onStepRef.current?.(data.time);
+        return;
       }
     }
 
@@ -405,6 +478,21 @@ export function MujocoSimProvider({
 
     onStepRef.current?.(data.time);
   }, -1);
+
+  function ensureInterpolationBuffers(model: MujocoModel) {
+    const state = interpolationStateRef.current;
+    const xposLength = model.nbody * 3;
+    const xquatLength = model.nbody * 4;
+    if (state.previousXpos.length !== xposLength) state.previousXpos = new Float64Array(xposLength);
+    if (state.currentXpos.length !== xposLength) state.currentXpos = new Float64Array(xposLength);
+    if (state.previousXquat.length !== xquatLength) state.previousXquat = new Float64Array(xquatLength);
+    if (state.currentXquat.length !== xquatLength) state.currentXquat = new Float64Array(xquatLength);
+  }
+
+  function copyBodyPose(data: MujocoData, xpos: Float64Array, xquat: Float64Array) {
+    xpos.set(data.xpos.subarray(0, xpos.length));
+    xquat.set(data.xquat.subarray(0, xquat.length));
+  }
 
   // --- API Methods ---
 
@@ -849,7 +937,7 @@ export function MujocoSimProvider({
       mjDataRef.current = null;
       setStatus('loading');
 
-      const result = await loadScene(mujoco, newConfig);
+      const result = await loadScene(mujoco, buildMergedConfig(newConfig));
 
       if (gen !== loadGenRef.current) {
         result.mjModel.delete();
@@ -859,6 +947,8 @@ export function MujocoSimProvider({
 
       mjModelRef.current = result.mjModel;
       mjDataRef.current = result.mjData;
+      physicsAccumulatorRef.current = 0;
+      interpolationStateRef.current.valid = false;
       configRef.current = newConfig;
 
       setStatus('ready');
@@ -874,8 +964,39 @@ export function MujocoSimProvider({
     if (bodyReloadTimerRef.current) clearTimeout(bodyReloadTimerRef.current);
     bodyReloadTimerRef.current = setTimeout(() => {
       bodyReloadTimerRef.current = null;
-      loadSceneApi(buildMergedConfig(configRef.current));
+      loadSceneApi(configRef.current);
     }, 0);
+  }, [loadSceneApi]);
+
+  const loadFromFilesApi = useCallback(
+    async (files: FileList | readonly LocalMujocoFile[], options?: LoadFromFilesOptions): Promise<void> => {
+      await loadSceneApi(createSceneConfigFromFiles(files, options));
+    },
+    [loadSceneApi]
+  );
+
+  const addBodyApi = useCallback(async (body: SceneObject): Promise<void> => {
+    const current = configRef.current;
+    const sceneObjects = [
+      ...(current.sceneObjects ?? []).filter((obj) => obj.name !== body.name),
+      body,
+    ];
+    await loadSceneApi({ ...current, sceneObjects });
+  }, [loadSceneApi]);
+
+  const removeBodyApi = useCallback(async (name: string): Promise<void> => {
+    const current = configRef.current;
+    bodyRegistryRef.current.delete(name);
+    const sceneObjects = (current.sceneObjects ?? []).filter((obj) => obj.name !== name);
+    await loadSceneApi({ ...current, sceneObjects });
+  }, [loadSceneApi]);
+
+  const recompileApi = useCallback(async (patches: XmlPatch[] = []): Promise<void> => {
+    const current = configRef.current;
+    await loadSceneApi({
+      ...current,
+      xmlPatches: patches.length ? [...(current.xmlPatches ?? []), ...patches] : current.xmlPatches,
+    });
   }, [loadSceneApi]);
 
   const getCanvasSnapshot = useCallback(
@@ -961,7 +1082,7 @@ export function MujocoSimProvider({
   const api = useMemo<MujocoSimAPI>(
     () => ({
       get status() { return status; },
-      config,
+      get config() { return configRef.current; },
       reset,
       setSpeed,
       togglePause,
@@ -1000,6 +1121,10 @@ export function MujocoSimProvider({
       getKeyframeNames,
       getKeyframeCount,
       loadScene: loadSceneApi,
+      loadFromFiles: loadFromFilesApi,
+      addBody: addBodyApi,
+      removeBody: removeBodyApi,
+      recompile: recompileApi,
       getCanvasSnapshot,
       project2DTo3D,
       setBodyMass,
@@ -1009,7 +1134,7 @@ export function MujocoSimProvider({
       mjDataRef,
     }),
     [
-      status, config, reset, setSpeed, togglePause, setPaused, step,
+      status, reset, setSpeed, togglePause, setPaused, step,
       getTime, getTimestep, applyKeyframe, saveState, restoreState,
       setQpos, setQvel, getQpos, getQvel, setCtrl, getCtrl,
       getControlMapApi, getActuatedJointsApi, resolveControlGroupApi,
@@ -1017,6 +1142,7 @@ export function MujocoSimProvider({
       getSensorData, getContacts, getBodies, getJoints, getGeoms, getSites,
       getActuatorsApi, getSensors, getModelOption, setGravity, setTimestepApi,
       raycast, getKeyframeNames, getKeyframeCount, loadSceneApi,
+      loadFromFilesApi, addBodyApi, removeBodyApi, recompileApi,
       getCanvasSnapshot, project2DTo3D,
       setBodyMass, setGeomFriction, setGeomSize,
     ]
@@ -1034,6 +1160,8 @@ export function MujocoSimProvider({
       pausedRef,
       speedRef,
       substepsRef,
+      interpolateRef,
+      interpolationStateRef,
       onSelectionRef,
       beforeStepCallbacks,
       afterStepCallbacks,

@@ -96,6 +96,10 @@ Use `<MujocoPhysics>` instead of `<MujocoCanvas>` when you need:
   Number of physics substeps per frame for improved stability.
 </ParamField>
 
+<ParamField body="interpolate" type="boolean" default="false">
+  Smooth rendered body poses between fixed physics steps. Useful for high-refresh displays.
+</ParamField>
+
 ## Ref
 
 `MujocoPhysics` forwards its ref as a `MujocoSimAPI` handle (the same object passed to `onReady`):

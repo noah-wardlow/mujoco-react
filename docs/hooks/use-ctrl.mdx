@@ -85,4 +85,4 @@ interface CtrlHandle {
 - `read()` and `write()` operate directly on `data.ctrl` — no re-renders
 - For setting multiple actuators at once, use `api.setCtrl({ name: value, ... })`
 - The actuator index is resolved once on mount
-- The `name` parameter accepts `string` by default, or a union type if you've declared a [`Register`](/guides/type-safe-names) augmentation
+- The `name` parameter accepts `string` by default, or a generated union type if you use [`mujocoReact()`](/guides/type-safe-names)

@@ -331,11 +331,24 @@ export interface XmlPatch {
   replace?: [string, string];
 }
 
+export type LocalMujocoFile = File;
+
+export interface LoadFromFilesOptions {
+  /** Entry MJCF/URDF file. Inferred from scene.xml, model.xml, robot.xml, or the first XML/URDF file when omitted. */
+  sceneFile?: string;
+  homeJoints?: number[];
+  xmlPatches?: XmlPatch[];
+  sceneObjects?: SceneObject[];
+  onReset?: (model: MujocoModel, data: MujocoData) => void;
+}
+
 export interface SceneConfig {
   /** Base URL for fetching model files. The loader fetches `src + sceneFile` and follows dependencies. */
   src: string;
-  /** Entry MJCF XML file name, e.g. 'scene.xml'. */
+  /** Entry MJCF XML or URDF file name, e.g. 'scene.xml' or 'robot.urdf'. */
   sceneFile: string;
+  /** Browser-selected files for local MJCF/URDF loading. Preserves webkitRelativePath when available. */
+  files?: readonly LocalMujocoFile[];
   sceneObjects?: SceneObject[];
   homeJoints?: number[];
   xmlPatches?: XmlPatch[];
@@ -778,6 +791,10 @@ export interface MujocoSimAPI {
 
   // Model loading (spec 9.1)
   loadScene(newConfig: SceneConfig): Promise<void>;
+  loadFromFiles(files: FileList | readonly LocalMujocoFile[], options?: LoadFromFilesOptions): Promise<void>;
+  addBody(body: SceneObject): Promise<void>;
+  removeBody(name: Bodies): Promise<void>;
+  recompile(patches?: XmlPatch[]): Promise<void>;
 
   // Canvas
   getCanvasSnapshot(width?: number, height?: number, mimeType?: string): string;
@@ -812,6 +829,7 @@ export type MujocoCanvasProps = Omit<CanvasProps, 'onError'> & {
   substeps?: number;
   paused?: boolean;
   speed?: number;
+  interpolate?: boolean;
 };
 
 // ---- Hook Return Types ----

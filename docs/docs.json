@@ -23,6 +23,7 @@
               "introduction",
               "installation",
               "guides/building-controllers",
+              "guides/type-safe-names",
               "architecture",
               "loading-models"
             ]
@@ -56,6 +57,7 @@
           "components/debug",
           "components/tendon-renderer",
           "components/flex-renderer",
+          "components/instanced-geom-renderer",
           "components/contact-listener",
           "components/trajectory-player"
         ]

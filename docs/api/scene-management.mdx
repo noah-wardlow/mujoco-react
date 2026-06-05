@@ -33,6 +33,59 @@ This method:
 5. Rebuilds the scene graph (SceneRenderer will re-render)
 6. Fires the `onReady` callback with the updated API
 
+## loadFromFiles(files, options?)
+
+Load MJCF or URDF from browser-selected files. Folder uploads preserve paths from `webkitRelativePath`; flat uploads fall back to matching mesh/texture assets by basename.
+
+```tsx
+const sim = useMujoco();
+
+<input
+  type="file"
+  multiple
+  // @ts-expect-error Chromium/WebKit folder uploads
+  webkitdirectory=""
+  onChange={(event) => {
+    if (sim.isReady && event.currentTarget.files) {
+      sim.api.loadFromFiles(event.currentTarget.files);
+    }
+  }}
+/>;
+```
+
+<ParamField body="files" type="FileList | File[]" required>
+  Browser-selected MJCF/URDF files and referenced assets.
+</ParamField>
+
+<ParamField body="options" type="LoadFromFilesOptions">
+  Optional `sceneFile`, `homeJoints`, `xmlPatches`, `sceneObjects`, and `onReset` settings.
+</ParamField>
+
+## addBody(body), removeBody(name), recompile(patches?)
+
+Edit the current scene configuration and recompile through MuJoCo. This is a model reload, not an in-place mutation of compiled `mjModel` memory.
+
+```tsx
+await api.addBody({
+  name: "spawned_cube",
+  type: "box",
+  size: [0.03, 0.03, 0.03],
+  position: [0.4, 0, 0.1],
+  rgba: [1, 0, 0, 1],
+  mass: 0.1,
+  freejoint: true,
+});
+
+await api.removeBody("spawned_cube");
+
+await api.recompile([
+  {
+    target: "scene.xml",
+    replace: ['timestep="0.002"', 'timestep="0.001"'],
+  },
+]);
+```
+
 ## Example: Robot Switcher
 
 ```tsx

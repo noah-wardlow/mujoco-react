@@ -44,6 +44,7 @@ export { SceneLights } from './components/SceneLights';
 export { Debug } from './components/Debug';
 export { TendonRenderer } from './components/TendonRenderer';
 export { FlexRenderer } from './components/FlexRenderer';
+export { InstancedGeomRenderer } from './components/InstancedGeomRenderer';
 export { ContactListener } from './components/ContactListener';
 export { TrajectoryPlayer } from './components/TrajectoryPlayer';
 

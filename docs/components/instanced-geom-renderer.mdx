@@ -1,0 +1,28 @@
+---
+title: "InstancedGeomRenderer"
+description: "Batch repeated compatible MuJoCo geoms into Three.js InstancedMesh objects"
+icon: "boxes"
+---
+
+`<InstancedGeomRenderer />` is an opt-in renderer for particle, granular, or repeated-geom scenes. It groups compatible MuJoCo geoms by type, size, mesh, and material, then updates instance matrices from `data.geom_xpos` and `data.geom_xmat`.
+
+```tsx
+import { InstancedGeomRenderer } from "mujoco-react";
+
+function Particles() {
+  return <InstancedGeomRenderer geomGroup={2} />;
+}
+```
+
+## Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `geomGroup` | `number` | Only instance geoms from this MuJoCo geom group |
+| `filter` | `(geom) => boolean` | Select geoms by name, type, body, or size |
+| `material` | `THREE.Material` | Override material for every batch |
+| `visible` | `boolean` | Hide or show instanced batches |
+| `castShadow` | `boolean` | Enable shadows |
+| `receiveShadow` | `boolean` | Receive shadows |
+
+Use the default `<SceneRenderer />` for ordinary robot models. Use `<InstancedGeomRenderer />` when many repeated geoms dominate rendering cost.

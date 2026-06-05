@@ -14,9 +14,6 @@ import type { SceneConfig } from "mujoco-react";
 const config: SceneConfig = {
   src: "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/franka_emika_panda/",
   sceneFile: "scene.xml",
-  numArmJoints: 7,
-  tcpSiteName: "tcp",
-  gripperActuatorName: "gripper",
   homeJoints: [1.707, -1.754, 0.003, -2.702, 0.003, 0.951, 2.490],
 };
 ```
@@ -32,9 +29,7 @@ const config: SceneConfig = {
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `numArmJoints` | `number` | `7` | Number of arm joints for IK |
-| `tcpSiteName` | `string` | `'tcp'` | MuJoCo site name for IK target |
-| `gripperActuatorName` | `string` | `'gripper'` | Actuator name for gripper control |
+| `files` | `File[]` | — | Browser-selected local MJCF/URDF files and assets |
 | `homeJoints` | `number[]` | — | Joint positions applied on reset |
 | `sceneObjects` | `SceneObject[]` | — | Dynamic objects injected into scene |
 | `xmlPatches` | `XmlPatch[]` | — | XML transformations before compilation |

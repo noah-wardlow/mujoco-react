@@ -68,4 +68,4 @@ Common MuJoCo sensor types and their dimensions:
 - The `read()` array is updated every frame via `useAfterPhysicsStep`
 - If the sensor doesn't exist, `read()` returns an empty `Float64Array`
 - For enumerating all sensors, use `api.getSensors()`
-- The `name` parameter accepts `string` by default, or a union type if you've declared a [`Register`](/guides/type-safe-names) augmentation
+- The `name` parameter accepts `string` by default, or a generated union type if you use [`mujocoReact()`](/guides/type-safe-names)

@@ -29,6 +29,8 @@ export interface MujocoPhysicsProps {
   paused?: boolean;
   /** Simulation speed multiplier. */
   speed?: number;
+  /** Interpolate rendered body poses between fixed physics steps. */
+  interpolate?: boolean;
   children: React.ReactNode;
 }
 
