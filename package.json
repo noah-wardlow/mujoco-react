@@ -34,7 +34,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/noah-wardlow/mujoco-react"
+    "url": "git+https://github.com/noah-wardlow/mujoco-react.git"
   },
   "scripts": {
     "build": "tsup",
