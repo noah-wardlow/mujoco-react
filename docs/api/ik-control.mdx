@@ -9,10 +9,10 @@ IK is provided by the `useIkController()` hook — it is not part of the core `M
 ## Setup
 
 ```tsx
-import { useIkController, IkGizmo } from "mujoco-react";
+import { IkGizmo, RobotSites, useIkController } from "mujoco-react";
 
 function MyScene() {
-  const ik = useIkController({ siteName: "tcp" });
+  const ik = useIkController({ siteName: RobotSites.franka.tcp });
 
   return (
     <>
@@ -106,19 +106,19 @@ const ik = useIkController(hasIk ? ikConfig : null);
 The default config is model-aware:
 
 ```tsx
-const ik = useIkController({ siteName: "tcp" });
+const ik = useIkController({ siteName: RobotSites.franka.tcp });
 ```
 
 The controller finds the site body and infers scalar hinge/slide joints by walking toward the model root. For nonstandard MJCFs, multi-arm scenes, or actuator orders that do not match qpos order, pass explicit selectors:
 
 ```tsx
 const ik = useIkController({
-  siteName: "tcp",
+  siteName: RobotSites.franka.tcp,
   joints: ["shoulder", "elbow", "wrist"],
 });
 
 const pandaIk = useIkController({
-  siteName: "tcp",
+  siteName: RobotSites.franka.tcp,
   actuators: /^actuator/,
 });
 ```
@@ -128,6 +128,7 @@ const pandaIk = useIkController({
 Pass `ikSolveFn` to the config to replace the built-in solver:
 
 ```tsx
+import { RobotSites } from "mujoco-react";
 import type { IKSolveFn } from "mujoco-react";
 
 const myIK: IKSolveFn = (pos, quat, currentQ) => {
@@ -135,7 +136,7 @@ const myIK: IKSolveFn = (pos, quat, currentQ) => {
   return solution;
 };
 
-const ik = useIkController({ siteName: "tcp", ikSolveFn: myIK });
+const ik = useIkController({ siteName: RobotSites.franka.tcp, ikSolveFn: myIK });
 ```
 
 **When to use a custom solver:**

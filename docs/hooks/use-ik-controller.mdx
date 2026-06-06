@@ -126,8 +126,11 @@ interface IkContextValue {
 A common pattern is disabling IK when keyboard control takes over. Pass the `ik` value to your controller:
 
 ```tsx
+import { IkGizmo, RobotSites, useBeforePhysicsStep, useIkController } from "mujoco-react";
+import type { IkContextValue } from "mujoco-react";
+
 function MyScene() {
-  const ik = useIkController({ siteName: "tcp" });
+  const ik = useIkController({ siteName: RobotSites.franka.tcp });
 
   return (
     <>
@@ -160,8 +163,10 @@ The gizmo re-enables IK automatically when dragged.
 ## Example: Waypoint Following
 
 ```tsx
+import { RobotSites, useAfterPhysicsStep, useIkController } from "mujoco-react";
+
 function WaypointFollower({ waypoints }: { waypoints: THREE.Vector3[] }) {
-  const ik = useIkController({ siteName: "tcp" });
+  const ik = useIkController({ siteName: RobotSites.franka.tcp });
   const [index, setIndex] = useState(0);
 
   useEffect(() => {

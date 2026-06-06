@@ -228,14 +228,14 @@ Use control groups when a robot's actuator order does not match a simple `qpos[0
 
 ```tsx
 import { useRef } from "react";
-import { resolveControlGroup, useBeforePhysicsStep } from "mujoco-react";
+import { resolveControlGroup, RobotSites, useBeforePhysicsStep } from "mujoco-react";
 import type { ControlGroupInfo } from "mujoco-react";
 
 function HoldTcpPose() {
   const armRef = useRef<ControlGroupInfo | null>(null);
 
   useBeforePhysicsStep((model, data) => {
-    armRef.current ??= resolveControlGroup(model, { siteName: "tcp" });
+    armRef.current ??= resolveControlGroup(model, { siteName: RobotSites.franka.tcp });
     if (!armRef.current) return;
 
     armRef.current.writeCtrl(data, armRef.current.readQpos(data));
@@ -798,7 +798,9 @@ await moveCameraTo(
 Read sensor values by name. Returns a `SensorHandle` with `read()`, `dim`, and `name`:
 
 ```tsx
-const force = useSensor("force_sensor_1");
+import { RobotSensors, useSensor } from "mujoco-react";
+
+const force = useSensor(RobotSensors.franka.force_sensor);
 // force.read() -> Float64Array, force.dim -> number
 ```
 
@@ -823,7 +825,9 @@ const { position, velocity } = useJointState("joint1");
 Read/write actuator control by name. Returns a `CtrlHandle` with `read()`, `write()`, `name`, and `range`:
 
 ```tsx
-const gripper = useCtrl("gripper");
+import { RobotActuators, useCtrl } from "mujoco-react";
+
+const gripper = useCtrl(RobotActuators.franka.gripper);
 // gripper.read() -> number, gripper.write(0.04), gripper.range -> [min, max]
 ```
 
@@ -843,11 +847,13 @@ useContactEvents("block_1", {
 Map keyboard keys to actuators:
 
 ```tsx
+import { RobotActuators, useKeyboardTeleop } from "mujoco-react";
+
 useKeyboardTeleop({
   bindings: {
     "w": { actuator: "forward", delta: 0.1 },
     "s": { actuator: "forward", delta: -0.1 },
-    "v": { actuator: "gripper", toggle: [0, 0.04] },
+    "v": { actuator: RobotActuators.franka.gripper, toggle: [0, 0.04] },
   },
 });
 ```

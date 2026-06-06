@@ -18,16 +18,16 @@ useKeyboardTeleop(config: {
 ## Usage
 
 ```tsx
-import { useKeyboardTeleop } from "mujoco-react";
+import { RobotActuators, useKeyboardTeleop } from "mujoco-react";
 
 function TeleopControls() {
   useKeyboardTeleop({
     bindings: {
-      "w": { actuator: "joint1", delta: 0.1 },
-      "s": { actuator: "joint1", delta: -0.1 },
-      "a": { actuator: "joint2", delta: 0.1 },
-      "d": { actuator: "joint2", delta: -0.1 },
-      "space": { actuator: "gripper", toggle: [0, 0.04] },
+      "w": { actuator: RobotActuators.franka.actuator1, delta: 0.1 },
+      "s": { actuator: RobotActuators.franka.actuator1, delta: -0.1 },
+      "a": { actuator: RobotActuators.franka.actuator2, delta: 0.1 },
+      "d": { actuator: RobotActuators.franka.actuator2, delta: -0.1 },
+      "space": { actuator: RobotActuators.franka.gripper, toggle: [0, 0.04] },
     },
     enabled: true,
   });
@@ -52,9 +52,11 @@ Add a delta value to the actuator each frame while the key is held:
 Press once to set the first value, press again for the second:
 
 ```tsx
-"space": { actuator: "gripper", toggle: [0, 0.04] }
-// Press space: ctrl[gripper] = 0
-// Press again: ctrl[gripper] = 0.04
+import { RobotActuators } from "mujoco-react";
+
+"space": { actuator: RobotActuators.franka.gripper, toggle: [0, 0.04] }
+// Press space: ctrl[RobotActuators.franka.gripper] = 0
+// Press again: ctrl[RobotActuators.franka.gripper] = 0.04
 ```
 
 ### `set` — Set value while held

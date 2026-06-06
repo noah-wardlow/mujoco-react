@@ -141,8 +141,10 @@ useFrame(() => {
 Everything inside `<MujocoCanvas>` (or `<MujocoPhysics>`) is a standard R3F child. You mix library components with your own:
 
 ```tsx
+import { IkGizmo, RobotSites, useIkController } from "mujoco-react";
+
 function Scene() {
-  const ik = useIkController({ siteName: "tcp" });
+  const ik = useIkController({ siteName: RobotSites.franka.tcp });
 
   return (
     <>

@@ -9,10 +9,10 @@ A draggable 3D gizmo (powered by drei's PivotControls) that drives inverse kinem
 ## Usage
 
 ```tsx
-import { useIkController, IkGizmo } from "mujoco-react";
+import { IkGizmo, RobotSites, useIkController } from "mujoco-react";
 
 function MyScene() {
-  const ik = useIkController({ siteName: "tcp" });
+  const ik = useIkController({ siteName: RobotSites.franka.tcp });
 
   return ik ? <IkGizmo controller={ik} /> : null;
 }
@@ -78,7 +78,7 @@ Override the site tracked by this gizmo (defaults to the controller's `siteName`
 Use the controller value from `useIkController()`:
 
 ```tsx
-const ik = useIkController({ siteName: "tcp" });
+const ik = useIkController({ siteName: RobotSites.franka.tcp });
 
 // Animate the gizmo to a position over 500ms
 ik?.moveTarget(new THREE.Vector3(0.5, 0, 0.3), 500);

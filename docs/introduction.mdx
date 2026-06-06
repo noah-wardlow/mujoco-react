@@ -31,12 +31,12 @@ npm install mujoco-react @react-three/fiber @react-three/drei three
 
 ```tsx
 import {
-  MujocoProvider, MujocoCanvas, useIkController, IkGizmo,
+  MujocoProvider, MujocoCanvas, RobotSites, useIkController, IkGizmo,
 } from "mujoco-react";
 import { OrbitControls } from "@react-three/drei";
 
 function Scene() {
-  const ik = useIkController({ siteName: "tcp" });
+  const ik = useIkController({ siteName: RobotSites.franka.tcp });
   return (
     <>
       <OrbitControls makeDefault />
