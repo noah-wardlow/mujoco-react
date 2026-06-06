@@ -55,6 +55,86 @@ export type RobotSites<TRobot extends string> = RobotResource<TRobot, 'sites'>;
 export type RobotGeoms<TRobot extends string> = RobotResource<TRobot, 'geoms'>;
 export type RobotKeyframes<TRobot extends string> = RobotResource<TRobot, 'keyframes'>;
 
+export type RegisterResourceKey = 'actuators' | 'sensors' | 'bodies' | 'joints' | 'sites' | 'geoms' | 'keyframes';
+export type RobotResourceObject<TRobot extends string, TKey extends RegisterResourceKey> =
+  string extends RobotResource<TRobot, TKey>
+    ? Record<string, string>
+    : { readonly [K in RobotResource<TRobot, TKey>]: K };
+export type RobotResourceCategory<TKey extends RegisterResourceKey> =
+  string extends Robots
+    ? Record<string, Record<string, string>>
+    : { readonly [TRobot in Robots]: RobotResourceObject<TRobot, TKey> };
+export type RobotResourceRegistry =
+  string extends Robots
+    ? Record<string, Record<RegisterResourceKey, Record<string, string>>>
+    : { readonly [TRobot in Robots]: { readonly [TKey in RegisterResourceKey]: RobotResourceObject<TRobot, TKey> } };
+
+type RuntimeRobotResources = Record<string, Record<RegisterResourceKey, Record<string, string>>>;
+type RuntimeRobotResourceRegistration = Readonly<Record<string, Readonly<Record<RegisterResourceKey, Readonly<Record<string, string>>>>>>;
+
+const runtimeRobotResources: RuntimeRobotResources = {};
+const REGISTER_RESOURCE_KEYS: RegisterResourceKey[] = ['actuators', 'sensors', 'bodies', 'joints', 'sites', 'geoms', 'keyframes'];
+
+function createEmptyRuntimeResources(): Record<RegisterResourceKey, Record<string, string>> {
+  return {
+    actuators: {},
+    sensors: {},
+    bodies: {},
+    joints: {},
+    sites: {},
+    geoms: {},
+    keyframes: {},
+  };
+}
+
+export function registerRobotResources(resources: RuntimeRobotResourceRegistration): void {
+  for (const [robot, robotResources] of Object.entries(resources)) {
+    const existing = runtimeRobotResources[robot] ?? createEmptyRuntimeResources();
+    for (const key of REGISTER_RESOURCE_KEYS) {
+      existing[key] = { ...existing[key], ...(robotResources[key] ?? {}) };
+    }
+    runtimeRobotResources[robot] = existing;
+  }
+}
+
+function createResourceCategory<TKey extends RegisterResourceKey>(key: TKey): RobotResourceCategory<TKey> {
+  return new Proxy({}, {
+    get(_target, robot) {
+      if (typeof robot !== 'string') return undefined;
+      return runtimeRobotResources[robot]?.[key] ?? {};
+    },
+    ownKeys() {
+      return Reflect.ownKeys(runtimeRobotResources);
+    },
+    getOwnPropertyDescriptor(_target, robot) {
+      if (typeof robot !== 'string' || !(robot in runtimeRobotResources)) return undefined;
+      return { enumerable: true, configurable: true };
+    },
+  }) as RobotResourceCategory<TKey>;
+}
+
+export const RobotResources: RobotResourceRegistry = new Proxy(runtimeRobotResources, {
+  get(target, robot) {
+    if (typeof robot !== 'string') return undefined;
+    return target[robot] ?? createEmptyRuntimeResources();
+  },
+  ownKeys(target) {
+    return Reflect.ownKeys(target);
+  },
+  getOwnPropertyDescriptor(target, robot) {
+    if (typeof robot !== 'string' || !(robot in target)) return undefined;
+    return { enumerable: true, configurable: true };
+  },
+}) as RobotResourceRegistry;
+
+export const RobotActuators: RobotResourceCategory<'actuators'> = createResourceCategory('actuators');
+export const RobotSensors: RobotResourceCategory<'sensors'> = createResourceCategory('sensors');
+export const RobotBodies: RobotResourceCategory<'bodies'> = createResourceCategory('bodies');
+export const RobotJoints: RobotResourceCategory<'joints'> = createResourceCategory('joints');
+export const RobotSites: RobotResourceCategory<'sites'> = createResourceCategory('sites');
+export const RobotGeoms: RobotResourceCategory<'geoms'> = createResourceCategory('geoms');
+export const RobotKeyframes: RobotResourceCategory<'keyframes'> = createResourceCategory('keyframes');
+
 export type Actuators = Register extends { actuators: infer T extends string } ? T : string;
 export type Sensors = Register extends { sensors: infer T extends string } ? T : string;
 export type Bodies = Register extends { bodies: infer T extends string } ? T : string;

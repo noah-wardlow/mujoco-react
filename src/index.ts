@@ -145,13 +145,6 @@ export type {
   RegisteredRobotMap,
   RobotResource,
   Robots,
-  RobotActuators,
-  RobotSensors,
-  RobotBodies,
-  RobotJoints,
-  RobotSites,
-  RobotGeoms,
-  RobotKeyframes,
   Actuators,
   Sensors,
   Bodies,
@@ -159,6 +152,18 @@ export type {
   Sites,
   Geoms,
   Keyframes,
+} from './types';
+
+export {
+  registerRobotResources,
+  RobotResources,
+  RobotActuators,
+  RobotSensors,
+  RobotBodies,
+  RobotJoints,
+  RobotSites,
+  RobotGeoms,
+  RobotKeyframes,
 } from './types';
 
 // Re-export MuJoCo types for convenience

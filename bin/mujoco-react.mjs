@@ -5,7 +5,7 @@ import { generateMujocoRegister } from '../dist/vite.js';
 
 const usage = `
 Usage:
-  mujoco-react codegen <scene.xml> [...more.xml] [--out src/mujoco-register.gen.d.ts] [--watch]
+  mujoco-react codegen <scene.xml> [...more.xml] [--out src/mujoco-register.gen.ts] [--watch]
   mujoco-react codegen franka=models/panda/scene.xml spot=models/spot/scene.xml
 
 Vite users usually do not need this command. Prefer:
@@ -32,7 +32,7 @@ if (command !== 'codegen') {
 }
 
 const commandArgs = args.slice(1);
-const out = valueAfter(commandArgs, '--out') ?? 'src/mujoco-register.gen.d.ts';
+const out = valueAfter(commandArgs, '--out') ?? 'src/mujoco-register.gen.ts';
 const moduleName = valueAfter(commandArgs, '--module') ?? 'mujoco-react';
 const shouldWatch = commandArgs.includes('--watch');
 const models = commandArgs.filter((arg, index) => {
