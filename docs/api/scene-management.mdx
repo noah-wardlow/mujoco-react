@@ -38,19 +38,30 @@ This method:
 Load MJCF or URDF from browser-selected files. Folder uploads preserve paths from `webkitRelativePath`; flat uploads fall back to matching mesh/texture assets by basename.
 
 ```tsx
-const sim = useMujoco();
+import { useEffect, useRef } from "react";
+import { useMujoco } from "mujoco-react";
 
-<input
-  type="file"
-  multiple
-  // @ts-expect-error Chromium/WebKit folder uploads
-  webkitdirectory=""
-  onChange={(event) => {
-    if (sim.isReady && event.currentTarget.files) {
-      sim.api.loadFromFiles(event.currentTarget.files);
-    }
-  }}
-/>;
+function ModelUpload() {
+  const sim = useMujoco();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.setAttribute("webkitdirectory", "");
+  }, []);
+
+  return (
+    <input
+      ref={inputRef}
+      type="file"
+      multiple
+      onChange={(event) => {
+        if (sim.isReady && event.currentTarget.files) {
+          sim.api.loadFromFiles(event.currentTarget.files);
+        }
+      }}
+    />
+  );
+}
 ```
 
 <ParamField body="files" type="FileList | File[]" required>
