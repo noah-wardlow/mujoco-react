@@ -1,3 +1,10 @@
+## [8.9.1](https://github.com/noah-wardlow/mujoco-react/compare/v8.9.0...v8.9.1) (2026-06-06)
+
+
+### Bug Fixes
+
+* align docs with generated resource values ([98b7b03](https://github.com/noah-wardlow/mujoco-react/commit/98b7b034c1c559f72712bd005e0ef6f7194ef4a7))
+
 # [8.9.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.8.0...v8.9.0) (2026-06-06)
 
 
