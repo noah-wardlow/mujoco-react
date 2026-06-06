@@ -1,3 +1,10 @@
+# [8.9.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.8.0...v8.9.0) (2026-06-06)
+
+
+### Features
+
+* generate typed robot resource values ([6f98e83](https://github.com/noah-wardlow/mujoco-react/commit/6f98e83c6a97ae1b5995383e36b18dafefff78e6))
+
 # [8.8.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.7.0...v8.8.0) (2026-06-06)
 
 
