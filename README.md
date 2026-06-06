@@ -32,7 +32,6 @@ export default defineConfig({
     mujocoReact({
       models: {
         franka: "models/panda/scene.xml",
-        spot: "models/spot/scene.xml",
       },
     }),
   ],
@@ -57,15 +56,6 @@ const generatedRobotResources = {
     geoms: { floor: "floor" },
     keyframes: { home: "home" },
   },
-  spot: {
-    actuators: { fl_hx: "fl_hx", fl_hy: "fl_hy", fl_kn: "fl_kn" },
-    sensors: {},
-    bodies: { body: "body", fl_hip: "fl_hip", fl_uleg: "fl_uleg" },
-    joints: { fl_hx: "fl_hx", fl_hy: "fl_hy", fl_kn: "fl_kn" },
-    sites: {},
-    geoms: { floor: "floor" },
-    keyframes: { home: "home" },
-  },
 };
 
 registerRobotResources(generatedRobotResources);
@@ -82,19 +72,10 @@ declare module "mujoco-react" {
         geoms: "floor";
         keyframes: "home";
       };
-      spot: {
-        actuators: "fl_hx" | "fl_hy" | "fl_kn";
-        sensors: never;
-        bodies: "body" | "fl_hip" | "fl_uleg";
-        joints: "fl_hx" | "fl_hy" | "fl_kn";
-        sites: never;
-        geoms: "floor";
-        keyframes: "home";
-      };
     };
-    actuators: "joint1" | "joint2" | "joint3" | "gripper" | "fl_hx" | "fl_hy" | "fl_kn";
+    actuators: "joint1" | "joint2" | "joint3" | "gripper";
     sensors: "force_sensor" | "torque_sensor";
-    bodies: "link0" | "link1" | "hand" | "body" | "fl_hip" | "fl_uleg";
+    bodies: "link0" | "link1" | "hand";
   }
 }
 ```
@@ -104,7 +85,7 @@ Once generated, hooks like `useCtrl`, `useSensor`, `useBodyState`, and API metho
 Non-Vite projects can generate the same file with:
 
 ```bash
-npx mujoco-react codegen franka=models/panda/scene.xml spot=models/spot/scene.xml
+npx mujoco-react codegen franka=models/panda/scene.xml
 ```
 
 ## Load a Model

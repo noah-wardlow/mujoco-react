@@ -20,7 +20,6 @@ export default defineConfig({
     mujocoReact({
       models: {
         franka: "models/panda/scene.xml",
-        spot: "models/spot/scene.xml",
       },
     }),
   ],
@@ -44,15 +43,6 @@ const generatedRobotResources = {
     geoms: { floor: "floor" },
     keyframes: { home: "home" },
   },
-  spot: {
-    actuators: { fl_hx: "fl_hx", fl_hy: "fl_hy", fl_kn: "fl_kn" },
-    sensors: {},
-    bodies: { body: "body", fl_hip: "fl_hip" },
-    joints: { fl_hx: "fl_hx", fl_hy: "fl_hy", fl_kn: "fl_kn" },
-    sites: {},
-    geoms: { floor: "floor" },
-    keyframes: { home: "home" },
-  },
 };
 
 registerRobotResources(generatedRobotResources);
@@ -69,20 +59,11 @@ declare module "mujoco-react" {
         geoms: "floor";
         keyframes: "home";
       };
-      spot: {
-        actuators: "fl_hx" | "fl_hy" | "fl_kn";
-        sensors: never;
-        bodies: "body" | "fl_hip";
-        joints: "fl_hx" | "fl_hy" | "fl_kn";
-        sites: never;
-        geoms: "floor";
-        keyframes: "home";
-      };
     };
-    actuators: "joint1" | "joint2" | "gripper" | "fl_hx" | "fl_hy" | "fl_kn";
+    actuators: "joint1" | "joint2" | "gripper";
     sensors: "imu_gyro";
-    bodies: "link0" | "hand" | "body" | "fl_hip";
-    joints: "joint1" | "joint2" | "fl_hx" | "fl_hy" | "fl_kn";
+    bodies: "link0" | "hand";
+    joints: "joint1" | "joint2";
     sites: "tcp";
     geoms: "floor";
     keyframes: "home";
@@ -119,28 +100,18 @@ function FrankaController() {
 }
 ```
 
-This keeps a Franka controller from accidentally depending on a Spot-only actuator name even when both robots are included in the same app. Generic helpers like `RobotActuators<"franka">` are still available for reusable library code.
+This keeps a Franka controller from accidentally depending on resources that are not part of the configured model. Generic helpers like `RobotActuators<"franka">` are still available for reusable library code.
 
 ## Multiple Models
 
-```ts
-mujocoReact({
-  models: {
-    franka: "models/panda/scene.xml",
-    spot: "models/spot/scene.xml",
-  },
-  generatedRegister: "src/mujoco-register.gen.ts",
-});
-```
-
-Names from all configured models are merged into the global `Register` unions, while `Register.robots` keeps package exports such as `RobotActuators.franka.gripper` scoped to the right robot.
+Add more entries to `models` when an app ships multiple robots. Names from all configured models are merged into the global `Register` unions, while `Register.robots` keeps package exports such as `RobotActuators.franka.gripper` scoped to the right robot.
 
 ## CLI Fallback
 
 Use the CLI for non-Vite projects or one-off generation:
 
 ```bash
-npx mujoco-react codegen franka=models/panda/scene.xml spot=models/spot/scene.xml
+npx mujoco-react codegen franka=models/panda/scene.xml
 ```
 
 Legacy alias:

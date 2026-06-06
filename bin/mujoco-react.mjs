@@ -6,7 +6,7 @@ import { generateMujocoRegister } from '../dist/vite.js';
 const usage = `
 Usage:
   mujoco-react codegen <scene.xml> [...more.xml] [--out src/mujoco-register.gen.ts] [--watch]
-  mujoco-react codegen franka=models/panda/scene.xml spot=models/spot/scene.xml
+  mujoco-react codegen franka=models/panda/scene.xml
 
 Vite users usually do not need this command. Prefer:
 
