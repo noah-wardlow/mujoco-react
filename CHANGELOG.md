@@ -1,3 +1,10 @@
+## [8.9.2](https://github.com/noah-wardlow/mujoco-react/compare/v8.9.1...v8.9.2) (2026-06-06)
+
+
+### Bug Fixes
+
+* simplify vite type generation docs ([0bc7cd2](https://github.com/noah-wardlow/mujoco-react/commit/0bc7cd28a2dfc95f0d7a0ba3dbd277f7d9c02a64))
+
 ## [8.9.1](https://github.com/noah-wardlow/mujoco-react/compare/v8.9.0...v8.9.1) (2026-06-06)
 
 
