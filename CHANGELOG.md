@@ -1,3 +1,10 @@
+# [8.8.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.7.0...v8.8.0) (2026-06-06)
+
+
+### Features
+
+* add generated robot namespace types ([ec1e659](https://github.com/noah-wardlow/mujoco-react/commit/ec1e65968216c6ee223c1df5d03688f70fa76135))
+
 # [8.7.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.6.0...v8.7.0) (2026-06-05)
 
 
