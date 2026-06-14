@@ -53,6 +53,7 @@
           "components/ik-gizmo",
           "components/drag-interaction",
           "components/contact-markers",
+          "components/splat-environment",
           "components/scene-lights",
           "components/debug",
           "components/tendon-renderer",

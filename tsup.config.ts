@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/vite.ts'],
+  entry: ['src/index.ts', 'src/vite.ts', 'src/spark.tsx'],
   format: ['esm'],
   dts: true,
   sourcemap: true,
@@ -14,6 +14,7 @@ export default defineConfig({
     '@react-three/fiber',
     '@react-three/drei',
     '@mujoco/mujoco',
+    '@sparkjsdev/spark',
   ],
   treeshake: true,
 });

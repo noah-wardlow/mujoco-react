@@ -41,6 +41,15 @@ export { IkGizmo } from './components/IkGizmo';
 export { ContactMarkers } from './components/ContactMarkers';
 export { DragInteraction } from './components/DragInteraction';
 export { SceneLights } from './components/SceneLights';
+export {
+  ScenarioLighting,
+  SplatEnvironment,
+  createSparkSplatViewerUrl,
+  createSplatEnvironmentUserData,
+  getScenarioBackground,
+  getScenarioCameraPosition,
+  useSplatEnvironment,
+} from './components/VisualScenario';
 export { Debug } from './components/Debug';
 export { TendonRenderer } from './components/TendonRenderer';
 export { FlexRenderer } from './components/FlexRenderer';
@@ -127,6 +136,20 @@ export type {
   DragInteractionProps,
   DebugProps,
   SceneLightsProps,
+  ScenarioLightingPreset,
+  SplatFormat,
+  SplatRendererKind,
+  SplatCollisionPrimitive,
+  ScenarioCameraConfig,
+  SplatAssetConfig,
+  SplatScenarioConfig,
+  SplatCollisionProxyConfig,
+  PairedSplatEnvironmentConfig,
+  SplatEnvironmentMetadataInput,
+  SplatEnvironmentMetadata,
+  VisualScenarioConfig,
+  ScenarioLightingProps,
+  SplatEnvironmentProps,
   TrajectoryPlayerProps,
   ContactListenerProps,
   // API

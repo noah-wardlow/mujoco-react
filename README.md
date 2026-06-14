@@ -141,6 +141,50 @@ Use it as a child of `<MujocoCanvas>`:
 </MujocoCanvas>
 ```
 
+## Gaussian Splat Environments
+
+Gaussian splats are visual context; MuJoCo XML remains the source of physics, contacts, and task fixtures. Pair each splat asset with collision proxy metadata so scene variants, rollouts, and datasets preserve both sides of the environment.
+
+Use the renderer-agnostic boundary from the main package:
+
+```tsx
+import { SplatEnvironment } from "mujoco-react";
+
+<SplatEnvironment
+  src="/models/lab/scene.spz"
+  format="spz"
+  collisionProxyMetadata={{
+    xmlPath: "/models/lab/collision.xml",
+    status: "validated",
+    primitives: ["plane", "box"],
+  }}
+/>;
+```
+
+For first-class Spark rendering, install Spark and import the optional adapter:
+
+```bash
+npm install @sparkjsdev/spark
+```
+
+```tsx
+import { SparkSplatEnvironment } from "mujoco-react/spark";
+
+<MujocoCanvas config={sceneConfig} gl={{ preserveDrawingBuffer: true }}>
+  <SparkSplatEnvironment
+    src="/models/lab/scene.spz"
+    format="spz"
+    collisionProxyMetadata={{
+      xmlPath: "/models/lab/collision.xml",
+      status: "validated",
+      primitives: ["plane", "box"],
+    }}
+    hideGroundMeshes
+    onStatusChange={(status) => console.log(status)}
+  />
+</MujocoCanvas>;
+```
+
 ## Write Controllers
 
 ```tsx

@@ -86,6 +86,14 @@ export function mujocoReact(options: MujocoReactPluginOptions) {
   return {
     name: 'mujoco-react',
     enforce: 'pre' as const,
+    config(userConfig: { build?: { chunkSizeWarningLimit?: number } }) {
+      // three + drei + MuJoCo WASM glue are inherently large; the large-chunk
+      // warning is expected, not a failure. Raise the limit so consumers don't
+      // see it. Vite merges plugin config on top of user config, so only set a
+      // default when the consumer hasn't specified their own limit.
+      if (userConfig.build?.chunkSizeWarningLimit !== undefined) return;
+      return { build: { chunkSizeWarningLimit: 4000 } };
+    },
     configResolved(config: ViteConfig) {
       root = config.root;
       generatedRegister = path.resolve(root, generatedRegister);

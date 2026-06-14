@@ -1,0 +1,106 @@
+---
+title: "SplatEnvironment"
+description: "Composable Gaussian splat environment boundaries and optional Spark rendering"
+icon: "scan"
+---
+
+`mujoco-react` treats Gaussian splats as visual environments and MuJoCo XML as physics truth.
+For realistic robot workflows, pair each `.spz`, `.ply`, or `.splat` visual asset with MJCF
+collision geometry that provides contacts, friction, and task fixtures.
+
+## Renderer-Agnostic Boundary
+
+Use `SplatEnvironment` from the main package when the app owns the renderer or when you want
+metadata and collision proxy composition without adding a splat renderer dependency.
+
+```tsx
+import { SplatEnvironment } from "mujoco-react";
+
+function VisualEnvironment() {
+  return (
+    <SplatEnvironment
+      src="/models/lab/scene.spz"
+      format="spz"
+      collisionProxyMetadata={{
+        xmlPath: "/models/lab/collision.xml",
+        status: "validated",
+        primitives: ["plane", "box", "mesh"],
+      }}
+      collisionProxy={<LabCollisionPreview />}
+    />
+  );
+}
+```
+
+`SplatEnvironment` writes stable `userData` onto its group:
+
+- `role: "splat-environment"`
+- `splatSrc`
+- `splatFormat`
+- `collisionProxyStatus`
+- `collisionProxyXmlPath`
+- `collisionProxyPrimitives`
+
+## Spark Renderer
+
+Install Spark in apps that want first-class `.spz` rendering:
+
+```bash
+npm install @sparkjsdev/spark
+```
+
+Then import the optional adapter from `mujoco-react/spark`:
+
+```tsx
+import { MujocoCanvas } from "mujoco-react";
+import { SparkSplatEnvironment } from "mujoco-react/spark";
+
+function Scene() {
+  return (
+    <MujocoCanvas config={config} gl={{ preserveDrawingBuffer: true }}>
+      <SparkSplatEnvironment
+        src="/models/lab/scene.spz"
+        format="spz"
+        collisionProxyMetadata={{
+          xmlPath: "/models/lab/collision.xml",
+          status: "validated",
+          primitives: ["plane", "box"],
+        }}
+        hideGroundMeshes
+        onStatusChange={(status) => console.log(status)}
+      />
+    </MujocoCanvas>
+  );
+}
+```
+
+`SparkSplatEnvironment` dynamically imports `@sparkjsdev/spark`, creates a `SparkRenderer`,
+adds a `SplatMesh` to the same Three scene, and leaves MuJoCo bodies in the same render pass.
+That mirrors the same-scene approach used by MuJoCo-GS-Web: splats provide visuals, while MJCF
+continues to provide contacts and robot physics.
+
+## Props
+
+<ParamField body="src" type="string">
+  URL for the visual splat asset.
+</ParamField>
+
+<ParamField body="format" type='"spz" | "ply" | "splat"' default='"spz"'>
+  Format metadata for the splat asset. `SparkSplatEnvironment` currently renders `.spz`.
+</ParamField>
+
+<ParamField body="collisionProxyMetadata" type="SplatCollisionProxyConfig">
+  MJCF/XML collision proxy metadata to preserve alongside scene variants, rollouts, and datasets.
+</ParamField>
+
+<ParamField body="collisionProxy" type="ReactNode">
+  Optional R3F preview geometry for the collision proxy.
+</ParamField>
+
+<ParamField body="hideGroundMeshes" type="boolean" default="false">
+  Hide meshes whose names include floor, ground, or plane while the splat is active.
+</ParamField>
+
+<ParamField body="onStatusChange" type='(status: "idle" | "loading" | "ready" | "error") => void'>
+  Called as Spark loading progresses.
+</ParamField>

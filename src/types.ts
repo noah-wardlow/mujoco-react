@@ -5,7 +5,7 @@
 
 import type React from 'react';
 import type { ReactNode } from 'react';
-import type { CanvasProps } from '@react-three/fiber';
+import type { CanvasProps, ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
 
 // ---- Register (type-safe named resources) ----
@@ -789,6 +789,97 @@ export interface DragInteractionProps {
 export interface SceneLightsProps {
   /** Override intensity for all MJCF lights. Default: 1.0. */
   intensity?: number;
+}
+
+// ---- Visual scenarios / 3DGS composition ----
+
+export type ScenarioLightingPreset = 'studio' | 'warehouse' | 'low-light' | 'splat';
+export type SplatFormat = 'spz' | 'ply' | 'splat';
+export type SplatRendererKind = 'spark' | 'custom';
+export type SplatCollisionPrimitive = 'plane' | 'box' | 'sphere' | 'capsule' | 'mesh';
+
+export interface ScenarioCameraConfig {
+  jitter?: number;
+  exposure?: number;
+  noise?: number;
+  blur?: number;
+}
+
+export interface SplatAssetConfig {
+  src: string;
+  /** Common browser-friendly splat format. Renderer-specific loaders may accept more. */
+  format?: SplatFormat;
+  /** Optional renderer hint. The library does not import renderer-specific code. */
+  renderer?: SplatRendererKind;
+}
+
+export interface SplatScenarioConfig {
+  enabled: boolean;
+  /** Common browser-friendly splat format. Renderer-specific loaders may accept more. */
+  format?: SplatFormat;
+  src?: string;
+  requiresCollisionProxy?: boolean;
+  collisionProxy?: SplatCollisionProxyConfig;
+}
+
+export interface SplatCollisionProxyConfig {
+  /** MJCF/XML file or artifact path that provides physics collision for the visual splat. */
+  xmlPath?: string;
+  /** Human-readable status for authoring and validation flows. */
+  status?: 'missing' | 'planned' | 'generated' | 'validated';
+  /** Primitive proxy shapes expected in the MJCF collision proxy. */
+  primitives?: SplatCollisionPrimitive[];
+  /** Optional notes that should travel with scene variants and rollout metadata. */
+  notes?: string[];
+}
+
+export interface PairedSplatEnvironmentConfig {
+  id: string;
+  label: string;
+  description?: string;
+  /** Visual-only Gaussian splat asset. */
+  splat: SplatAssetConfig;
+  /** MJCF/XML contact geometry paired with the visual splat. */
+  collisionProxy: SplatCollisionProxyConfig & { xmlPath: string };
+}
+
+export interface SplatEnvironmentMetadataInput {
+  environment?: PairedSplatEnvironmentConfig;
+  src?: string;
+  format?: SplatFormat;
+  collisionProxy?: SplatCollisionProxyConfig;
+}
+
+export interface SplatEnvironmentMetadata {
+  src?: string;
+  format: SplatFormat;
+  collisionProxy?: SplatCollisionProxyConfig;
+  userData: Record<string, unknown>;
+}
+
+export interface VisualScenarioConfig {
+  id?: string;
+  label?: string;
+  seed?: number;
+  lighting?: ScenarioLightingPreset;
+  environment?: string;
+  camera?: ScenarioCameraConfig;
+  splat?: SplatScenarioConfig;
+}
+
+export interface ScenarioLightingProps {
+  preset?: ScenarioLightingPreset;
+  intensity?: number;
+  castShadow?: boolean;
+}
+
+export interface SplatEnvironmentProps extends Omit<ThreeElements['group'], 'ref'> {
+  environment?: PairedSplatEnvironmentConfig;
+  src?: string;
+  format?: SplatFormat;
+  collisionProxy?: ReactNode;
+  collisionProxyMetadata?: SplatCollisionProxyConfig;
+  showPlaceholder?: boolean;
 }
 
 export type TrajectoryInput = TrajectoryFrame[] | number[][];
