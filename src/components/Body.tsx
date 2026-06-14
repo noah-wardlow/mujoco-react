@@ -30,6 +30,7 @@ export function Body({
   solref,
   solimp,
   condim,
+  group,
   children,
 }: BodyProps) {
   const { bodyRegistryRef, hiddenBodiesRef, requestBodyReload, mjDataRef, mjModelRef, status } =
@@ -53,6 +54,7 @@ export function Body({
       solref,
       solimp,
       condim,
+      group,
     };
     bodyRegistryRef.current.set(name, { definition, hasCustomChildren: hasChildren });
     if (hasChildren) {
@@ -66,7 +68,7 @@ export function Body({
         requestBodyReload();
       }
     };
-  }, [name, type, size, position, rgba, mass, freejoint, friction, solref, solimp, condim, hasChildren, bodyRegistryRef, hiddenBodiesRef, requestBodyReload]);
+  }, [name, type, size, position, rgba, mass, freejoint, friction, solref, solimp, condim, group, hasChildren, bodyRegistryRef, hiddenBodiesRef, requestBodyReload]);
 
   // Resolve body ID once the scene is ready
   useEffect(() => {

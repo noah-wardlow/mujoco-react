@@ -31,6 +31,7 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
       paused,
       speed,
       interpolate,
+      loadingFallback,
       children,
       ...canvasProps
     },
@@ -44,7 +45,13 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
       }
     }, [wasmStatus, wasmError, onError]);
 
-    if (wasmStatus === 'error' || wasmStatus === 'loading' || !mujoco) {
+    if (wasmStatus === 'loading' || !mujoco) {
+      return loadingFallback ? (
+        <Canvas {...canvasProps}>{loadingFallback}</Canvas>
+      ) : null;
+    }
+
+    if (wasmStatus === 'error') {
       return null;
     }
 

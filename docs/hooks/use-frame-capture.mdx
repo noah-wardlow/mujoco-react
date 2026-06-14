@@ -1,0 +1,89 @@
+---
+title: "useFrameCapture"
+description: "Capture still frames from a canvas-backed scene"
+icon: "camera"
+---
+
+Capture a still image from a MuJoCo/R3F canvas. This is useful for dataset
+provenance, visual regression checks, thumbnails, and policy rollout reports.
+
+For WebGL scenes, pass `gl={{ preserveDrawingBuffer: true }}` to
+`MujocoCanvas` when you need deterministic captures after the frame presents.
+
+## Signature
+
+```tsx
+useFrameCapture(options?: {
+  target?: HTMLCanvasElement | HTMLElement | React.RefObject<HTMLElement | HTMLCanvasElement | null>
+  type?: string
+  quality?: number
+  waitForAnimationFrame?: boolean
+}): {
+  status: "idle" | "capturing" | "captured" | "error"
+  error: Error | null
+  isCapturing: boolean
+  capture: (options?: FrameCaptureOptions) => Promise<FrameCaptureResult>
+  captureBlob: (options?: FrameCaptureOptions) => Promise<FrameCaptureBlobResult>
+  reset: () => void
+}
+```
+
+## Usage
+
+```tsx
+import { useRef } from "react";
+import { MujocoCanvas, useFrameCapture } from "mujoco-react";
+
+function SceneCapture({ config }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const frameCapture = useFrameCapture({
+    target: containerRef,
+    type: "image/png",
+  });
+
+  async function saveFrame() {
+    const frame = await frameCapture.capture();
+    await fetch("/api/captures/frame", {
+      method: "POST",
+      body: JSON.stringify({ dataUrl: frame.dataUrl }),
+    });
+  }
+
+  return (
+    <div ref={containerRef}>
+      <MujocoCanvas
+        config={config}
+        gl={{ preserveDrawingBuffer: true }}
+      />
+      <button onClick={saveFrame} disabled={frameCapture.isCapturing}>
+        Capture frame
+      </button>
+    </div>
+  );
+}
+```
+
+## Standalone Helpers
+
+```tsx
+import { captureFrame, captureFrameBlob } from "mujoco-react";
+
+const image = await captureFrame({ target: containerElement });
+const blob = await captureFrameBlob({ target: canvasElement });
+```
+
+## Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `target` | `HTMLCanvasElement`, `HTMLElement`, or ref | required | Canvas or container that contains a canvas |
+| `type` | `string` | `"image/png"` | Output MIME type |
+| `quality` | `number` | browser default | JPEG/WebP quality where supported |
+| `waitForAnimationFrame` | `boolean` | `true` | Wait one frame before capture |
+
+## Notes
+
+- A container target uses the first descendant `canvas`.
+- `capture()` returns a data URL for JSON/API payloads.
+- `captureBlob()` returns a Blob for file uploads or object URLs.
+- Browser canvas security rules apply: cross-origin textures can taint the canvas.

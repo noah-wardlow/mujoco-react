@@ -429,6 +429,8 @@ export interface SceneObject {
   solref?: string;
   solimp?: string;
   condim?: number;
+  /** MuJoCo geom group. Group 3 is conventionally used for collision-only helper geoms. */
+  group?: number;
 }
 
 export interface XmlPatch {
@@ -443,6 +445,8 @@ export type LocalMujocoFile = File;
 export interface LoadFromFilesOptions {
   /** Entry MJCF/URDF file. Inferred from scene.xml, model.xml, robot.xml, or the first XML/URDF file when omitted. */
   sceneFile?: string;
+  /** Additional MJCF environment XML files merged into the entry scene before MuJoCo compilation. */
+  environmentFiles?: string[];
   homeJoints?: number[];
   xmlPatches?: XmlPatch[];
   sceneObjects?: SceneObject[];
@@ -456,6 +460,14 @@ export interface SceneConfig {
   sceneFile: string;
   /** Browser-selected files for local MJCF/URDF loading. Preserves webkitRelativePath when available. */
   files?: readonly LocalMujocoFile[];
+  /**
+   * Additional MJCF environment XML files merged into the entry scene before compilation.
+   *
+   * Use this for static collision/physics layers such as a Gaussian-splat
+   * environment's proxy `scene.xml`; render the splat itself as a separate
+   * visual layer.
+   */
+  environmentFiles?: string[];
   sceneObjects?: SceneObject[];
   homeJoints?: number[];
   xmlPatches?: XmlPatch[];
@@ -709,10 +721,28 @@ export interface KeyboardTeleopConfig {
 
 // ---- Policy (spec 10.1) ----
 
+export type PolicyVector = Float32Array | Float64Array | number[];
+
+export interface PolicyObservationInput {
+  model: MujocoModel;
+  data: MujocoData;
+}
+
+export interface PolicyInferenceInput extends PolicyObservationInput {
+  observation: PolicyVector;
+}
+
+export interface PolicyActionInput extends PolicyInferenceInput {
+  action: PolicyVector;
+}
+
 export interface PolicyConfig {
   frequency: number;
-  onObservation: (model: MujocoModel, data: MujocoData) => Float32Array | Float64Array | number[];
-  onAction: (action: Float32Array | Float64Array | number[], model: MujocoModel, data: MujocoData) => void;
+  enabled?: boolean;
+  onObservation: (input: PolicyObservationInput) => PolicyVector;
+  /** Run policy inference. Omit to pass observations directly to `onAction` for custom inline controllers. */
+  infer?: (input: PolicyInferenceInput) => PolicyVector;
+  onAction: (input: PolicyActionInput) => void;
 }
 
 // ---- Observation Builder ----
@@ -805,6 +835,13 @@ export interface ScenarioCameraConfig {
   blur?: number;
 }
 
+export interface ScenarioMaterialConfig {
+  randomizeObjectColors?: boolean;
+  randomizeTableMaterial?: boolean;
+  roughness?: number;
+  metalness?: number;
+}
+
 export interface SplatAssetConfig {
   src: string;
   /** Common browser-friendly splat format. Renderer-specific loaders may accept more. */
@@ -819,7 +856,7 @@ export interface SplatScenarioConfig {
   format?: SplatFormat;
   src?: string;
   requiresCollisionProxy?: boolean;
-  collisionProxy?: SplatCollisionProxyConfig;
+  collisionProxy?: SplatCollisionProxyConfig | null;
 }
 
 export interface SplatCollisionProxyConfig {
@@ -845,6 +882,8 @@ export interface PairedSplatEnvironmentConfig {
 
 export interface SplatEnvironmentMetadataInput {
   environment?: PairedSplatEnvironmentConfig;
+  scenario?: VisualScenarioConfig;
+  renderer?: SplatRendererKind;
   src?: string;
   format?: SplatFormat;
   collisionProxy?: SplatCollisionProxyConfig;
@@ -857,6 +896,12 @@ export interface SplatEnvironmentMetadata {
   userData: Record<string, unknown>;
 }
 
+export type SplatSceneInput =
+  | PairedSplatEnvironmentConfig
+  | VisualScenarioConfig
+  | undefined
+  | null;
+
 export interface VisualScenarioConfig {
   id?: string;
   label?: string;
@@ -864,7 +909,8 @@ export interface VisualScenarioConfig {
   lighting?: ScenarioLightingPreset;
   environment?: string;
   camera?: ScenarioCameraConfig;
-  splat?: SplatScenarioConfig;
+  materials?: ScenarioMaterialConfig;
+  splat?: SplatScenarioConfig | null;
 }
 
 export interface ScenarioLightingProps {
@@ -875,11 +921,26 @@ export interface ScenarioLightingProps {
 
 export interface SplatEnvironmentProps extends Omit<ThreeElements['group'], 'ref'> {
   environment?: PairedSplatEnvironmentConfig;
+  scenario?: VisualScenarioConfig;
+  renderer?: SplatRendererKind;
   src?: string;
   format?: SplatFormat;
   collisionProxy?: ReactNode;
   collisionProxyMetadata?: SplatCollisionProxyConfig;
   showPlaceholder?: boolean;
+}
+
+export interface VisualScenarioEffectsProps {
+  scenario?: VisualScenarioConfig;
+  enabled?: boolean;
+  applyBackground?: boolean;
+  applyFog?: boolean;
+  applyRenderer?: boolean;
+  applyMaterials?: boolean;
+  background?: THREE.ColorRepresentation;
+  fogNear?: number;
+  fogFar?: number;
+  materialFilter?: (object: THREE.Object3D, material: THREE.Material) => boolean;
 }
 
 export type TrajectoryInput = TrajectoryFrame[] | number[][];
@@ -920,6 +981,8 @@ export interface BodyProps {
   solref?: string;
   solimp?: string;
   condim?: number;
+  /** MuJoCo geom group. Group 3 is conventionally used for collision-only helper geoms. */
+  group?: number;
   children?: ReactNode;
 }
 
@@ -1017,6 +1080,8 @@ export interface MujocoSimAPI {
 
 export type MujocoCanvasProps = Omit<CanvasProps, 'onError'> & {
   config: SceneConfig;
+  /** R3F content rendered while the MuJoCo WASM module is still loading. */
+  loadingFallback?: ReactNode;
   onReady?: (api: MujocoSimAPI) => void;
   onError?: (error: Error) => void;
   onStep?: (time: number) => void;

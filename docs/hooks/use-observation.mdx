@@ -40,8 +40,8 @@ function PolicyDriver({ policy }) {
   usePolicy({
     frequency: 50,
     onObservation: () => obs.readValues(),
-    onAction: (observation, model, data) => {
-      const action = policy.predict(observation);
+    infer: ({ observation }) => policy.predict(observation),
+    onAction: ({ action, model, data }) => {
       for (let i = 0; i < Math.min(model.nu, action.length); i++) {
         data.ctrl[i] = action[i];
       }

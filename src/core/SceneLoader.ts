@@ -477,8 +477,9 @@ function sceneObjectToXml(obj: SceneObject): string {
   const solref = obj.solref ? ` solref="${obj.solref}"` : '';
   const solimp = obj.solimp ? ` solimp="${obj.solimp}"` : '';
   const condim = obj.condim ? ` condim="${obj.condim}"` : '';
+  const group = obj.group !== undefined ? ` group="${obj.group}"` : '';
   // Always set contype/conaffinity=1 so objects collide regardless of model defaults
-  return `<body name="${obj.name}" pos="${pos}">${joint}<geom type="${obj.type}" size="${size}" rgba="${rgba}" contype="1" conaffinity="1"${mass}${friction}${solref}${solimp}${condim}/></body>`;
+  return `<body name="${obj.name}" pos="${pos}">${joint}<geom type="${obj.type}" size="${size}" rgba="${rgba}" contype="1" conaffinity="1"${mass}${friction}${solref}${solimp}${condim}${group}/></body>`;
 }
 
 /** Create virtual directory structure for a file path. */
@@ -527,6 +528,22 @@ function localFilePath(file: LocalMujocoFile): string {
   return normalizeVfsPath(file.webkitRelativePath || file.name);
 }
 
+function dirname(path: string): string {
+  const normalized = normalizeVfsPath(path);
+  const idx = normalized.lastIndexOf('/');
+  return idx === -1 ? '' : normalized.slice(0, idx + 1);
+}
+
+function relativeVfsPath(fromDir: string, targetPath: string): string {
+  const from = normalizeVfsPath(fromDir).split('/').filter(Boolean);
+  const target = normalizeVfsPath(targetPath).split('/').filter(Boolean);
+  while (from.length && target.length && from[0] === target[0]) {
+    from.shift();
+    target.shift();
+  }
+  return [...from.map(() => '..'), ...target].join('/') || '.';
+}
+
 function inferSceneFile(files: readonly LocalMujocoFile[], options?: LoadFromFilesOptions): string {
   if (options?.sceneFile) return normalizeVfsPath(options.sceneFile);
 
@@ -551,11 +568,143 @@ export function createSceneConfigFromFiles(
     src: '',
     sceneFile: inferSceneFile(fileArray, options),
     files: fileArray,
+    environmentFiles: options.environmentFiles?.map(normalizeVfsPath),
     homeJoints: options.homeJoints,
     xmlPatches: options.xmlPatches,
     sceneObjects: options.sceneObjects,
     onReset: options.onReset,
   };
+}
+
+const ENVIRONMENT_MERGE_SECTIONS = [
+  'asset',
+  'worldbody',
+  'contact',
+  'equality',
+  'tendon',
+  'sensor',
+  'keyframe',
+  'custom',
+  'extension',
+] as const;
+
+function directChild(parent: Element, tagName: string): Element | null {
+  const lower = tagName.toLowerCase();
+  for (const child of Array.from(parent.children)) {
+    if (child.tagName.toLowerCase() === lower) return child;
+  }
+  return null;
+}
+
+function ensureTopLevelSection(doc: XMLDocument, tagName: string): Element {
+  const root = doc.documentElement;
+  const existing = directChild(root, tagName);
+  if (existing) return existing;
+
+  const section = doc.createElement(tagName);
+  if (tagName === 'asset') {
+    const worldbody = directChild(root, 'worldbody');
+    if (worldbody) root.insertBefore(section, worldbody);
+    else root.appendChild(section);
+  } else {
+    root.appendChild(section);
+  }
+  return section;
+}
+
+function readCompilerDirs(doc: XMLDocument) {
+  const compiler = directChild(doc.documentElement, 'compiler');
+  const assetDir = compiler?.getAttribute('assetdir') || '';
+  return {
+    meshDir: compiler?.getAttribute('meshdir') || assetDir,
+    textureDir: compiler?.getAttribute('texturedir') || assetDir,
+  };
+}
+
+function isExternalPath(path: string): boolean {
+  return /^[a-z]+:\/\//i.test(path) || path.startsWith('package://') || path.startsWith('/');
+}
+
+function fileReferencePrefix(el: Element, compilerDirs: ReturnType<typeof readCompilerDirs>): string {
+  const tag = el.tagName.toLowerCase();
+  if (tag === 'mesh') return compilerDirs.meshDir ? compilerDirs.meshDir + '/' : '';
+  if (tag === 'texture' || tag === 'hfield') return compilerDirs.textureDir ? compilerDirs.textureDir + '/' : '';
+  return '';
+}
+
+function rewriteFileReferencesForMerge(node: Element, sourceFile: string, targetFile: string, sourceDoc: XMLDocument) {
+  const sourceDir = dirname(sourceFile);
+  const targetDir = dirname(targetFile);
+  const compilerDirs = readCompilerDirs(sourceDoc);
+  node.querySelectorAll('[file], [filename]').forEach((el) => {
+    const attr = el.hasAttribute('file') ? 'file' : 'filename';
+    const value = el.getAttribute(attr);
+    if (!value || isExternalPath(value)) return;
+
+    const sourceRelativePath = normalizeVfsPath(fileReferencePrefix(el, compilerDirs) + value);
+    const resolvedPath = normalizeVfsPath(sourceDir + sourceRelativePath);
+    el.setAttribute(attr, relativeVfsPath(targetDir, resolvedPath));
+  });
+}
+
+function hasParseError(doc: XMLDocument): boolean {
+  return doc.getElementsByTagName('parsererror').length > 0;
+}
+
+function composeEnvironmentXml(
+  sceneXml: string,
+  config: SceneConfig,
+  parser: DOMParser,
+  environmentXmlByPath: Map<string, string>
+): string {
+  const environmentFiles = config.environmentFiles?.map(normalizeVfsPath) ?? [];
+  if (!environmentFiles.length) return sceneXml;
+
+  const sceneDoc = parser.parseFromString(sceneXml, 'text/xml');
+  if (hasParseError(sceneDoc)) {
+    console.warn(`Could not compose environments: failed to parse ${config.sceneFile}`);
+    return sceneXml;
+  }
+
+  for (const environmentFile of environmentFiles) {
+    const environmentXml = environmentXmlByPath.get(environmentFile);
+    if (!environmentXml) {
+      console.warn(`Environment XML not found: ${environmentFile}`);
+      continue;
+    }
+
+    const environmentDoc = parser.parseFromString(environmentXml, 'text/xml');
+    if (hasParseError(environmentDoc)) {
+      console.warn(`Skipping environment XML with parse errors: ${environmentFile}`);
+      continue;
+    }
+
+    for (const sectionName of ENVIRONMENT_MERGE_SECTIONS) {
+      const environmentSection = directChild(environmentDoc.documentElement, sectionName);
+      if (!environmentSection?.children.length) continue;
+
+      const targetSection = ensureTopLevelSection(sceneDoc, sectionName);
+      for (const child of Array.from(environmentSection.children)) {
+        const imported = sceneDoc.importNode(child, true) as Element;
+        rewriteFileReferencesForMerge(imported, environmentFile, config.sceneFile, environmentDoc);
+        targetSection.appendChild(imported);
+      }
+    }
+  }
+
+  return new XMLSerializer().serializeToString(sceneDoc);
+}
+
+function findTextByConfiguredPath(textByPath: Map<string, string>, configuredPath: string): string | undefined {
+  const normalized = normalizeVfsPath(configuredPath);
+  const direct = textByPath.get(normalized);
+  if (direct) return direct;
+
+  const suffix = '/' + normalized;
+  for (const [path, text] of textByPath) {
+    if (path.endsWith(suffix) || path === normalized.split('/').pop()) return text;
+  }
+  return undefined;
 }
 
 function applyXmlPatches(text: string, fname: string, config: SceneConfig): string {
@@ -627,10 +776,25 @@ async function loadSceneFromFiles(
     if (isModelTextFile(path)) {
       const text = applyXmlPatches(await file.text(), path, config);
       textByPath.set(path, text);
-      mujoco.FS.writeFile(`/working/${path}`, text);
     } else {
       mujoco.FS.writeFile(`/working/${path}`, new Uint8Array(await file.arrayBuffer()));
+      written.add(path);
     }
+  }
+
+  const environmentXmlByPath = new Map<string, string>();
+  for (const environmentFile of config.environmentFiles?.map(normalizeVfsPath) ?? []) {
+    const environmentXml = findTextByConfiguredPath(textByPath, environmentFile);
+    if (environmentXml) environmentXmlByPath.set(environmentFile, environmentXml);
+  }
+
+  for (const [path, text] of textByPath) {
+    const composedText = path === config.sceneFile
+      ? composeEnvironmentXml(text, config, parser, environmentXmlByPath)
+      : text;
+    textByPath.set(path, composedText);
+    ensureDir(mujoco, path);
+    mujoco.FS.writeFile(`/working/${path}`, composedText);
     written.add(path);
   }
 
@@ -689,6 +853,18 @@ export async function loadScene(
 
   const baseUrl = config.src.endsWith('/') ? config.src : config.src + '/';
 
+  const environmentXmlByPath = new Map<string, string>();
+  const environmentFiles = config.environmentFiles?.map(normalizeVfsPath) ?? [];
+  for (const environmentFile of environmentFiles) {
+    onProgress?.(`Downloading ${environmentFile}...`);
+    const res = await fetch(baseUrl + environmentFile);
+    if (!res.ok) {
+      console.warn(`Failed to fetch environment XML ${environmentFile}: ${res.status} ${res.statusText}`);
+      continue;
+    }
+    environmentXmlByPath.set(environmentFile, applyXmlPatches(await res.text(), environmentFile, config));
+  }
+
   const downloaded = new Set<string>();
   const xmlQueue: string[] = [config.sceneFile];
   const assetFiles: string[] = [];
@@ -714,7 +890,10 @@ export async function loadScene(
       continue;
     }
 
-    const text = applyXmlPatches(await res.text(), fname, config);
+    const patchedText = applyXmlPatches(await res.text(), fname, config);
+    const text = fname === config.sceneFile
+      ? composeEnvironmentXml(patchedText, config, parser, environmentXmlByPath)
+      : patchedText;
 
     ensureDir(mujoco, fname);
     mujoco.FS.writeFile(`/working/${fname}`, text);

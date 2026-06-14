@@ -12,20 +12,17 @@ collision geometry that provides contacts, friction, and task fixtures.
 
 Use `SplatEnvironment` from the main package when the app owns the renderer or when you want
 metadata and collision proxy composition without adding a splat renderer dependency.
+For scenario-driven apps, pass the scenario directly; the component resolves the visual asset
+and MJCF collision proxy metadata without app-side prop reshaping.
 
 ```tsx
 import { SplatEnvironment } from "mujoco-react";
 
-function VisualEnvironment() {
+function VisualEnvironment({ scenario }) {
   return (
     <SplatEnvironment
-      src="/models/lab/scene.spz"
-      format="spz"
-      collisionProxyMetadata={{
-        xmlPath: "/models/lab/collision.xml",
-        status: "validated",
-        primitives: ["plane", "box", "mesh"],
-      }}
+      scenario={scenario}
+      renderer="custom"
       collisionProxy={<LabCollisionPreview />}
     />
   );
@@ -41,6 +38,32 @@ function VisualEnvironment() {
 - `collisionProxyXmlPath`
 - `collisionProxyPrimitives`
 
+## Visual Scenario Effects
+
+Use `VisualScenarioEffects` next to `ScenarioLighting` to make visual scenario metadata
+affect the actual Three scene. It applies camera exposure, optional background/fog, and
+deterministic material variation without changing MuJoCo physics.
+
+```tsx
+import {
+  ScenarioLighting,
+  VisualScenarioEffects,
+} from "mujoco-react";
+
+function Scene({ scenario }) {
+  return (
+    <MujocoCanvas config={config}>
+      <VisualScenarioEffects
+        scenario={scenario}
+        applyBackground={!scenario.splat?.enabled}
+        materialFilter={(object) => object.name.startsWith("prop_")}
+      />
+      <ScenarioLighting preset={scenario.lighting} />
+    </MujocoCanvas>
+  );
+}
+```
+
 ## Spark Renderer
 
 Install Spark in apps that want first-class `.spz` rendering:
@@ -53,22 +76,22 @@ Then import the optional adapter from `mujoco-react/spark`:
 
 ```tsx
 import { MujocoCanvas } from "mujoco-react";
-import { SparkSplatEnvironment } from "mujoco-react/spark";
+import {
+  SparkSplatEnvironment,
+  useSparkSplatLifecycle,
+} from "mujoco-react/spark";
 
-function Scene() {
+function Scene({ scenario }) {
+  const splat = useSparkSplatLifecycle();
+
   return (
     <MujocoCanvas config={config} gl={{ preserveDrawingBuffer: true }}>
       <SparkSplatEnvironment
-        src="/models/lab/scene.spz"
-        format="spz"
-        collisionProxyMetadata={{
-          xmlPath: "/models/lab/collision.xml",
-          status: "validated",
-          primitives: ["plane", "box"],
-        }}
+        scenario={scenario}
         hideGroundMeshes
-        onStatusChange={(status) => console.log(status)}
+        {...splat.props}
       />
+      <StatusBadge status={splat.status} error={splat.error} />
     </MujocoCanvas>
   );
 }
@@ -78,6 +101,20 @@ function Scene() {
 adds a `SplatMesh` to the same Three scene, and leaves MuJoCo bodies in the same render pass.
 That mirrors the same-scene approach used by MuJoCo-GS-Web: splats provide visuals, while MJCF
 continues to provide contacts and robot physics.
+
+Spark rendering currently supports `.spz` assets. If a scenario points at `.ply` or `.splat`,
+`SparkSplatEnvironment` reports `status: "error"` through `useSparkSplatLifecycle` so the app can
+show a clear unsupported-format state. Keep using `SplatEnvironment` for renderer-agnostic metadata
+or when integrating a different splat renderer.
+
+Use `useSparkSplatLifecycle` when the app needs status badges, loading affordances, or error
+messages around the splat renderer. The hook returns:
+
+- `status: "idle" | "loading" | "ready" | "error"`
+- `error: Error | null`
+- `isLoading`, `isReady`, and `isError`
+- `props`, which can be spread onto `SparkSplatEnvironment`
+- `reset()`, for retry flows
 
 ## Props
 
@@ -91,6 +128,17 @@ continues to provide contacts and robot physics.
 
 <ParamField body="collisionProxyMetadata" type="SplatCollisionProxyConfig">
   MJCF/XML collision proxy metadata to preserve alongside scene variants, rollouts, and datasets.
+</ParamField>
+
+<ParamField body="environment" type="PairedSplatEnvironmentConfig">
+  Paired visual/physics environment config. Use `createPairedSplatEnvironment(scenario)`
+  when the app stores splat data inside visual scenarios.
+</ParamField>
+
+<ParamField body="scenario" type="VisualScenarioConfig">
+  Visual scenario metadata with an optional `splat` block. When present, this is enough
+  for `SplatEnvironment` and `SparkSplatEnvironment` to resolve `src`, `format`, and
+  collision proxy metadata.
 </ParamField>
 
 <ParamField body="collisionProxy" type="ReactNode">

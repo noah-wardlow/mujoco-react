@@ -11,13 +11,21 @@ Run a policy inference loop at a fixed frequency (decimation), independent of th
 ```tsx
 usePolicy(config: {
   frequency: number;
-  onObservation: (model: MujocoModel, data: MujocoData) => Float32Array | Float64Array | number[];
-  onAction: (obs: Float32Array | Float64Array | number[], model: MujocoModel, data: MujocoData) => void;
+  enabled?: boolean;
+  onObservation: (input: { model: MujocoModel; data: MujocoData }) => PolicyVector;
+  infer?: (input: { observation: PolicyVector; model: MujocoModel; data: MujocoData }) => PolicyVector;
+  onAction: (input: {
+    action: PolicyVector;
+    observation: PolicyVector;
+    model: MujocoModel;
+    data: MujocoData;
+  }) => void;
 }): {
   start: () => void;
   stop: () => void;
   isRunning: boolean;
-  lastObservation: Float32Array | null;
+  lastObservation: PolicyVector | null;
+  lastAction: PolicyVector | null;
 }
 ```
 
@@ -30,7 +38,7 @@ function PolicyRunner({ model: nnModel }) {
   const policy = usePolicy({
     frequency: 50, // 50 Hz policy rate
 
-    onObservation: (model, data) => {
+    onObservation: ({ model, data }) => {
       return buildObservation(model, data, {
         qpos: true,
         qvel: true,
@@ -38,9 +46,9 @@ function PolicyRunner({ model: nnModel }) {
       }).values;
     },
 
-    onAction: (obs, model, data) => {
-      // Run inference and apply actions
-      const action = nnModel.predict(obs); // Your ML model
+    infer: ({ observation }) => nnModel.predict(observation),
+
+    onAction: ({ action, model, data }) => {
       for (let i = 0; i < model.nu; i++) {
         data.ctrl[i] = action[i];
       }
@@ -61,8 +69,10 @@ function PolicyRunner({ model: nnModel }) {
 | Field | Type | Description |
 |-------|------|-------------|
 | `frequency` | `number` | Policy inference rate in Hz |
-| `onObservation` | `(model, data) => Float32Array \| Float64Array \| number[]` | Build observation vector from simulation state |
-| `onAction` | `(obs, model, data) => void` | Run inference, write actions to `data.ctrl` |
+| `enabled` | `boolean` | Start enabled or disabled |
+| `onObservation` | `({ model, data }) => PolicyVector` | Build observation vector from simulation state |
+| `infer` | `({ observation, model, data }) => PolicyVector` | Optional policy inference step |
+| `onAction` | `({ action, observation, model, data }) => void` | Write actions to `data.ctrl` |
 
 ## Return Value
 
@@ -72,14 +82,16 @@ function PolicyRunner({ model: nnModel }) {
 | `stop` | `() => void` | Stop the policy loop |
 | `isRunning` | `boolean` | Whether the policy is currently active |
 | `lastObservation` | `Float32Array \| Float64Array \| number[] \| null` | Most recent observation vector |
+| `lastAction` | `Float32Array \| Float64Array \| number[] \| null` | Most recent action vector |
 
 ## How It Works
 
 1. The hook registers a `useBeforePhysicsStep` callback
 2. Each physics step, it checks if enough time has elapsed since the last inference (based on `frequency`)
 3. If so, it calls `onObservation` to build the observation vector
-4. Then calls `onAction` with the observation to run inference and apply actions
-5. Between inference steps, the previous actions continue to be applied (zero-order hold)
+4. Then calls `infer` if provided; otherwise it uses the observation as the action
+5. Then calls `onAction` to apply actions
+6. Between inference steps, the previous actions continue to be applied (zero-order hold)
 
 ## Example: TensorFlow.js Policy
 
@@ -95,20 +107,23 @@ function TFPolicy() {
 
   const policy = usePolicy({
     frequency: 50,
-    onObservation: (model, data) => {
+    onObservation: ({ model, data }) => {
       return buildObservation(model, data, {
         qpos: true,
         qvel: true,
       }).values;
     },
-    onAction: (obs, model, data) => {
-      if (!modelRef.current) return;
-      const tensor = tf.tensor2d(obs, [1, obs.length]);
+    infer: ({ observation }) => {
+      if (!modelRef.current) return new Float32Array(0);
+      const tensor = tf.tensor2d(observation, [1, observation.length]);
       const action = modelRef.current.predict(tensor) as tf.Tensor;
       const values = action.dataSync();
-      for (let i = 0; i < model.nu; i++) data.ctrl[i] = values[i];
       tensor.dispose();
       action.dispose();
+      return Array.from(values);
+    },
+    onAction: ({ action, model, data }) => {
+      for (let i = 0; i < Math.min(model.nu, action.length); i++) data.ctrl[i] = action[i];
     },
   });
 

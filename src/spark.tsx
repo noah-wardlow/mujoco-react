@@ -4,7 +4,13 @@
  */
 
 import { useThree } from '@react-three/fiber';
-import { useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import * as THREE from 'three';
 import {
   SplatEnvironment,
@@ -17,8 +23,21 @@ import type {
 type SparkModule = typeof import('@sparkjsdev/spark');
 type SparkRendererInstance = InstanceType<SparkModule['SparkRenderer']>;
 type SparkSplatMeshInstance = InstanceType<SparkModule['SplatMesh']>;
+type SparkDisposable = {
+  dispose?: () => unknown;
+};
 
 export type SparkSplatStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+export interface SparkSplatLifecycle {
+  status: SparkSplatStatus;
+  error: Error | null;
+  isLoading: boolean;
+  isReady: boolean;
+  isError: boolean;
+  props: Pick<SparkSplatEnvironmentProps, 'onStatusChange' | 'onError'>;
+  reset: () => void;
+}
 
 export interface SparkSplatEnvironmentProps extends SplatEnvironmentProps {
   /** Enable Spark LoD handling for large splat assets. Default: true. */
@@ -35,6 +54,75 @@ export interface SparkSplatEnvironmentProps extends SplatEnvironmentProps {
 }
 
 /**
+ * Tracks Spark 3DGS loading state for UI that wraps `SparkSplatEnvironment`.
+ *
+ * Use the returned `props` with `<SparkSplatEnvironment {...lifecycle.props} />`
+ * to avoid repeating status/error state in app code.
+ */
+export function useSparkSplatLifecycle({
+  enabled = true,
+  initialStatus,
+  onError,
+  onStatusChange,
+}: {
+  enabled?: boolean;
+  initialStatus?: SparkSplatStatus;
+  onError?: (error: Error) => void;
+  onStatusChange?: (status: SparkSplatStatus) => void;
+} = {}): SparkSplatLifecycle {
+  const [status, setStatus] = useState<SparkSplatStatus>(
+    initialStatus ?? (enabled ? 'loading' : 'idle')
+  );
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    setStatus(enabled ? initialStatus ?? 'loading' : 'idle');
+    setError(null);
+  }, [enabled, initialStatus]);
+
+  const handleStatusChange = useCallback(
+    (nextStatus: SparkSplatStatus) => {
+      setStatus(nextStatus);
+      if (nextStatus !== 'error') {
+        setError(null);
+      }
+      onStatusChange?.(nextStatus);
+    },
+    [onStatusChange]
+  );
+
+  const handleError = useCallback(
+    (nextError: Error) => {
+      setError(nextError);
+      setStatus('error');
+      onError?.(nextError);
+    },
+    [onError]
+  );
+
+  const reset = useCallback(() => {
+    setStatus(enabled ? initialStatus ?? 'loading' : 'idle');
+    setError(null);
+  }, [enabled, initialStatus]);
+
+  return useMemo(
+    () => ({
+      status,
+      error,
+      isLoading: status === 'loading',
+      isReady: status === 'ready',
+      isError: status === 'error',
+      props: {
+        onStatusChange: handleStatusChange,
+        onError: handleError,
+      },
+      reset,
+    }),
+    [error, handleError, handleStatusChange, reset, status]
+  );
+}
+
+/**
  * Optional SparkJS-backed Gaussian splat renderer for React Three Fiber scenes.
  *
  * Import from `mujoco-react/spark` and install `@sparkjsdev/spark` in the app
@@ -42,6 +130,8 @@ export interface SparkSplatEnvironmentProps extends SplatEnvironmentProps {
  */
 export function SparkSplatEnvironment({
   environment,
+  scenario,
+  renderer = 'spark',
   src,
   format,
   collisionProxy,
@@ -66,6 +156,8 @@ export function SparkSplatEnvironment({
   const { gl, invalidate } = useThree();
   const metadata = useSplatEnvironment({
     environment,
+    scenario,
+    renderer,
     src,
     format,
     collisionProxy: collisionProxyMetadata,
@@ -99,8 +191,17 @@ export function SparkSplatEnvironment({
     }
 
     async function loadSplat() {
-      if (!metadata.src || metadata.format !== 'spz') {
+      if (!metadata.src) {
         setLifecycleStatus('idle');
+        return;
+      }
+
+      if (metadata.format !== 'spz') {
+        const unsupportedFormatError = new Error(
+          `SparkSplatEnvironment only supports .spz assets; received "${metadata.format}".`
+        );
+        setLifecycleStatus('error');
+        onErrorRef.current?.(unsupportedFormatError);
         return;
       }
 
@@ -166,13 +267,13 @@ export function SparkSplatEnvironment({
 
       if (meshRef.current) {
         groupRef.current?.remove(meshRef.current);
-        meshRef.current.dispose?.();
+        safelyDisposeSparkResource(meshRef.current);
         meshRef.current = null;
       }
 
       if (sparkRef.current) {
         groupRef.current?.remove(sparkRef.current);
-        sparkRef.current.dispose?.();
+        safelyDisposeSparkResource(sparkRef.current);
         sparkRef.current = null;
       }
     };
@@ -189,6 +290,8 @@ export function SparkSplatEnvironment({
     <SplatEnvironment
       {...groupProps}
       environment={environment}
+      scenario={scenario}
+      renderer={renderer}
       src={metadata.src}
       format={metadata.format}
       collisionProxyMetadata={metadata.collisionProxy}
@@ -199,4 +302,35 @@ export function SparkSplatEnvironment({
       {children}
     </SplatEnvironment>
   );
+}
+
+function safelyDisposeSparkResource(resource: SparkDisposable) {
+  try {
+    const result = resource.dispose?.();
+    if (isPromiseLike(result)) {
+      void Promise.resolve(result).catch(handleSparkDisposeError);
+    }
+  } catch (error) {
+    handleSparkDisposeError(error);
+  }
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'then' in value &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
+function handleSparkDisposeError(error: unknown) {
+  if (
+    error instanceof Error &&
+    error.message.toLowerCase().includes('worker terminate')
+  ) {
+    return;
+  }
+
+  console.warn('[mujoco-react] Spark resource disposal failed.', error);
 }

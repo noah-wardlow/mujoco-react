@@ -3,20 +3,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useThree } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
 import type { ReactNode } from 'react';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type {
   PairedSplatEnvironmentConfig,
+  ScenarioMaterialConfig,
+  SceneConfig,
   SplatCollisionProxyConfig,
   SplatEnvironmentMetadata,
   SplatEnvironmentMetadataInput,
   SplatFormat,
+  SplatRendererKind,
+  SplatSceneInput,
   ScenarioLightingPreset,
   ScenarioLightingProps,
   SplatEnvironmentProps,
   VisualScenarioConfig,
+  VisualScenarioEffectsProps,
 } from '../types';
 
 const DEFAULT_BACKGROUND = '#181a1f';
@@ -104,6 +110,99 @@ export function getScenarioCameraPosition(
   ];
 }
 
+export function VisualScenarioEffects(props: VisualScenarioEffectsProps) {
+  useVisualScenarioEffects(props);
+  return null;
+}
+
+export function useVisualScenarioEffects({
+  scenario,
+  enabled = true,
+  applyBackground = true,
+  applyFog = true,
+  applyRenderer = true,
+  applyMaterials = true,
+  background,
+  fogNear,
+  fogFar,
+  materialFilter,
+}: VisualScenarioEffectsProps) {
+  const { gl, scene, invalidate } = useThree();
+
+  useEffect(() => {
+    if (!enabled || !scenario) {
+      return undefined;
+    }
+
+    const previousExposure = gl.toneMappingExposure;
+    const previousBackground = scene.background;
+    const previousFog = scene.fog;
+    const materialSnapshots = new Map<
+      THREE.Material,
+      {
+        color?: THREE.Color;
+        roughness?: number;
+        metalness?: number;
+      }
+    >();
+
+    if (applyRenderer) {
+      gl.toneMappingExposure = scenario.camera?.exposure ?? 1;
+    }
+
+    if (applyBackground) {
+      scene.background = new THREE.Color(
+        background ?? getScenarioBackground(scenario.lighting)
+      );
+    }
+
+    if (applyFog) {
+      scene.fog = createScenarioFog(scenario, background, fogNear, fogFar);
+    }
+
+    if (applyMaterials && scenario.materials) {
+      applyScenarioMaterials(scene, scenario, materialSnapshots, materialFilter);
+    }
+
+    invalidate();
+
+    return () => {
+      gl.toneMappingExposure = previousExposure;
+      scene.background = previousBackground;
+      scene.fog = previousFog;
+
+      for (const [material, snapshot] of materialSnapshots) {
+        const mutable = getMutableScenarioMaterial(material);
+        if (!mutable) continue;
+        if (snapshot.color) mutable.color.copy(snapshot.color);
+        if (typeof snapshot.roughness === 'number') {
+          mutable.roughness = snapshot.roughness;
+        }
+        if (typeof snapshot.metalness === 'number') {
+          mutable.metalness = snapshot.metalness;
+        }
+        mutable.needsUpdate = true;
+      }
+
+      invalidate();
+    };
+  }, [
+    applyBackground,
+    applyFog,
+    applyMaterials,
+    applyRenderer,
+    background,
+    enabled,
+    fogFar,
+    fogNear,
+    gl,
+    invalidate,
+    materialFilter,
+    scenario,
+    scene,
+  ]);
+}
+
 /**
  * Renderer-agnostic Gaussian splat environment boundary.
  *
@@ -113,6 +212,8 @@ export function getScenarioCameraPosition(
  */
 export function SplatEnvironment({
   environment,
+  scenario,
+  renderer,
   src,
   format,
   collisionProxy,
@@ -123,6 +224,8 @@ export function SplatEnvironment({
 }: SplatEnvironmentProps) {
   const metadata = useSplatEnvironment({
     environment,
+    scenario,
+    renderer,
     src,
     format,
     collisionProxy: collisionProxyMetadata,
@@ -149,13 +252,31 @@ export function SplatEnvironment({
 
 export function useSplatEnvironment({
   environment,
+  scenario,
+  renderer,
   src,
   format,
   collisionProxy,
 }: SplatEnvironmentMetadataInput): SplatEnvironmentMetadata {
-  const resolvedSrc = src ?? environment?.splat.src;
-  const resolvedFormat = format ?? environment?.splat.format ?? 'spz';
-  const resolvedCollisionProxy = collisionProxy ?? environment?.collisionProxy;
+  const scenarioEnvironment = useMemo(
+    () =>
+      environment ??
+      (scenario
+        ? createPairedSplatEnvironment(scenario, { renderer })
+        : undefined),
+    [environment, renderer, scenario]
+  );
+  const resolvedSrc = src ?? scenarioEnvironment?.splat.src ?? scenario?.splat?.src;
+  const resolvedFormat =
+    format ??
+    scenarioEnvironment?.splat.format ??
+    scenario?.splat?.format ??
+    'spz';
+  const resolvedCollisionProxy =
+    collisionProxy ??
+    scenarioEnvironment?.collisionProxy ??
+    scenario?.splat?.collisionProxy ??
+    undefined;
 
   return useMemo(
     () => ({
@@ -163,14 +284,108 @@ export function useSplatEnvironment({
       format: resolvedFormat,
       collisionProxy: resolvedCollisionProxy,
       userData: createSplatEnvironmentUserData({
-        environment,
+        environment: scenarioEnvironment,
         src: resolvedSrc,
         format: resolvedFormat,
         collisionProxy: resolvedCollisionProxy,
       }),
     }),
-    [environment, resolvedSrc, resolvedFormat, resolvedCollisionProxy]
+    [scenarioEnvironment, resolvedSrc, resolvedFormat, resolvedCollisionProxy]
   );
+}
+
+/**
+ * Convert a generic visual scenario splat block into a paired visual/physics
+ * environment config. Returns undefined until both the splat asset and MJCF
+ * collision proxy are present.
+ */
+export function createPairedSplatEnvironment(
+  scenario: Pick<VisualScenarioConfig, 'id' | 'label' | 'environment' | 'splat'>,
+  options: {
+    id?: string;
+    label?: string;
+    description?: string;
+    renderer?: SplatRendererKind;
+  } = {}
+): PairedSplatEnvironmentConfig | undefined {
+  const splat = scenario.splat;
+  const collisionProxy = splat?.collisionProxy;
+
+  if (!splat?.enabled || !splat.src || !collisionProxy?.xmlPath) {
+    return undefined;
+  }
+
+  return {
+    id: options.id ?? scenario.id ?? 'splat-environment',
+    label: options.label ?? scenario.label ?? 'Gaussian splat environment',
+    description:
+      options.description ??
+      (scenario.environment
+        ? `Visual ${scenario.environment} splat paired with MJCF collision proxy.`
+        : undefined),
+    splat: {
+      src: splat.src,
+      format: splat.format ?? 'spz',
+      renderer: options.renderer,
+    },
+    collisionProxy: {
+      ...collisionProxy,
+      xmlPath: collisionProxy.xmlPath,
+    },
+  };
+}
+
+function isPairedSplatEnvironment(input: SplatSceneInput): input is PairedSplatEnvironmentConfig {
+  return !!input && 'collisionProxy' in input && 'splat' in input;
+}
+
+function sceneRelativePath(sceneConfig: SceneConfig, path: string): string {
+  const src = sceneConfig.src;
+  if (!src) return path;
+
+  const base = src.endsWith('/') ? src : src + '/';
+  if (path.startsWith(base)) return path.slice(base.length);
+  return path;
+}
+
+function uniquePaths(paths: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const path of paths) {
+    if (seen.has(path)) continue;
+    seen.add(path);
+    result.push(path);
+  }
+  return result;
+}
+
+/**
+ * Compose a MuJoCo scene config with a paired splat collision proxy.
+ *
+ * This keeps the common hybrid setup declarative:
+ * robot XML remains `sceneFile`, the `.spz` remains a visual-only layer, and
+ * the paired MJCF collision proxy is added to `environmentFiles`.
+ */
+export function withSplatEnvironment(
+  sceneConfig: SceneConfig,
+  input: SplatSceneInput,
+  options: { renderer?: SplatRendererKind } = {}
+): SceneConfig {
+  const environment = isPairedSplatEnvironment(input)
+    ? input
+    : input
+      ? createPairedSplatEnvironment(input, options)
+      : undefined;
+  const xmlPath = environment?.collisionProxy.xmlPath;
+  if (!xmlPath) return sceneConfig;
+
+  return {
+    ...sceneConfig,
+    environmentFiles: uniquePaths([
+      ...(sceneConfig.environmentFiles ?? []),
+      sceneRelativePath(sceneConfig, xmlPath),
+    ]),
+  };
 }
 
 export function createSplatEnvironmentUserData({
@@ -224,6 +439,128 @@ function SplatPlaceholder() {
       </mesh>
     </group>
   );
+}
+
+function createScenarioFog(
+  scenario: VisualScenarioConfig,
+  background: THREE.ColorRepresentation | undefined,
+  fogNear: number | undefined,
+  fogFar: number | undefined
+) {
+  if (scenario.lighting === 'low-light') {
+    return new THREE.Fog(
+      background ?? getScenarioBackground(scenario.lighting),
+      fogNear ?? 2.5,
+      fogFar ?? 9
+    );
+  }
+
+  if (scenario.lighting === 'warehouse') {
+    return new THREE.Fog(
+      background ?? getScenarioBackground(scenario.lighting),
+      fogNear ?? 5,
+      fogFar ?? 16
+    );
+  }
+
+  return null;
+}
+
+function applyScenarioMaterials(
+  scene: THREE.Scene,
+  scenario: VisualScenarioConfig,
+  snapshots: Map<
+    THREE.Material,
+    {
+      color?: THREE.Color;
+      roughness?: number;
+      metalness?: number;
+    }
+  >,
+  materialFilter: VisualScenarioEffectsProps['materialFilter']
+) {
+  const materials = scenario.materials;
+  if (!materials) return;
+
+  scene.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) {
+      return;
+    }
+
+    for (const material of normalizeMaterials(object.material)) {
+      const mutable = getMutableScenarioMaterial(material);
+      if (!mutable) continue;
+      if (materialFilter && !materialFilter(object, material)) continue;
+
+      if (!snapshots.has(material)) {
+        snapshots.set(material, {
+          color: mutable.color.clone(),
+          roughness: mutable.roughness,
+          metalness: mutable.metalness,
+        });
+      }
+
+      applyScenarioMaterial(mutable, object, scenario, materials);
+    }
+  });
+}
+
+function applyScenarioMaterial(
+  material: THREE.MeshStandardMaterial | THREE.MeshPhysicalMaterial,
+  object: THREE.Object3D,
+  scenario: VisualScenarioConfig,
+  materials: ScenarioMaterialConfig
+) {
+  const seed = scenario.seed ?? 0;
+  const objectKey = `${scenario.id ?? 'scenario'}:${object.name}:${material.name}:${seed}`;
+  const variation = hashToUnitInterval(objectKey);
+
+  if (materials.randomizeObjectColors) {
+    material.color.setHSL(variation, 0.38, 0.42);
+  }
+
+  if (materials.randomizeTableMaterial) {
+    material.roughness = clamp01(
+      materials.roughness ?? 0.35 + variation * 0.45
+    );
+    material.metalness = clamp01(
+      materials.metalness ?? variation * 0.12
+    );
+  }
+
+  material.needsUpdate = true;
+}
+
+function normalizeMaterials(
+  material: THREE.Material | THREE.Material[]
+): THREE.Material[] {
+  return Array.isArray(material) ? material : [material];
+}
+
+function getMutableScenarioMaterial(
+  material: THREE.Material
+): THREE.MeshStandardMaterial | THREE.MeshPhysicalMaterial | null {
+  if (
+    material instanceof THREE.MeshStandardMaterial ||
+    material instanceof THREE.MeshPhysicalMaterial
+  ) {
+    return material;
+  }
+
+  return null;
+}
+
+function hashToUnitInterval(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
+
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
 }
 
 export type SplatCollisionProxy = ReactNode | ThreeElements['group'];

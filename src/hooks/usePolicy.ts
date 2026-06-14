@@ -6,7 +6,7 @@
  */
 
 import { useRef } from 'react';
-import { useMujocoContext, useBeforePhysicsStep } from '../core/MujocoSimProvider';
+import { useBeforePhysicsStep } from '../core/MujocoSimProvider';
 import type { PolicyConfig } from '../types';
 
 /**
@@ -20,12 +20,13 @@ import type { PolicyConfig } from '../types';
  * @returns { step, isRunning } control handles
  */
 export function usePolicy(config: PolicyConfig) {
-  const { mjModelRef } = useMujocoContext();
   const lastActionTimeRef = useRef(0);
+  const lastObservationRef = useRef<ReturnType<PolicyConfig['onObservation']> | null>(null);
   const lastActionRef = useRef<Float32Array | Float64Array | number[] | null>(null);
-  const isRunningRef = useRef(true);
+  const isRunningRef = useRef(config.enabled ?? true);
   const configRef = useRef(config);
   configRef.current = config;
+  isRunningRef.current = config.enabled ?? isRunningRef.current;
 
   useBeforePhysicsStep((model, data) => {
     if (!isRunningRef.current) return;
@@ -37,13 +38,15 @@ export function usePolicy(config: PolicyConfig) {
     // Check if it's time for a new action
     if (data.time - lastActionTimeRef.current >= interval) {
       // Build observation
-      const obs = cfg.onObservation(model, data);
+      const observation = cfg.onObservation({ model, data });
+      const action = cfg.infer ? cfg.infer({ observation, model, data }) : observation;
 
-      // Apply action (consumer does inference inline or uses cached result)
-      cfg.onAction(obs, model, data);
+      // Apply action. If `infer` is omitted, this preserves the legacy inline-controller path.
+      cfg.onAction({ action, observation, model, data });
 
       lastActionTimeRef.current = data.time;
-      lastActionRef.current = obs;
+      lastObservationRef.current = observation;
+      lastActionRef.current = action;
     }
   });
 
@@ -51,6 +54,7 @@ export function usePolicy(config: PolicyConfig) {
     get isRunning() { return isRunningRef.current; },
     start: () => { isRunningRef.current = true; },
     stop: () => { isRunningRef.current = false; },
-    get lastObservation() { return lastActionRef.current; },
+    get lastObservation() { return lastObservationRef.current; },
+    get lastAction() { return lastActionRef.current; },
   };
 }

@@ -44,11 +44,15 @@ export { SceneLights } from './components/SceneLights';
 export {
   ScenarioLighting,
   SplatEnvironment,
+  VisualScenarioEffects,
+  createPairedSplatEnvironment,
   createSparkSplatViewerUrl,
   createSplatEnvironmentUserData,
   getScenarioBackground,
   getScenarioCameraPosition,
   useSplatEnvironment,
+  useVisualScenarioEffects,
+  withSplatEnvironment,
 } from './components/VisualScenario';
 export { Debug } from './components/Debug';
 export { TendonRenderer } from './components/TendonRenderer';
@@ -73,6 +77,20 @@ export { useTrajectoryPlayer } from './hooks/useTrajectoryPlayer';
 export { useTrajectoryRecorder } from './hooks/useTrajectoryRecorder';
 export { useGamepad } from './hooks/useGamepad';
 export { useVideoRecorder } from './hooks/useVideoRecorder';
+export {
+  captureFrame,
+  captureFrameBlob,
+  useFrameCapture,
+} from './hooks/useFrameCapture';
+export type {
+  FrameCaptureAPI,
+  FrameCaptureBlobResult,
+  FrameCaptureOptions,
+  FrameCaptureResult,
+  FrameCaptureStatus,
+  FrameCaptureTarget,
+  FrameCaptureTargetRef,
+} from './hooks/useFrameCapture';
 export { useCtrlNoise } from './hooks/useCtrlNoise';
 export { useBodyMeshes } from './hooks/useBodyMeshes';
 export { useSelectionHighlight } from './hooks/useSelectionHighlight';
@@ -124,6 +142,10 @@ export type {
   KeyboardTeleopConfig,
   // Policy
   PolicyConfig,
+  PolicyVector,
+  PolicyObservationInput,
+  PolicyInferenceInput,
+  PolicyActionInput,
   // Observations
   ObservationConfig,
   ObservationHandle,
@@ -147,9 +169,12 @@ export type {
   PairedSplatEnvironmentConfig,
   SplatEnvironmentMetadataInput,
   SplatEnvironmentMetadata,
+  SplatSceneInput,
   VisualScenarioConfig,
   ScenarioLightingProps,
+  ScenarioMaterialConfig,
   SplatEnvironmentProps,
+  VisualScenarioEffectsProps,
   TrajectoryPlayerProps,
   ContactListenerProps,
   // API

@@ -69,8 +69,22 @@ function ModelUpload() {
 </ParamField>
 
 <ParamField body="options" type="LoadFromFilesOptions">
-  Optional `sceneFile`, `homeJoints`, `xmlPatches`, `sceneObjects`, and `onReset` settings.
+  Optional `sceneFile`, `environmentFiles`, `homeJoints`, `xmlPatches`, `sceneObjects`, and `onReset` settings.
 </ParamField>
+
+## Composable Environments
+
+Use `environmentFiles` when a robot should run inside a reusable MJCF environment. The loader merges the environment XML's assets and physics sections into the entry model before MuJoCo compiles it.
+
+```tsx
+const config = {
+  src: "/models/xlerobot/",
+  sceneFile: "xlerobot.xml",
+  environmentFiles: ["splats/tabletop/scene.xml"],
+};
+```
+
+This works well with Gaussian splats: keep the `.spz` as a visual-only layer and keep the paired `scene.xml` as the collision/physics layer.
 
 ## addBody(body), removeBody(name), recompile(patches?)
 

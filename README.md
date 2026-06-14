@@ -145,20 +145,42 @@ Use it as a child of `<MujocoCanvas>`:
 
 Gaussian splats are visual context; MuJoCo XML remains the source of physics, contacts, and task fixtures. Pair each splat asset with collision proxy metadata so scene variants, rollouts, and datasets preserve both sides of the environment.
 
-Use the renderer-agnostic boundary from the main package:
+Use `VisualScenarioEffects` when the same MuJoCo task should render under
+different camera exposure, fog/background, and deterministic material variants:
 
 ```tsx
-import { SplatEnvironment } from "mujoco-react";
+import { ScenarioLighting, VisualScenarioEffects } from "mujoco-react";
 
-<SplatEnvironment
-  src="/models/lab/scene.spz"
-  format="spz"
-  collisionProxyMetadata={{
-    xmlPath: "/models/lab/collision.xml",
-    status: "validated",
-    primitives: ["plane", "box"],
-  }}
-/>;
+<MujocoCanvas config={sceneConfig}>
+  <VisualScenarioEffects
+    scenario={scenario}
+    materialFilter={(object) => object.name.startsWith("prop_")}
+  />
+  <ScenarioLighting preset={scenario.lighting} />
+</MujocoCanvas>;
+```
+
+Use the renderer-agnostic boundary from the main package. If your app stores
+visual scenarios as data, pass the scenario directly; the component resolves the
+splat asset and paired MJCF collision proxy metadata for you.
+
+```tsx
+import { SplatEnvironment, withSplatEnvironment } from "mujoco-react";
+
+<SplatEnvironment scenario={scenario} renderer="custom" />;
+```
+
+For MuJoCo + 3DGS composition, derive the collision environment from the same
+splat metadata and pass the resulting config to `<MujocoCanvas>`:
+
+```tsx
+const sceneConfig = withSplatEnvironment(
+  {
+    src: "/models/xlerobot/",
+    sceneFile: "xlerobot.xml",
+  },
+  kitchenScenario
+);
 ```
 
 For first-class Spark rendering, install Spark and import the optional adapter:
@@ -168,22 +190,25 @@ npm install @sparkjsdev/spark
 ```
 
 ```tsx
-import { SparkSplatEnvironment } from "mujoco-react/spark";
+import {
+  SparkSplatEnvironment,
+  useSparkSplatLifecycle,
+} from "mujoco-react/spark";
 
-<MujocoCanvas config={sceneConfig} gl={{ preserveDrawingBuffer: true }}>
-  <SparkSplatEnvironment
-    src="/models/lab/scene.spz"
-    format="spz"
-    collisionProxyMetadata={{
-      xmlPath: "/models/lab/collision.xml",
-      status: "validated",
-      primitives: ["plane", "box"],
-    }}
-    hideGroundMeshes
-    onStatusChange={(status) => console.log(status)}
-  />
-</MujocoCanvas>;
+function Scene() {
+  const splat = useSparkSplatLifecycle();
+
+  return (
+    <MujocoCanvas config={sceneConfig} gl={{ preserveDrawingBuffer: true }}>
+      <SparkSplatEnvironment scenario={scenario} hideGroundMeshes {...splat.props} />
+      <StatusBadge status={splat.status} error={splat.error} />
+    </MujocoCanvas>
+  );
+}
 ```
+
+`SparkSplatEnvironment` currently renders `.spz` assets. Use the renderer-agnostic
+`SplatEnvironment` for `.ply`/`.splat` metadata or when wiring a different renderer.
 
 ## Write Controllers
 
@@ -497,11 +522,22 @@ interface SceneConfig {
   src: string;                      // Base URL for model files
   sceneFile: string;                // Entry XML/URDF file, e.g. "scene.xml"
   files?: File[];                   // Local files for browser upload workflows
+  environmentFiles?: string[];      // Static MJCF environment XMLs merged before compile
   sceneObjects?: SceneObject[];     // Objects injected into scene XML at load time
   homeJoints?: number[];            // Initial joint positions
   xmlPatches?: XmlPatch[];          // Patches applied to XML files during loading
   onReset?: (model, data) => void;  // Called during reset after mj_resetData
 }
+```
+
+Use `environmentFiles` to compose reusable physics/collision layers with a robot model. For Gaussian splat scenes, keep the `.spz` as a parallel visual layer and point `environmentFiles` at the paired MJCF proxy scene:
+
+```tsx
+const kitchenRobot: SceneConfig = {
+  src: "/models/xlerobot/",
+  sceneFile: "xlerobot.xml",
+  environmentFiles: ["splats/tabletop/scene.xml"],
+};
 ```
 
 ### Local Files and URDF
@@ -905,7 +941,8 @@ const obs = useObservation({ qpos: true, qvel: true, projectedGravity: "torso" }
 const policy = usePolicy({
   frequency: 50,
   onObservation: () => obs.readValues(),
-  onAction: (action, model, data) => applyAction(action, data),
+  infer: ({ observation }) => policySession.run(observation),
+  onAction: ({ action, data }) => applyAction(action, data),
 });
 ```
 
