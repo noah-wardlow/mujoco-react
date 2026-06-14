@@ -1,3 +1,10 @@
+# [9.1.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.0.0...v9.1.0) (2026-06-14)
+
+
+### Features
+
+* add canvas frame capture api ([130181e](https://github.com/noah-wardlow/mujoco-react/commit/130181e7b7534f6535d1040417daf14f606f8fa3))
+
 # [9.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.11.0...v9.0.0) (2026-06-14)
 
 
