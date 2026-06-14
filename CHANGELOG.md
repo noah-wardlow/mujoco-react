@@ -1,3 +1,10 @@
+# [9.2.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.1.0...v9.2.0) (2026-06-14)
+
+
+### Features
+
+* add fixed camera capture APIs ([889efc3](https://github.com/noah-wardlow/mujoco-react/commit/889efc352f3c3d75a919841fe1d3b36c955bc2f7))
+
 # [9.1.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.0.0...v9.1.0) (2026-06-14)
 
 
