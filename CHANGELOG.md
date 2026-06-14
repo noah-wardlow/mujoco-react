@@ -1,3 +1,10 @@
+# [8.11.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.10.0...v8.11.0) (2026-06-14)
+
+
+### Features
+
+* add composable splat scene workflows ([8ef58a5](https://github.com/noah-wardlow/mujoco-react/commit/8ef58a515e6215935bd894765eaa1abfe106b785))
+
 # [8.10.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.9.2...v8.10.0) (2026-06-14)
 
 
