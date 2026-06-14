@@ -1,3 +1,10 @@
+# [8.10.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.9.2...v8.10.0) (2026-06-14)
+
+
+### Features
+
+* add gaussian splat environments ([41d0d57](https://github.com/noah-wardlow/mujoco-react/commit/41d0d57a9e6afc30b67c33a5c40711c5fc4aa6c0))
+
 ## [8.9.2](https://github.com/noah-wardlow/mujoco-react/compare/v8.9.1...v8.9.2) (2026-06-06)
 
 
