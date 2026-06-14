@@ -1,3 +1,17 @@
+# [9.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.11.0...v9.0.0) (2026-06-14)
+
+
+### Features
+
+* use object-style public callbacks ([7cf3d12](https://github.com/noah-wardlow/mujoco-react/commit/7cf3d12e08630ad3d8e12496a6693108de96b780))
+
+
+### BREAKING CHANGES
+
+* Public callbacks now receive a single named input object instead of positional arguments. Update useBeforePhysicsStep, useAfterPhysicsStep, onReset, onReady, onStep, onSelection, IkGizmo onDrag, IKSolveFn, materialFilter, and trajectory callbacks to destructure named fields.
+
+Co-Authored-By: OpenAI Codex <noreply@openai.com>
+
 # [8.11.0](https://github.com/noah-wardlow/mujoco-react/compare/v8.10.0...v8.11.0) (2026-06-14)
 
 
