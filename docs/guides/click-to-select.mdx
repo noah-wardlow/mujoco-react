@@ -87,7 +87,7 @@ function App() {
   return (
     <MujocoCanvas
       config={config}
-      onSelection={(bodyId, name) => {
+      onSelection={({ bodyId, name }) => {
         console.log(`Selected body ${name} (id: ${bodyId})`);
         setSelectedBodyId(bodyId);
       }}

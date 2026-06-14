@@ -70,7 +70,7 @@ export function useKeyboardTeleop(config: KeyboardTeleopConfig) {
   }, []);
 
   // Apply bindings each physics frame
-  useBeforePhysicsStep((_model, data) => {
+  useBeforePhysicsStep(({ data }) => {
     if (!enabledRef.current) return;
     const bindings = bindingsRef.current;
     const cache = actuatorCacheRef.current;

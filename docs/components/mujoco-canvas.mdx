@@ -47,7 +47,7 @@ function App() {
   Scene configuration — robot ID, model file, joints, etc. See [Loading Models](/loading-models).
 </ParamField>
 
-<ParamField body="onReady" type="(api: MujocoSimAPI) => void">
+<ParamField body="onReady" type="({ api }) => void">
   Fires when the model is loaded and simulation is ready. Receives the full API object.
 </ParamField>
 
@@ -55,11 +55,11 @@ function App() {
   Called if model loading or simulation fails.
 </ParamField>
 
-<ParamField body="onStep" type="(time: number) => void">
+<ParamField body="onStep" type="({ time, model, data }) => void">
   Called after each physics step with the current simulation time.
 </ParamField>
 
-<ParamField body="onSelection" type="(bodyId: number, name: string) => void">
+<ParamField body="onSelection" type="({ bodyId, name }) => void">
   Fired when a body is double-clicked in the scene.
 </ParamField>
 

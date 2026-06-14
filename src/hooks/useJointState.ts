@@ -59,7 +59,7 @@ export function useJointState(name: Joints): JointStateResult {
     jointIdRef.current = -1;
   }, [name, status, mjModelRef]);
 
-  useAfterPhysicsStep((_model, data) => {
+  useAfterPhysicsStep(({ data }) => {
     if (jointIdRef.current < 0) return;
     const qa = qposAdrRef.current;
     const da = dofAdrRef.current;

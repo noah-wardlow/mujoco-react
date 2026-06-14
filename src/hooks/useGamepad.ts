@@ -50,7 +50,7 @@ export function useGamepad(config: GamepadConfig) {
     }
   }, [config.axes, config.buttons, status, mjModelRef]);
 
-  useBeforePhysicsStep((_model, data) => {
+  useBeforePhysicsStep(({ data }) => {
     const cfg = configRef.current;
     if (cfg.enabled === false) return;
 

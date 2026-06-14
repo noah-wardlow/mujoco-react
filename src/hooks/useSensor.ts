@@ -39,7 +39,7 @@ export function useSensor(name: Sensors): SensorHandle {
   }, [name, status, mjModelRef]);
 
   // Update every frame after physics step
-  useAfterPhysicsStep((_model, data) => {
+  useAfterPhysicsStep(({ data }) => {
     if (sensorIdRef.current < 0) return;
     const adr = sensorAdrRef.current;
     const dim = sensorDimRef.current;

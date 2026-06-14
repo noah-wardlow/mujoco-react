@@ -31,9 +31,9 @@ Override the site tracked by this gizmo (defaults to the controller's `siteName`
 ```tsx
 <IkGizmo
   controller={ik}
-  onDrag={(pos, quat) => {
+  onDrag={({ position, quaternion }) => {
     // Consumer handles the response — IK is NOT auto-enabled
-    console.log("Target:", pos, quat);
+    console.log("Target:", position, quaternion);
   }}
 />
 ```
@@ -52,7 +52,7 @@ Override the site tracked by this gizmo (defaults to the controller's `siteName`
   Visual scale of the gizmo handles.
 </ParamField>
 
-<ParamField body="onDrag" type="(pos: THREE.Vector3, quat: THREE.Quaternion) => void">
+<ParamField body="onDrag" type="({ position, quaternion }) => void">
   Custom drag callback. When provided, the gizmo does **not** automatically enable IK — the consumer is responsible for handling the drag.
 </ParamField>
 
@@ -69,7 +69,7 @@ Override the site tracked by this gizmo (defaults to the controller's `siteName`
 - OrbitControls are disabled during drag
 
 **When dragging (with `onDrag` prop):**
-- The `onDrag` callback fires with position and quaternion
+- The `onDrag` callback fires with `{ position, quaternion }`
 - IK is NOT automatically enabled — the consumer decides what to do
 - OrbitControls are disabled during drag
 

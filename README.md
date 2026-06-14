@@ -154,7 +154,7 @@ import { ScenarioLighting, VisualScenarioEffects } from "mujoco-react";
 <MujocoCanvas config={sceneConfig}>
   <VisualScenarioEffects
     scenario={scenario}
-    materialFilter={(object) => object.name.startsWith("prop_")}
+    materialFilter={({ object }) => object.name.startsWith("prop_")}
   />
   <ScenarioLighting preset={scenario.lighting} />
 </MujocoCanvas>;
@@ -216,7 +216,7 @@ function Scene() {
 import { useBeforePhysicsStep } from "mujoco-react";
 
 function MyController() {
-  useBeforePhysicsStep((_model, data) => {
+  useBeforePhysicsStep(({ data }) => {
     data.ctrl[0] = Math.sin(data.time);
   });
 
@@ -284,7 +284,7 @@ import type { ControlGroupInfo } from "mujoco-react";
 function HoldTcpPose() {
   const armRef = useRef<ControlGroupInfo | null>(null);
 
-  useBeforePhysicsStep((model, data) => {
+  useBeforePhysicsStep(({ model, data }) => {
     armRef.current ??= resolveControlGroup(model, { siteName: RobotSites.franka.tcp });
     if (!armRef.current) return;
 
@@ -305,7 +305,7 @@ Build policy-ready observation vectors from common MuJoCo state without hard-cod
 import { buildObservation, useBeforePhysicsStep } from "mujoco-react";
 
 function PolicyDriver() {
-  useBeforePhysicsStep((model, data) => {
+  useBeforePhysicsStep(({ model, data }) => {
     const obs = buildObservation(model, data, {
       qpos: true,
       qvel: true,
@@ -361,7 +361,7 @@ function useWebSocketControls(url: string) {
   }, [url]);
 
   // Apply incoming actuator controls each physics step.
-  useBeforePhysicsStep((model, data) => {
+  useBeforePhysicsStep(({ model, data }) => {
     const ctrl = latestCtrlRef.current;
     if (!ctrl) return;
     for (let i = 0; i < Math.min(ctrl.length, model.nu); i++) {
@@ -370,7 +370,7 @@ function useWebSocketControls(url: string) {
   });
 
   // Send simulation feedback back after physics.
-  useAfterPhysicsStep((model, data) => {
+  useAfterPhysicsStep(({ data }) => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
@@ -433,8 +433,8 @@ The built-in `useIkController()` uses Damped Least-Squares. Pass `ikSolveFn` to 
 import { RobotSites } from "mujoco-react";
 import type { IKSolveFn } from "mujoco-react";
 
-const myIK: IKSolveFn = (pos, quat, currentQ) => {
-  return myAnalyticalSolver(pos, currentQ); // return joint angles or null
+const myIK: IKSolveFn = ({ position, currentQ }) => {
+  return myAnalyticalSolver(position, currentQ); // return joint angles or null
 };
 
 const ik = useIkController({ siteName: RobotSites.franka.tcp, ikSolveFn: myIK });
@@ -526,7 +526,7 @@ interface SceneConfig {
   sceneObjects?: SceneObject[];     // Objects injected into scene XML at load time
   homeJoints?: number[];            // Initial joint positions
   xmlPatches?: XmlPatch[];          // Patches applied to XML files during loading
-  onReset?: (model, data) => void;  // Called during reset after mj_resetData
+  onReset?: ({ model, data }) => void;  // Called during reset after mj_resetData
 }
 ```
 
@@ -636,10 +636,10 @@ Thin wrapper around R3F `<Canvas>`. Accepts all R3F Canvas props plus:
 | Prop | Type | Description |
 |------|------|-------------|
 | `config` | `SceneConfig` | **Required.** Scene/robot configuration |
-| `onReady` | `(api: MujocoSimAPI) => void` | Fires when model is loaded |
+| `onReady` | `({ api }) => void` | Fires when model is loaded |
 | `onError` | `(error: Error) => void` | Fires on scene load failure |
-| `onStep` | `(time: number) => void` | Called each physics step |
-| `onSelection` | `(bodyId: number, name: string) => void` | Called on double-click |
+| `onStep` | `({ time, model, data }) => void` | Called each physics step |
+| `onSelection` | `({ bodyId, name }) => void` | Called on double-click |
 | `gravity` | `[number, number, number]` | Override model gravity |
 | `timestep` | `number` | Override model.opt.timestep |
 | `substeps` | `number` | mj_step calls per frame |
@@ -664,10 +664,10 @@ Physics provider for use inside your own R3F `<Canvas>`. Same physics props as `
 | Prop | Type | Description |
 |------|------|-------------|
 | `config` | `SceneConfig` | **Required.** Scene/robot configuration |
-| `onReady` | `(api: MujocoSimAPI) => void` | Fires when model is loaded |
+| `onReady` | `({ api }) => void` | Fires when model is loaded |
 | `onError` | `(error: Error) => void` | Fires on scene load failure |
-| `onStep` | `(time: number) => void` | Called each physics step |
-| `onSelection` | `(bodyId: number, name: string) => void` | Called on double-click |
+| `onStep` | `({ time, model, data }) => void` | Called each physics step |
+| `onSelection` | `({ bodyId, name }) => void` | Called on double-click |
 | `gravity` | `[number, number, number]` | Override model gravity |
 | `timestep` | `number` | Override model.opt.timestep |
 | `substeps` | `number` | mj_step calls per frame |
@@ -715,7 +715,7 @@ drei PivotControls gizmo that tracks a MuJoCo site and drives IK on drag. Requir
 | `controller` | `IkContextValue` | **required** | Controller from `useIkController()` |
 | `siteName` | `string?` | controller's site | MuJoCo site to track |
 | `scale` | `number?` | `0.18` | Gizmo handle scale |
-| `onDrag` | `(pos, quat) => void` | -- | Custom drag handler (disables auto-IK) |
+| `onDrag` | `({ position, quaternion }) => void` | -- | Custom drag handler (disables auto-IK) |
 
 ### `<DragInteraction />`
 
@@ -826,7 +826,7 @@ if (mujoco) {
 Run logic **before** `mj_step` each frame. Write to `data.ctrl`, apply forces, drive automation.
 
 ```tsx
-useBeforePhysicsStep((model, data) => {
+useBeforePhysicsStep(({ data }) => {
   data.ctrl[0] = Math.sin(data.time);
 });
 ```

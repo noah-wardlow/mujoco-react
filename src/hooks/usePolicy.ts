@@ -28,7 +28,7 @@ export function usePolicy(config: PolicyConfig) {
   configRef.current = config;
   isRunningRef.current = config.enabled ?? isRunningRef.current;
 
-  useBeforePhysicsStep((model, data) => {
+  useBeforePhysicsStep(({ model, data }) => {
     if (!isRunningRef.current) return;
 
     const cfg = configRef.current;

@@ -17,7 +17,7 @@ useTrajectoryPlayer(
     loop?: boolean;
     mode?: "kinematic" | "physics";
     onComplete?: () => void;
-    onStateChange?: (state: PlaybackState) => void;
+    onStateChange?: (input: { state: PlaybackState }) => void;
   }
 ): {
   play: () => void;
@@ -44,7 +44,7 @@ function PlaybackControls({ trajectory }) {
     speed: 1.0,
     loop: true,
     onComplete: () => console.log("done"),
-    onStateChange: (state) => console.log(state),
+    onStateChange: ({ state }) => console.log(state),
   });
 
   return (
@@ -97,7 +97,7 @@ player.play();
 | `loop` | `boolean` | `false` | Loop when reaching the end |
 | `mode` | `"kinematic" \| "physics"` | `"kinematic"` | Playback mode (see below) |
 | `onComplete` | `() => void` | — | Called when playback reaches the end (non-looping) |
-| `onStateChange` | `(state: PlaybackState) => void` | — | Called on every state transition |
+| `onStateChange` | `({ state }) => void` | — | Called on every state transition |
 
 ## Return Value
 

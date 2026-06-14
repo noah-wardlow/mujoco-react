@@ -110,8 +110,14 @@ export type {
   IkConfig,
   IkContextValue,
   IKSolveFn,
+  IkSolveInput,
   // Callbacks
   PhysicsStepCallback,
+  PhysicsStepInput,
+  ResetCallbackInput,
+  ReadyCallbackInput,
+  StepCallbackInput,
+  SelectionCallbackInput,
   // State management
   StateSnapshot,
   // Model introspection
@@ -155,6 +161,7 @@ export type {
   // Component props
   BodyProps,
   IkGizmoProps,
+  IkGizmoDragInput,
   DragInteractionProps,
   DebugProps,
   SceneLightsProps,
@@ -175,7 +182,10 @@ export type {
   ScenarioMaterialConfig,
   SplatEnvironmentProps,
   VisualScenarioEffectsProps,
+  VisualScenarioMaterialFilterInput,
   TrajectoryPlayerProps,
+  TrajectoryFrameCallbackInput,
+  TrajectoryStateChangeInput,
   ContactListenerProps,
   // API
   MujocoSimAPI,

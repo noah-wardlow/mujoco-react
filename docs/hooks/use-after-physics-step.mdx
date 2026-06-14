@@ -10,7 +10,7 @@ Register a callback that runs **after** `mj_step` every physics frame. Use this 
 
 ```tsx
 useAfterPhysicsStep(
-  callback: (model: MujocoModel, data: MujocoData) => void
+  callback: (input: { model: MujocoModel; data: MujocoData }) => void
 ): void
 ```
 
@@ -19,7 +19,7 @@ useAfterPhysicsStep(
 ### Reading State
 
 ```tsx
-useAfterPhysicsStep((model, data) => {
+useAfterPhysicsStep(({ data }) => {
   const pos = data.xpos.subarray(3, 6); // Body 1 position
   console.log("Body position:", pos[0], pos[1], pos[2]);
 });
@@ -28,7 +28,7 @@ useAfterPhysicsStep((model, data) => {
 ### Computing Rewards (RL)
 
 ```tsx
-useAfterPhysicsStep((model, data) => {
+useAfterPhysicsStep(({ data }) => {
   const targetPos = [0.5, 0, 0.3];
   const eePos = data.xpos.subarray(eeSiteId * 3, eeSiteId * 3 + 3);
   const dist = Math.sqrt(
@@ -43,7 +43,7 @@ useAfterPhysicsStep((model, data) => {
 ### Logging Sensor Data
 
 ```tsx
-useAfterPhysicsStep((model, data) => {
+useAfterPhysicsStep(({ model, data }) => {
   if (data.time % 0.1 < model.opt.timestep) {
     logRef.current.push({
       time: data.time,

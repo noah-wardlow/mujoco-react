@@ -57,7 +57,7 @@ ik?.syncTargetToSite();
 
 Useful after programmatic joint changes to re-align the gizmo with the actual end-effector.
 
-### solveIK(pos, quat, currentQ)
+### solveIK({ position, quaternion, currentQ })
 
 Run IK solving manually (without the gizmo).
 
@@ -66,7 +66,11 @@ const targetPos = new THREE.Vector3(0.5, 0, 0.3);
 const targetQuat = new THREE.Quaternion();
 const currentJoints = Array.from(api.getQpos()).slice(0, 7);
 
-const solution = ik?.solveIK(targetPos, targetQuat, currentJoints);
+const solution = ik?.solveIK({
+  position: targetPos,
+  quaternion: targetQuat,
+  currentQ: currentJoints,
+});
 if (solution) {
   const qpos = api.getQpos();
   for (let i = 0; i < solution.length; i++) {
@@ -131,8 +135,8 @@ Pass `ikSolveFn` to the config to replace the built-in solver:
 import { RobotSites } from "mujoco-react";
 import type { IKSolveFn } from "mujoco-react";
 
-const myIK: IKSolveFn = (pos, quat, currentQ) => {
-  const solution = myAnalyticalSolver(pos, currentQ);
+const myIK: IKSolveFn = ({ position, currentQ }) => {
+  const solution = myAnalyticalSolver(position, currentQ);
   return solution;
 };
 

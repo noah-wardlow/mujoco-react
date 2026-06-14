@@ -139,7 +139,7 @@ export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
           const model = mjModelRef.current;
           if (model && bodyID < model.nbody && onSelectionRef.current) {
             const name = getName(model, model.name_bodyadr[bodyID]);
-            onSelectionRef.current(bodyID, name);
+            onSelectionRef.current({ bodyId: bodyID, name });
           }
         }
       }}

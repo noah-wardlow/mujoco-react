@@ -450,7 +450,7 @@ export interface LoadFromFilesOptions {
   homeJoints?: number[];
   xmlPatches?: XmlPatch[];
   sceneObjects?: SceneObject[];
-  onReset?: (model: MujocoModel, data: MujocoData) => void;
+  onReset?: (input: ResetCallbackInput) => void;
 }
 
 export interface SceneConfig {
@@ -471,7 +471,7 @@ export interface SceneConfig {
   sceneObjects?: SceneObject[];
   homeJoints?: number[];
   xmlPatches?: XmlPatch[];
-  onReset?: (model: MujocoModel, data: MujocoData) => void;
+  onReset?: (input: ResetCallbackInput) => void;
 }
 
 // ---- IK Controller Config ----
@@ -513,7 +513,7 @@ export interface IkContextValue {
   setIkEnabled: (enabled: boolean) => void;
   moveTarget: (pos: THREE.Vector3, duration?: number) => void;
   syncTargetToSite: () => void;
-  solveIK: (pos: THREE.Vector3, quat: THREE.Quaternion, currentQ: number[]) => number[] | null;
+  solveIK: (input: IkSolveInput) => number[] | null;
   getGizmoStats: () => { pos: THREE.Vector3; rot: THREE.Euler } | null;
 }
 
@@ -536,11 +536,15 @@ export interface PhysicsConfig {
 // ---- IK ----
 
 export type IKSolveFn = (
-  pos: THREE.Vector3,
-  quat: THREE.Quaternion,
-  currentQ: number[],
-  context?: IKSolveContext
+  input: IkSolveInput
 ) => number[] | null;
+
+export interface IkSolveInput {
+  position: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+  currentQ: number[];
+  context?: IKSolveContext;
+}
 
 export interface IKSolveContext {
   model: MujocoModel;
@@ -551,10 +555,29 @@ export interface IKSolveContext {
 
 // ---- Callbacks ----
 
-export type PhysicsStepCallback = (
-  model: MujocoModel,
-  data: MujocoData
-) => void;
+export interface PhysicsStepInput {
+  model: MujocoModel;
+  data: MujocoData;
+}
+
+export interface ResetCallbackInput extends PhysicsStepInput {}
+
+export interface ReadyCallbackInput {
+  api: MujocoSimAPI;
+}
+
+export interface StepCallbackInput {
+  time: number;
+  model: MujocoModel;
+  data: MujocoData;
+}
+
+export interface SelectionCallbackInput {
+  bodyId: number;
+  name: string;
+}
+
+export type PhysicsStepCallback = (input: PhysicsStepInput) => void;
 
 // ---- State Management (spec 4.1) ----
 
@@ -808,7 +831,12 @@ export interface IkGizmoProps {
   controller: IkContextValue;
   siteName?: string;
   scale?: number;
-  onDrag?: (position: THREE.Vector3, quaternion: THREE.Quaternion) => void;
+  onDrag?: (input: IkGizmoDragInput) => void;
+}
+
+export interface IkGizmoDragInput {
+  position: THREE.Vector3;
+  quaternion: THREE.Quaternion;
 }
 
 export interface DragInteractionProps {
@@ -940,7 +968,12 @@ export interface VisualScenarioEffectsProps {
   background?: THREE.ColorRepresentation;
   fogNear?: number;
   fogFar?: number;
-  materialFilter?: (object: THREE.Object3D, material: THREE.Material) => boolean;
+  materialFilter?: (input: VisualScenarioMaterialFilterInput) => boolean;
+}
+
+export interface VisualScenarioMaterialFilterInput {
+  object: THREE.Object3D;
+  material: THREE.Material;
 }
 
 export type TrajectoryInput = TrajectoryFrame[] | number[][];
@@ -952,9 +985,18 @@ export interface TrajectoryPlayerProps {
   loop?: boolean;
   playing?: boolean;
   mode?: 'kinematic' | 'physics';
-  onFrame?: (frameIdx: number) => void;
+  onFrame?: (input: TrajectoryFrameCallbackInput) => void;
   onComplete?: () => void;
-  onStateChange?: (state: PlaybackState) => void;
+  onStateChange?: (input: TrajectoryStateChangeInput) => void;
+}
+
+export interface TrajectoryFrameCallbackInput {
+  frameIndex: number;
+  frame: TrajectoryFrame | number[] | undefined;
+}
+
+export interface TrajectoryStateChangeInput {
+  state: PlaybackState;
 }
 
 export interface SelectionHighlightProps {
@@ -1082,10 +1124,10 @@ export type MujocoCanvasProps = Omit<CanvasProps, 'onError'> & {
   config: SceneConfig;
   /** R3F content rendered while the MuJoCo WASM module is still loading. */
   loadingFallback?: ReactNode;
-  onReady?: (api: MujocoSimAPI) => void;
+  onReady?: (input: ReadyCallbackInput) => void;
   onError?: (error: Error) => void;
-  onStep?: (time: number) => void;
-  onSelection?: (bodyId: number, name: string) => void;
+  onStep?: (input: StepCallbackInput) => void;
+  onSelection?: (input: SelectionCallbackInput) => void;
   // Declarative physics config (spec 1.1)
   gravity?: [number, number, number];
   timestep?: number;

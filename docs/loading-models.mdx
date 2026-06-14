@@ -33,7 +33,7 @@ const config: SceneConfig = {
 | `homeJoints` | `number[]` | — | Joint positions applied on reset |
 | `sceneObjects` | `SceneObject[]` | — | Dynamic objects injected into scene |
 | `xmlPatches` | `XmlPatch[]` | — | XML transformations before compilation |
-| `onReset` | `(model, data) => void` | — | Custom logic run after each reset |
+| `onReset` | `({ model, data }) => void` | — | Custom logic run after each reset |
 
 ## Model Sources
 
@@ -169,7 +169,7 @@ const config: SceneConfig = {
       position: [0.5, 0, 0.025], rgba: [1, 0, 0, 1],
       mass: 0.1, freejoint: true },
   ],
-  onReset: (model, data) => {
+  onReset: ({ model, data }) => {
     // Randomize cube position on each reset
     const bodyId = 1; // or use findBodyByName
     const qposAdr = model.jnt_qposadr[0];

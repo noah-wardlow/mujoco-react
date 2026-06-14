@@ -6,19 +6,25 @@
 import { forwardRef, useEffect } from 'react';
 import { useMujocoWasm } from './MujocoProvider';
 import { MujocoSimProvider } from './MujocoSimProvider';
-import type { MujocoSimAPI, SceneConfig } from '../types';
+import type {
+  MujocoSimAPI,
+  ReadyCallbackInput,
+  SceneConfig,
+  SelectionCallbackInput,
+  StepCallbackInput,
+} from '../types';
 
 export interface MujocoPhysicsProps {
   /** Scene/robot configuration. */
   config: SceneConfig;
   /** Fires when model is loaded and API is ready. */
-  onReady?: (api: MujocoSimAPI) => void;
+  onReady?: (input: ReadyCallbackInput) => void;
   /** Fires on scene load failure. */
   onError?: (error: Error) => void;
   /** Called each physics step. */
-  onStep?: (time: number) => void;
+  onStep?: (input: StepCallbackInput) => void;
   /** Called on body double-click selection. */
-  onSelection?: (bodyId: number, name: string) => void;
+  onSelection?: (input: SelectionCallbackInput) => void;
   /** Override model gravity. */
   gravity?: [number, number, number];
   /** Override model.opt.timestep. */

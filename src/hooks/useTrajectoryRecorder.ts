@@ -22,7 +22,7 @@ export function useTrajectoryRecorder(options: RecorderOptions = {}) {
   const framesRef = useRef<TrajectoryFrame[]>([]);
   const fields = options.fields ?? ['qpos'];
 
-  useAfterPhysicsStep((_model, data) => {
+  useAfterPhysicsStep(({ data }) => {
     if (!recordingRef.current) return;
 
     const frame: TrajectoryFrame = {

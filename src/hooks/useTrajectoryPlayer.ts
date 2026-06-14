@@ -8,7 +8,7 @@
 import { useCallback, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useMujocoContext, useBeforePhysicsStep } from '../core/MujocoSimProvider';
-import type { PlaybackState, TrajectoryFrame, TrajectoryInput } from '../types';
+import type { PlaybackState, TrajectoryStateChangeInput, TrajectoryFrame, TrajectoryInput } from '../types';
 
 export interface TrajectoryPlayerOptions {
   fps?: number;
@@ -16,7 +16,7 @@ export interface TrajectoryPlayerOptions {
   loop?: boolean;
   mode?: 'kinematic' | 'physics';
   onComplete?: () => void;
-  onStateChange?: (state: PlaybackState) => void;
+  onStateChange?: (input: TrajectoryStateChangeInput) => void;
 }
 
 /** Check if input is TrajectoryFrame[] (vs number[][]) */
@@ -74,7 +74,7 @@ export function useTrajectoryPlayer(
   const setState = useCallback((next: PlaybackState) => {
     if (stateRef.current === next) return;
     stateRef.current = next;
-    optionsRef.current.onStateChange?.(next);
+    optionsRef.current.onStateChange?.({ state: next });
   }, []);
 
   const play = useCallback(() => {
@@ -181,7 +181,7 @@ export function useTrajectoryPlayer(
   });
 
   // --- Physics mode: set ctrl values each physics step ---
-  useBeforePhysicsStep((model, data) => {
+  useBeforePhysicsStep(({ model, data }) => {
     if (stateRef.current !== 'playing') return;
     if ((optionsRef.current.mode ?? 'kinematic') !== 'physics') return;
 

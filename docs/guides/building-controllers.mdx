@@ -71,7 +71,7 @@ function MyController() {
     };
   }, []);
 
-  useBeforePhysicsStep((_model, data) => {
+  useBeforePhysicsStep(({ data }) => {
     const k = keys.current;
     if (k["KeyW"]) data.ctrl[0] += 0.01;
     if (k["KeyS"]) data.ctrl[0] -= 0.01;
@@ -108,7 +108,7 @@ function useArmController(config: ArmControllerConfig) {
 
   // ... keyboard listeners ...
 
-  useBeforePhysicsStep((_model, data) => {
+  useBeforePhysicsStep(({ data }) => {
     for (const arm of config.arms) {
       // Read keys, solve IK, write to data.ctrl[arm.indices[i]]
     }
@@ -158,8 +158,8 @@ Pass `ikSolveFn` to replace the built-in solver while keeping the gizmo, reset h
 import { IkGizmo, RobotSites, useIkController } from "mujoco-react";
 import type { IKSolveFn } from "mujoco-react";
 
-const myIK: IKSolveFn = (pos, quat, currentQ) => {
-  return myAnalyticalSolver(pos, currentQ); // return joint angles or null
+const myIK: IKSolveFn = ({ position, currentQ }) => {
+  return myAnalyticalSolver(position, currentQ); // return joint angles or null
 };
 
 const ik = useIkController({ siteName: RobotSites.franka.tcp, ikSolveFn: myIK });
@@ -172,7 +172,7 @@ Solve IK yourself inside `useBeforePhysicsStep` with full access to the model an
 
 ```tsx
 function MyIKController({ targetRef }) {
-  useBeforePhysicsStep((model, data) => {
+  useBeforePhysicsStep(({ model, data }) => {
     const target = targetRef.current;
     if (!target) return;
 
@@ -205,7 +205,7 @@ export const useMyController = createControllerHook<MyConfig, { amplitude: numbe
   (config) => {
     const amplitudeRef = useRef(0);
 
-    useBeforePhysicsStep((_model, data) => {
+    useBeforePhysicsStep(({ data }) => {
       if (!config) return;
       const freq = config.frequency ?? 1.0;
       amplitudeRef.current = config.gain * Math.sin(data.time * freq);
@@ -246,7 +246,7 @@ interface MyConfig {
 }
 
 function MyControllerImpl({ config, children }: { config: MyConfig; children?: React.ReactNode }) {
-  useBeforePhysicsStep((_model, data) => {
+  useBeforePhysicsStep(({ data }) => {
     const freq = config.frequency ?? 1.0;
     data.ctrl[config.actuatorIndex] = config.gain * Math.sin(data.time * freq);
   });
@@ -320,7 +320,7 @@ import { useBeforePhysicsStep } from "mujoco-react";
 import type { IkContextValue } from "mujoco-react";
 
 function MyArmController({ ik }: { ik?: IkContextValue | null }) {
-  useBeforePhysicsStep((_model, data) => {
+  useBeforePhysicsStep(({ data }) => {
     const anyKeyPressed = /* check keyboard state */;
 
     if (anyKeyPressed && ik?.ikEnabledRef.current) {

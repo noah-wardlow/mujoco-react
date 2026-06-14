@@ -26,7 +26,7 @@ const _scale = new THREE.Vector3(1, 1, 1);
  * - `controller` — IkContextValue from `useIkController()`.
  * - `siteName` — MuJoCo site to track. Defaults to the controller's configured site.
  * - `scale` — Gizmo handle scale. Default: 0.18.
- * - `onDrag` — Custom drag callback `(pos, quat) => void`.
+ * - `onDrag` — Custom drag callback `({ position, quaternion }) => void`.
  *   When omitted, dragging enables IK and writes to the IK target.
  *   When provided, the consumer handles what happens during drag.
  */
@@ -112,7 +112,7 @@ export function IkGizmo({ controller, siteName, scale = 0.18, onDrag }: IkGizmoP
           world.decompose(_pos, _quat, _scale);
           if (onDrag) {
             // Custom: consumer handles the drag
-            onDrag(_pos.clone(), _quat.clone());
+            onDrag({ position: _pos.clone(), quaternion: _quat.clone() });
           } else {
             // Default: write to IK target
             const target = ikTargetRef.current;

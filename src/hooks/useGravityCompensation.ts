@@ -13,7 +13,7 @@ import { useBeforePhysicsStep } from '../core/MujocoSimProvider';
  * hook (and DragInteraction) compose correctly — both add to a clean slate.
  */
 export function useGravityCompensation(enabled = true): void {
-  useBeforePhysicsStep((model, data) => {
+  useBeforePhysicsStep(({ model, data }) => {
     if (!enabled) return;
     for (let i = 0; i < model.nv; i++) {
       data.qfrc_applied[i] += data.qfrc_bias[i];

@@ -44,8 +44,8 @@ function MyScene({ hasIk }: { hasIk: boolean }) {
 import { RobotSites } from "mujoco-react";
 import type { IKSolveFn } from "mujoco-react";
 
-const myIK: IKSolveFn = (pos, quat, currentQ) => {
-  return myAnalyticalSolver(pos, currentQ);
+const myIK: IKSolveFn = ({ position, currentQ }) => {
+  return myAnalyticalSolver(position, currentQ);
 };
 
 const ik = useIkController({ siteName: RobotSites.franka.tcp, ikSolveFn: myIK });
@@ -97,7 +97,12 @@ interface IkContextValue {
   setIkEnabled(enabled: boolean): void;
   moveTarget(pos: THREE.Vector3, duration?: number): void;
   syncTargetToSite(): void;
-  solveIK(pos: THREE.Vector3, quat: THREE.Quaternion, currentQ: number[]): number[] | null;
+  solveIK(input: {
+    position: THREE.Vector3;
+    quaternion: THREE.Quaternion;
+    currentQ: number[];
+    context?: IKSolveContext;
+  }): number[] | null;
   getGizmoStats(): { pos: THREE.Vector3; rot: THREE.Euler } | null;
 }
 ```
@@ -109,7 +114,7 @@ interface IkContextValue {
 | `setIkEnabled(enabled)` | Enable/disable IK solving |
 | `moveTarget(pos, duration?)` | Move IK target with optional animation |
 | `syncTargetToSite()` | Snap IK target to current site position |
-| `solveIK(pos, quat, currentQ)` | Solve IK manually, returns joint angles or null |
+| `solveIK({ position, quaternion, currentQ })` | Solve IK manually, returns joint angles or null |
 | `getGizmoStats()` | Get current gizmo position and rotation |
 
 ### Refs
@@ -141,7 +146,7 @@ function MyScene() {
 }
 
 function MyArmController({ ik }: { ik: IkContextValue | null }) {
-  useBeforePhysicsStep((_model, data) => {
+  useBeforePhysicsStep(({ data }) => {
     const anyKeyPressed = checkKeys();
 
     if (anyKeyPressed && ik?.ikEnabledRef.current) {

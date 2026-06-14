@@ -10,7 +10,7 @@ Register a callback that runs **before** `mj_step` every physics frame. This is 
 
 ```tsx
 useBeforePhysicsStep(
-  callback: (model: MujocoModel, data: MujocoData) => void
+  callback: (input: { model: MujocoModel; data: MujocoData }) => void
 ): void
 ```
 
@@ -19,7 +19,7 @@ useBeforePhysicsStep(
 ### Setting Actuator Controls
 
 ```tsx
-useBeforePhysicsStep((model, data) => {
+useBeforePhysicsStep(({ data }) => {
   // Sinusoidal control on the first actuator
   data.ctrl[0] = Math.sin(data.time * 2.0);
 });
@@ -28,7 +28,7 @@ useBeforePhysicsStep((model, data) => {
 ### Applying Forces
 
 ```tsx
-useBeforePhysicsStep((model, data) => {
+useBeforePhysicsStep(({ data }) => {
   // Push body 3 upward
   // xfrc_applied layout: 6 per body [torque(3), force(3)]
   const offset = 3 * 6;
@@ -42,7 +42,7 @@ useBeforePhysicsStep((model, data) => {
 
 ```tsx
 function PDController({ jointIndex, target, kp, kd }) {
-  useBeforePhysicsStep((model, data) => {
+  useBeforePhysicsStep(({ data }) => {
     const q = data.qpos[jointIndex];
     const dq = data.qvel[jointIndex];
     data.ctrl[jointIndex] = kp * (target - q) - kd * dq;
@@ -67,14 +67,14 @@ Multiple `useBeforePhysicsStep` hooks compose correctly. Each callback adds to t
 
 ```tsx
 // Component A: gravity compensation
-useBeforePhysicsStep((model, data) => {
+useBeforePhysicsStep(({ model, data }) => {
   for (let i = 0; i < model.nv; i++) {
     data.qfrc_applied[i] += data.qfrc_bias[i];
   }
 });
 
 // Component B: custom control
-useBeforePhysicsStep((model, data) => {
+useBeforePhysicsStep(({ data }) => {
   data.ctrl[0] = computeControl();
 });
 ```

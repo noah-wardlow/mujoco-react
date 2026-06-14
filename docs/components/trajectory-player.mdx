@@ -16,9 +16,9 @@ Declarative component for playing back recorded trajectories. Wraps the `useTraj
     speed={1.5}
     loop
     playing={isPlaying}
-    onFrame={(idx) => console.log("Frame:", idx)}
+    onFrame={({ frameIndex }) => console.log("Frame:", frameIndex)}
     onComplete={() => setIsPlaying(false)}
-    onStateChange={(state) => console.log(state)}
+    onStateChange={({ state }) => console.log(state)}
   />
 </MujocoCanvas>
 ```
@@ -49,7 +49,7 @@ Declarative component for playing back recorded trajectories. Wraps the `useTraj
   Playback mode. `kinematic` pauses physics and drives qpos directly. `physics` keeps the simulation running and applies ctrl values from the trajectory.
 </ParamField>
 
-<ParamField body="onFrame" type="(frameIdx: number) => void">
+<ParamField body="onFrame" type="({ frameIndex, frame }) => void">
   Called each time a new frame is displayed. Synced to the R3F render loop via `useFrame` for precise timing.
 </ParamField>
 
@@ -57,7 +57,7 @@ Declarative component for playing back recorded trajectories. Wraps the `useTraj
   Called when playback reaches the end (non-looping only).
 </ParamField>
 
-<ParamField body="onStateChange" type="(state: PlaybackState) => void">
+<ParamField body="onStateChange" type="({ state }) => void">
   Called on every state transition (`idle`, `playing`, `paused`, `completed`).
 </ParamField>
 

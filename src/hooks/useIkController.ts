@@ -10,7 +10,7 @@ import { createControllerHook } from '../core/createController';
 import { useMujocoContext, useBeforePhysicsStep } from '../core/MujocoSimProvider';
 import { GenericIK } from '../core/GenericIK';
 import { createContiguousControlGroup, findSiteByName, resolveControlGroup } from '../core/SceneLoader';
-import type { ControlGroupInfo, IkConfig, IkContextValue, IKSolveFn, MujocoData } from '../types';
+import type { ControlGroupInfo, IkConfig, IkContextValue, IKSolveFn, IkSolveInput, MujocoData } from '../types';
 
 // Preallocated temp for syncGizmoToSite
 const _syncMat4 = new THREE.Matrix4();
@@ -84,16 +84,16 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
 
     // IK solve function
     const ikSolveFn = useCallback(
-      (pos: THREE.Vector3, quat: THREE.Quaternion, currentQ: number[]): number[] | null => {
+      ({ position, quaternion, currentQ, context }: IkSolveInput): number[] | null => {
         if (!config) return null;
-        if (config.ikSolveFn) return config.ikSolveFn(pos, quat, currentQ);
+        if (config.ikSolveFn) return config.ikSolveFn({ position, quaternion, currentQ, context });
         const model = mjModelRef.current;
         const data = mjDataRef.current;
         const controlGroup = controlGroupRef.current;
         if (!model || !data || !controlGroup || siteIdRef.current === -1) return null;
         return genericIkRef.current.solve(
           model, data, siteIdRef.current, controlGroup.qposAdr,
-          pos, quat, currentQ,
+          position, quaternion, currentQ,
           { damping: config.damping, maxIterations: config.maxIterations },
         );
       },
@@ -128,7 +128,7 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
     });
 
     // IK solve in physics loop
-    useBeforePhysicsStep((model, data) => {
+    useBeforePhysicsStep(({ model, data }) => {
       if (!config || !ikEnabledRef.current) {
         ikCalculatingRef.current = false;
         return;
@@ -142,13 +142,22 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
 
       const currentQ = Array.from(controlGroup.readQpos(data));
       const solution = config.ikSolveFn
-        ? config.ikSolveFn(target.position, target.quaternion, currentQ, {
-            model,
-            data,
-            siteId: siteIdRef.current,
-            controlGroup,
+        ? config.ikSolveFn({
+            position: target.position,
+            quaternion: target.quaternion,
+            currentQ,
+            context: {
+              model,
+              data,
+              siteId: siteIdRef.current,
+              controlGroup,
+            },
           })
-        : ikSolveFnRef.current(target.position, target.quaternion, currentQ);
+        : ikSolveFnRef.current({
+            position: target.position,
+            quaternion: target.quaternion,
+            currentQ,
+          });
       if (solution) {
         controlGroup.writeCtrl(data, solution);
       }
@@ -192,8 +201,8 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
     }, [mjDataRef]);
 
     const solveIK = useCallback(
-      (pos: THREE.Vector3, quat: THREE.Quaternion, currentQ: number[]): number[] | null => {
-        return ikSolveFnRef.current(pos, quat, currentQ);
+      (input: IkSolveInput): number[] | null => {
+        return ikSolveFnRef.current(input);
       },
       [],
     );

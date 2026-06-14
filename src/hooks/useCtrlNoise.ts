@@ -30,7 +30,7 @@ export function useCtrlNoise(config: CtrlNoiseConfig = {}) {
   configRef.current = config;
   const noiseRef = useRef<Float64Array | null>(null);
 
-  useBeforePhysicsStep((_model, data) => {
+  useBeforePhysicsStep(({ data }) => {
     const cfg = configRef.current;
     if (cfg.enabled === false) return;
 

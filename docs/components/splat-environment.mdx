@@ -56,7 +56,7 @@ function Scene({ scenario }) {
       <VisualScenarioEffects
         scenario={scenario}
         applyBackground={!scenario.splat?.enabled}
-        materialFilter={(object) => object.name.startsWith("prop_")}
+        materialFilter={({ object }) => object.name.startsWith("prop_")}
       />
       <ScenarioLighting preset={scenario.lighting} />
     </MujocoCanvas>

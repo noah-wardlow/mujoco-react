@@ -31,11 +31,14 @@ import {
   MujocoSimAPI,
   PhysicsStepCallback,
   RayHit,
+  ReadyCallbackInput,
   SceneConfig,
   SceneObject,
+  SelectionCallbackInput,
   SensorInfo,
   SiteInfo,
   StateSnapshot,
+  StepCallbackInput,
   XmlPatch,
 } from '../types';
 import {
@@ -117,7 +120,7 @@ export interface MujocoSimContextValue {
   interpolateRef: React.RefObject<boolean>;
   interpolationStateRef: React.RefObject<BodyInterpolationState>;
   onSelectionRef: React.RefObject<
-    ((bodyId: number, name: string) => void) | undefined
+    ((input: SelectionCallbackInput) => void) | undefined
   >;
   beforeStepCallbacks: React.RefObject<Set<PhysicsStepCallback>>;
   afterStepCallbacks: React.RefObject<Set<PhysicsStepCallback>>;
@@ -197,7 +200,7 @@ export function useBeforePhysicsStep(callback: PhysicsStepCallback) {
   callbackRef.current = callback;
 
   useEffect(() => {
-    const wrapped: PhysicsStepCallback = (model, data) => callbackRef.current(model, data);
+    const wrapped: PhysicsStepCallback = (input) => callbackRef.current(input);
     beforeStepCallbacks.current.add(wrapped);
     return () => { beforeStepCallbacks.current.delete(wrapped); };
   }, [beforeStepCallbacks]);
@@ -209,7 +212,7 @@ export function useAfterPhysicsStep(callback: PhysicsStepCallback) {
   callbackRef.current = callback;
 
   useEffect(() => {
-    const wrapped: PhysicsStepCallback = (model, data) => callbackRef.current(model, data);
+    const wrapped: PhysicsStepCallback = (input) => callbackRef.current(input);
     afterStepCallbacks.current.add(wrapped);
     return () => { afterStepCallbacks.current.delete(wrapped); };
   }, [afterStepCallbacks]);
@@ -219,10 +222,10 @@ interface MujocoSimProviderProps {
   mujoco: MujocoModule;
   config: SceneConfig;
   apiRef?: React.ForwardedRef<MujocoSimAPI>;
-  onReady?: (api: MujocoSimAPI) => void;
+  onReady?: (input: ReadyCallbackInput) => void;
   onError?: (error: Error) => void;
-  onStep?: (time: number) => void;
-  onSelection?: (bodyId: number, name: string) => void;
+  onStep?: (input: StepCallbackInput) => void;
+  onSelection?: (input: SelectionCallbackInput) => void;
   // Declarative physics config props
   gravity?: [number, number, number];
   timestep?: number;
@@ -380,7 +383,7 @@ export function MujocoSimProvider({
   useEffect(() => {
     if (status === 'ready') {
       const api = apiRef.current;
-      if (onReady) onReady(api);
+      if (onReady) onReady({ api });
       // Assign the forwarded ref
       if (externalApiRef) {
         if (typeof externalApiRef === 'function') {
@@ -409,7 +412,7 @@ export function MujocoSimProvider({
 
     // Before-step callbacks
     for (const cb of beforeStepCallbacks.current) {
-      cb(model, data);
+      cb({ model, data });
     }
 
     const numSubsteps = substepsRef.current;
@@ -466,17 +469,17 @@ export function MujocoSimProvider({
       interpolationStateRef.current.valid = true;
 
       if (!stepped) {
-        onStepRef.current?.(data.time);
+        onStepRef.current?.({ time: data.time, model, data });
         return;
       }
     }
 
     // After-step callbacks
     for (const cb of afterStepCallbacks.current) {
-      cb(model, data);
+      cb({ model, data });
     }
 
-    onStepRef.current?.(data.time);
+    onStepRef.current?.({ time: data.time, model, data });
   }, -1);
 
   function ensureInterpolationBuffers(model: MujocoModel) {
@@ -515,7 +518,7 @@ export function MujocoSimProvider({
       }
     }
 
-    configRef.current.onReset?.(model, data);
+    configRef.current.onReset?.({ model, data });
     mujoco.mj_forward(model, data);
 
     // Notify composable plugins (e.g. IkController)

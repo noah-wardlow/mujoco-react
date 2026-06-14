@@ -43,7 +43,7 @@ export type ControllerComponent<TConfig> = React.FC<{
  * const MyController = createController<{ speed: number }>(
  *   { name: 'my-controller', defaultConfig: { speed: 1.0 } },
  *   function MyControllerImpl({ config }) {
- *     useBeforePhysicsStep((_model, data) => {
+ *     useBeforePhysicsStep(({ data }) => {
  *       data.ctrl[0] = config.speed;
  *     });
  *     return null;
@@ -100,7 +100,7 @@ export function createController<TConfig>(
  *   { name: 'useMyController', defaultConfig: { gain: 1.0 } },
  *   function useMyControllerImpl(config) {
  *     // config is MyConfig | null — hooks must be called unconditionally
- *     useBeforePhysicsStep((_model, data) => {
+ *     useBeforePhysicsStep(({ data }) => {
  *       if (!config) return;
  *       data.ctrl[0] = config.gain * Math.sin(data.time);
  *     });

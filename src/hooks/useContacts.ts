@@ -60,7 +60,7 @@ export function useContacts(
     bodyResolvedRef.current = true;
   }, [bodyName, status, mjModelRef]);
 
-  useAfterPhysicsStep((model, data) => {
+  useAfterPhysicsStep(({ model, data }) => {
     // Resolve body id lazily once model exists, to avoid missing the first ready frame.
     if (bodyName && !bodyResolvedRef.current) {
       bodyIdRef.current = findBodyByName(model, bodyName);

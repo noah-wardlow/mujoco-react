@@ -54,7 +54,10 @@ export function TrajectoryPlayer({
     const currentFrame = player.frame;
     if (currentFrame !== lastReportedFrameRef.current && player.playing) {
       lastReportedFrameRef.current = currentFrame;
-      onFrameRef.current(currentFrame);
+      onFrameRef.current({
+        frameIndex: currentFrame,
+        frame: trajectory[currentFrame],
+      });
     }
   });
 

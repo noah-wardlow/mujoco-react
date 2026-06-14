@@ -168,7 +168,7 @@ export function DragInteraction({
   }, [gl, camera, scene, controls, mjDataRef]);
 
   // Apply spring force each physics frame
-  useBeforePhysicsStep((model, data) => {
+  useBeforePhysicsStep(({ model, data }) => {
     if (!draggingRef.current || bodyIdRef.current <= 0) return;
 
     const bid = bodyIdRef.current;

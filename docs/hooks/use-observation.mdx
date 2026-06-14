@@ -74,7 +74,7 @@ Use the pure helper when you already have `model` and `data` inside a physics ca
 ```tsx
 import { buildObservation, useBeforePhysicsStep } from "mujoco-react";
 
-useBeforePhysicsStep((model, data) => {
+useBeforePhysicsStep(({ model, data }) => {
   const obs = buildObservation(model, data, {
     qpos: true,
     qvel: true,

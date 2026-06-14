@@ -77,7 +77,7 @@ A controller is a React component that calls `useBeforePhysicsStep` to write `da
 import { useBeforePhysicsStep } from "mujoco-react";
 
 function MyController() {
-  useBeforePhysicsStep((_model, data) => {
+  useBeforePhysicsStep(({ data }) => {
     data.ctrl[0] = Math.sin(data.time);        // sine wave on actuator 0
     data.ctrl[1] = data.sensordata[0] * -0.5;  // feedback from a sensor
   });

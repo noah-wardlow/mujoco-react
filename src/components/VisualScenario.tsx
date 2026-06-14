@@ -490,7 +490,7 @@ function applyScenarioMaterials(
     for (const material of normalizeMaterials(object.material)) {
       const mutable = getMutableScenarioMaterial(material);
       if (!mutable) continue;
-      if (materialFilter && !materialFilter(object, material)) continue;
+      if (materialFilter && !materialFilter({ object, material })) continue;
 
       if (!snapshots.has(material)) {
         snapshots.set(material, {

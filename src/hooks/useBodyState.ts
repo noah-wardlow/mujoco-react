@@ -29,7 +29,7 @@ export function useBodyState(name: Bodies): BodyStateResult {
     bodyIdRef.current = findBodyByName(model, name);
   }, [name, status, mjModelRef]);
 
-  useAfterPhysicsStep((_model, data) => {
+  useAfterPhysicsStep(({ data }) => {
     const bid = bodyIdRef.current;
     if (bid < 0) return;
 
