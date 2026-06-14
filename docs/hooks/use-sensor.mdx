@@ -17,14 +17,16 @@ useSensor(name: Sensors): SensorHandle
 ```tsx
 import { RobotSensors, useSensor } from "mujoco-react";
 
-function ForceSensorDisplay() {
-  const force = useSensor(RobotSensors.franka.force_sensor);
+function ImuDisplay() {
+  const angularVelocity = useSensor(
+    RobotSensors.g1["imu-torso-angular-velocity"]
+  );
   const textRef = useRef<any>(null);
 
   useFrame(() => {
-    const v = force.read();
-    const magnitude = Math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2);
-    if (textRef.current) textRef.current.text = `${magnitude.toFixed(2)} N`;
+    const v = angularVelocity.read();
+    const speed = Math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2);
+    if (textRef.current) textRef.current.text = `${speed.toFixed(2)} rad/s`;
   });
 
   return <Text ref={textRef} position={[0, 0.5, 0]} />;

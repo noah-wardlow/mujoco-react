@@ -86,6 +86,8 @@
           "hooks/use-trajectory-player",
           "hooks/use-video-recorder",
           "hooks/use-frame-capture",
+          "hooks/use-camera-frame-capture",
+          "hooks/use-camera-sequence-recorder",
           "hooks/use-ctrl-noise",
           "hooks/use-gravity-compensation",
           "hooks/use-body-meshes",

@@ -74,12 +74,19 @@ This loads the Franka Panda from [DeepMind Menagerie](https://github.com/google-
 A controller is a React component that calls `useBeforePhysicsStep` to write `data.ctrl` each frame:
 
 ```tsx
-import { useBeforePhysicsStep } from "mujoco-react";
+import {
+  RobotActuators,
+  useBeforePhysicsStep,
+  useCtrl,
+} from "mujoco-react";
 
 function MyController() {
+  const shoulder = useCtrl(RobotActuators.franka.actuator1);
+  const elbow = useCtrl(RobotActuators.franka.actuator2);
+
   useBeforePhysicsStep(({ data }) => {
-    data.ctrl[0] = Math.sin(data.time);        // sine wave on actuator 0
-    data.ctrl[1] = data.sensordata[0] * -0.5;  // feedback from a sensor
+    shoulder.write(Math.sin(data.time));
+    elbow.write(Math.cos(data.time) * 0.5);
   });
   return null;
 }

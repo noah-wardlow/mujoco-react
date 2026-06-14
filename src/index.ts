@@ -82,6 +82,13 @@ export {
   captureFrameBlob,
   useFrameCapture,
 } from './hooks/useFrameCapture';
+export { useCameraFrameCapture } from './hooks/useCameraFrameCapture';
+export { useCameraSequenceRecorder } from './hooks/useCameraSequenceRecorder';
+export {
+  captureCameraFrame,
+  captureCameraFrameBlob,
+  renderCameraFrameToCanvas,
+} from './rendering/cameraFrameCapture';
 export { useCtrlNoise } from './hooks/useCtrlNoise';
 export { useBodyMeshes } from './hooks/useBodyMeshes';
 export { useSelectionHighlight } from './hooks/useSelectionHighlight';
@@ -181,6 +188,17 @@ export type {
   // API
   MujocoSimAPI,
   MujocoFrameCaptureOptions,
+  CameraFrameCaptureAPI,
+  CameraFrameCaptureBlobResult,
+  CameraFrameCaptureOptions,
+  CameraFrameCaptureQuaternion,
+  CameraFrameCaptureResult,
+  CameraFrameCaptureVector3,
+  CameraFrameSequenceCamera,
+  CameraFrameSequenceFrame,
+  CameraFrameSequenceOptions,
+  CameraFrameSequenceRecorderAPI,
+  CameraFrameSequenceResult,
   MujocoCanvasProps,
   MujocoContextValue,
   // Hook return types

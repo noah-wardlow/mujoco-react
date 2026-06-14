@@ -1,0 +1,92 @@
+---
+title: "useCameraFrameCapture"
+description: "Capture offscreen frames from a chosen camera pose"
+icon: "camera"
+---
+
+Capture a still image from a specific camera pose without moving the user's
+interactive viewport. This is useful for fixed dataset cameras, policy rollout
+reports, thumbnails, and visual regression checks.
+
+Unlike `useFrameCapture`, this renders the scene to an offscreen render target.
+It does not require `preserveDrawingBuffer`.
+
+## Signature
+
+```tsx
+useCameraFrameCapture(options?: {
+  camera?: THREE.Camera
+  position?: THREE.Vector3 | readonly [number, number, number]
+  lookAt?: THREE.Vector3 | readonly [number, number, number]
+  quaternion?: THREE.Quaternion | readonly [number, number, number, number]
+  up?: THREE.Vector3 | readonly [number, number, number]
+  width?: number
+  height?: number
+  type?: string
+  quality?: number
+  fov?: number
+  near?: number
+  far?: number
+}): {
+  status: "idle" | "capturing" | "captured" | "error"
+  error: Error | null
+  isCapturing: boolean
+  capture: (options?: CameraFrameCaptureOptions) => Promise<CameraFrameCaptureResult>
+  captureBlob: (options?: CameraFrameCaptureOptions) => Promise<CameraFrameCaptureBlobResult>
+  reset: () => void
+}
+```
+
+## Usage
+
+```tsx
+import { useCameraFrameCapture } from "mujoco-react";
+
+function DatasetCaptureButton() {
+  const capture = useCameraFrameCapture({
+    width: 1024,
+    height: 1024,
+    position: [1.4, -1.2, 1.1],
+    lookAt: [0.35, -0.3, 0.75],
+    type: "image/png",
+  });
+
+  async function saveFrame() {
+    const frame = await capture.captureBlob();
+    await uploadDatasetImage(frame.blob);
+  }
+
+  return (
+    <button onClick={saveFrame} disabled={capture.isCapturing}>
+      Capture dataset view
+    </button>
+  );
+}
+```
+
+## API Ref Path
+
+`MujocoSimAPI` exposes the same offscreen camera capture methods:
+
+```tsx
+const frame = await apiRef.current?.captureCameraFrame({
+  width: 1024,
+  height: 1024,
+  position: [1.4, -1.2, 1.1],
+  lookAt: [0.35, -0.3, 0.75],
+});
+
+const blob = await apiRef.current?.captureCameraFrameBlob({
+  width: 1024,
+  height: 1024,
+  position: [1.4, -1.2, 1.1],
+  lookAt: [0.35, -0.3, 0.75],
+});
+```
+
+## Notes
+
+- Use `position` + `lookAt` for dataset cameras.
+- Use `quaternion` when replaying a recorded camera pose.
+- Use `camera` to clone an existing `THREE.Camera`.
+- The returned canvas is generated from an offscreen render target.

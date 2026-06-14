@@ -213,18 +213,20 @@ function Scene() {
 ## Write Controllers
 
 ```tsx
-import { useBeforePhysicsStep } from "mujoco-react";
+import { RobotActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
 
 function MyController() {
+  const shoulder = useCtrl(RobotActuators.franka.actuator1);
+
   useBeforePhysicsStep(({ data }) => {
-    data.ctrl[0] = Math.sin(data.time);
+    shoulder.write(Math.sin(data.time));
   });
 
   return null;
 }
 ```
 
-Controllers are just React children that read sensors, write `data.ctrl`, apply forces, or call the `MujocoSimAPI` at physics-step time.
+Controllers are just React children that read sensors, write named controls, apply forces, or call the `MujocoSimAPI` at physics-step time.
 
 With generated resource values, reusable controllers can be scoped to one robot without hand-typing names:
 
@@ -388,15 +390,20 @@ function useWebSocketControls(url: string) {
 For reusable controllers with typed config, default merging, and children, use the `createController` factory:
 
 ```tsx
-import { createController, useCtrl, useBeforePhysicsStep } from "mujoco-react";
+import {
+  RobotActuators,
+  createController,
+  useBeforePhysicsStep,
+  useCtrl,
+} from "mujoco-react";
 
 export const MyController = createController<{ gain: number }>(
   { name: "MyController", defaultConfig: { gain: 1.0 } },
   ({ config, children }) => {
-    const shoulder = useCtrl("shoulder");
+    const shoulder = useCtrl(RobotActuators.franka.actuator1);
 
-    useBeforePhysicsStep(() => {
-      shoulder.write(config.gain * Math.sin(Date.now() / 1000));
+    useBeforePhysicsStep(({ data }) => {
+      shoulder.write(config.gain * Math.sin(data.time));
     });
 
     return <>{children}</>;
@@ -826,8 +833,12 @@ if (mujoco) {
 Run logic **before** `mj_step` each frame. Write to `data.ctrl`, apply forces, drive automation.
 
 ```tsx
+import { RobotActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
+
+const shoulder = useCtrl(RobotActuators.franka.actuator1);
+
 useBeforePhysicsStep(({ data }) => {
-  data.ctrl[0] = Math.sin(data.time);
+  shoulder.write(Math.sin(data.time));
 });
 ```
 
@@ -861,8 +872,8 @@ Read sensor values by name. Returns a `SensorHandle` with `read()`, `dim`, and `
 ```tsx
 import { RobotSensors, useSensor } from "mujoco-react";
 
-const force = useSensor(RobotSensors.franka.force_sensor);
-// force.read() -> Float64Array, force.dim -> number
+const imu = useSensor(RobotSensors.g1["imu-torso-angular-velocity"]);
+// imu.read() -> Float64Array, imu.dim -> number
 ```
 
 ### `useBodyState(name)`
@@ -996,6 +1007,13 @@ const blob = await apiRef.current?.captureFrameBlob({ type: "image/png" });
 
 Use `useFrameCapture()` or the standalone `captureFrame()` helpers when you own
 the canvas or want to capture a custom container.
+
+Use `captureCameraFrame()` / `captureCameraFrameBlob()` when dataset generation
+needs a fixed offscreen camera pose or resolution without moving the user's
+interactive viewport.
+
+Use `recordCameraSequence()` / `useCameraSequenceRecorder()` to step policy
+rollouts and capture synchronized frames from one or more fixed camera configs.
 
 ### `useCtrlNoise(config)`
 

@@ -59,9 +59,13 @@ Controllers are React components that call `useBeforePhysicsStep` to write `data
 
 ```tsx
 // This is a complete controller:
+import { RobotActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
+
 function MyController() {
+  const shoulder = useCtrl(RobotActuators.franka.actuator1);
+
   useBeforePhysicsStep(({ data }) => {
-    data.ctrl[0] = Math.sin(data.time);
+    shoulder.write(Math.sin(data.time));
   });
   return null;
 }

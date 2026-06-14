@@ -1,0 +1,122 @@
+---
+title: "useCameraSequenceRecorder"
+description: "Record fixed-camera image sequences while stepping simulation"
+icon: "video"
+---
+
+Record a short simulation sequence from one or more fixed camera poses. This is
+useful for dataset camera streams, policy rollout videos, visual regression
+clips, and LeRobot-style MP4 shard generation.
+
+The recorder pauses the interactive simulation while it records, optionally
+resets the model, steps MuJoCo between frames, waits for the scene graph to
+sync, and renders every requested camera into an offscreen image.
+
+## Signature
+
+```tsx
+useCameraSequenceRecorder(): {
+  status: "idle" | "capturing" | "captured" | "error"
+  error: Error | null
+  isRecording: boolean
+  record: (options: CameraFrameSequenceOptions) => Promise<CameraFrameSequenceResult>
+  reset: () => void
+}
+```
+
+`CameraFrameSequenceOptions`:
+
+```tsx
+{
+  cameras: Array<{
+    key: string
+    position?: THREE.Vector3 | readonly [number, number, number]
+    lookAt?: THREE.Vector3 | readonly [number, number, number]
+    quaternion?: THREE.Quaternion | readonly [number, number, number, number]
+    up?: THREE.Vector3 | readonly [number, number, number]
+    width?: number
+    height?: number
+    type?: string
+    quality?: number
+    fov?: number
+    near?: number
+    far?: number
+  }>
+  frames: number
+  stepsPerFrame?: number
+  reset?: boolean
+  captureInitialFrame?: boolean
+  onFrame?: (frame: CameraFrameSequenceFrame) => void | Promise<void>
+}
+```
+
+## Usage
+
+```tsx
+import { useCameraSequenceRecorder } from "mujoco-react";
+
+function RecordDatasetClip() {
+  const recorder = useCameraSequenceRecorder();
+
+  async function record() {
+    await recorder.record({
+      frames: 32,
+      stepsPerFrame: 2,
+      cameras: [
+        {
+          key: "head",
+          width: 640,
+          height: 480,
+          position: [1.4, -1.2, 1.1],
+          lookAt: [0.35, -0.3, 0.75],
+        },
+        {
+          key: "wrist",
+          width: 640,
+          height: 480,
+          position: [0.55, -0.55, 0.95],
+          lookAt: [0.35, -0.3, 0.75],
+        },
+      ],
+      onFrame: async (frame) => {
+        for (const [cameraKey, image] of Object.entries(frame.cameras)) {
+          await uploadFrame({
+            cameraKey,
+            frameIndex: frame.frameIndex,
+            dataUrl: image.dataUrl,
+          });
+        }
+      },
+    });
+  }
+
+  return (
+    <button onClick={record} disabled={recorder.isRecording}>
+      Record cameras
+    </button>
+  );
+}
+```
+
+## API Ref Path
+
+`MujocoSimAPI` exposes the same sequence recorder:
+
+```tsx
+await apiRef.current?.recordCameraSequence({
+  frames: 16,
+  cameras: [
+    { key: "head", position: [1, -1, 1], lookAt: [0, 0, 0.5] },
+  ],
+});
+```
+
+## Notes
+
+- Use `onFrame` for long sequences so you can stream frames to storage instead
+  of keeping all images in memory.
+- `captureInitialFrame` defaults to `true`; set it to `false` to step before
+  frame zero.
+- `stepsPerFrame` defaults to `1`.
+- Camera keys are application-defined, so they can map cleanly to dataset
+  feature names such as `observation.images.head`.

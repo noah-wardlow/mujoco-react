@@ -55,10 +55,11 @@ Read keyboard input via window event listeners and a ref:
 
 ```tsx
 import { useEffect, useRef } from "react";
-import { useBeforePhysicsStep } from "mujoco-react";
+import { RobotActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
 
 function MyController() {
   const keys = useRef<Record<string, boolean>>({});
+  const shoulder = useCtrl(RobotActuators.franka.actuator1);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => { keys.current[e.code] = true; };
@@ -73,8 +74,9 @@ function MyController() {
 
   useBeforePhysicsStep(({ data }) => {
     const k = keys.current;
-    if (k["KeyW"]) data.ctrl[0] += 0.01;
-    if (k["KeyS"]) data.ctrl[0] -= 0.01;
+    const next =
+      shoulder.read() + (k["KeyW"] ? 0.01 : 0) - (k["KeyS"] ? 0.01 : 0);
+    shoulder.write(next);
   });
 
   return null;
@@ -87,7 +89,7 @@ A generic hook that accepts a static config object makes it easy to support mult
 
 ```tsx
 interface ArmConfig {
-  indices: number[];        // Actuator indices for this arm
+  actuators: string[];      // Generated actuator names for this arm
   keys: string[];           // Key codes for movement
   initialJoints?: number[]; // Starting joint positions
 }
@@ -100,17 +102,20 @@ interface ArmControllerConfig {
 }
 ```
 
-The hook reads keyboard state and writes to the correct actuator indices each frame:
+The hook reads keyboard state and writes to the correct actuator handles each frame:
 
 ```tsx
 function useArmController(config: ArmControllerConfig) {
   const keys = useRef<Record<string, boolean>>({});
+  const sim = useMujoco();
 
   // ... keyboard listeners ...
 
   useBeforePhysicsStep(({ data }) => {
+    if (!sim.isReady) return;
     for (const arm of config.arms) {
-      // Read keys, solve IK, write to data.ctrl[arm.indices[i]]
+      // Read keys, solve IK, then:
+      // sim.api.setCtrl(arm.actuators[i], value)
     }
   });
 }
@@ -122,7 +127,13 @@ Then each robot controller is just a config:
 const SO101_CONFIG: ArmControllerConfig = {
   numActuators: 6,
   arms: [{
-    indices: [0, 1, 2, 3, 4, 5],
+    actuators: [
+      RobotActuators.so101.Rotation,
+      RobotActuators.so101.Pitch,
+      RobotActuators.so101.Elbow,
+      RobotActuators.so101.Wrist_Pitch,
+      RobotActuators.so101.Wrist_Roll,
+    ],
     keys: ["KeyD", "KeyA", "KeyW", "KeyS", "KeyQ", "KeyE",
            "KeyR", "KeyF", "KeyZ", "KeyC", "KeyV"],
     initialJoints: [0.0158, 2.052, 2.1307, -0.0845, 1.5857, -0.3745],
@@ -172,13 +183,23 @@ Solve IK yourself inside `useBeforePhysicsStep` with full access to the model an
 
 ```tsx
 function MyIKController({ targetRef }) {
+  const sim = useMujoco();
+
   useBeforePhysicsStep(({ model, data }) => {
     const target = targetRef.current;
-    if (!target) return;
+    if (!target || !sim.isReady) return;
 
     const joints = myCustomIKSolve(model, data, target);
     if (joints) {
-      for (let i = 0; i < joints.length; i++) data.ctrl[i] = joints[i];
+      sim.api.setCtrl({
+        [RobotActuators.franka.actuator1]: joints[0],
+        [RobotActuators.franka.actuator2]: joints[1],
+        [RobotActuators.franka.actuator3]: joints[2],
+        [RobotActuators.franka.actuator4]: joints[3],
+        [RobotActuators.franka.actuator5]: joints[4],
+        [RobotActuators.franka.actuator6]: joints[5],
+        [RobotActuators.franka.actuator7]: joints[6],
+      });
     }
   });
   return null;
@@ -192,11 +213,11 @@ This gives you full access to model/data for whatever solver you want.
 For reusable controllers with typed config and default merging, use the `createControllerHook` factory. It stabilizes config references (so inline objects don't cause re-renders), merges defaults, and supports disabling via `null`.
 
 ```tsx
-import { createControllerHook, useBeforePhysicsStep } from "mujoco-react";
+import { createControllerHook, RobotActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
 
 interface MyConfig {
   gain: number;
-  actuatorIndex: number;
+  actuator: string;
   frequency?: number;
 }
 
@@ -204,12 +225,13 @@ export const useMyController = createControllerHook<MyConfig, { amplitude: numbe
   { name: "useMyController", defaultConfig: { gain: 1.0, frequency: 1.0 } },
   (config) => {
     const amplitudeRef = useRef(0);
+    const actuator = useCtrl(config?.actuator ?? RobotActuators.franka.actuator1);
 
     useBeforePhysicsStep(({ data }) => {
       if (!config) return;
       const freq = config.frequency ?? 1.0;
       amplitudeRef.current = config.gain * Math.sin(data.time * freq);
-      data.ctrl[config.actuatorIndex] = amplitudeRef.current;
+      actuator.write(amplitudeRef.current);
     });
 
     if (!config) return null;
@@ -217,7 +239,7 @@ export const useMyController = createControllerHook<MyConfig, { amplitude: numbe
   },
 );
 
-// const result = useMyController({ gain: 2.0, actuatorIndex: 0 });
+// const result = useMyController({ gain: 2.0, actuator: RobotActuators.franka.actuator1 });
 // const disabled = useMyController(null); // returns null, no-ops
 ```
 
@@ -237,18 +259,20 @@ Pass `null` to disable the controller without breaking the rules of hooks — `u
 The `createController` factory is the component equivalent — same config stabilization and default merging, but returns a component that can render children:
 
 ```tsx
-import { createController, useBeforePhysicsStep } from "mujoco-react";
+import { createController, RobotActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
 
 interface MyConfig {
   gain: number;
-  actuatorIndex: number;
+  actuator: string;
   frequency?: number;
 }
 
 function MyControllerImpl({ config, children }: { config: MyConfig; children?: React.ReactNode }) {
+  const actuator = useCtrl(config.actuator);
+
   useBeforePhysicsStep(({ data }) => {
     const freq = config.frequency ?? 1.0;
-    data.ctrl[config.actuatorIndex] = config.gain * Math.sin(data.time * freq);
+    actuator.write(config.gain * Math.sin(data.time * freq));
   });
   return <>{children}</>;
 }
@@ -258,7 +282,7 @@ export const MyController = createController<MyConfig>(
   MyControllerImpl,
 );
 
-// <MyController config={{ gain: 2.0, actuatorIndex: 0 }}>
+// <MyController config={{ gain: 2.0, actuator: RobotActuators.franka.actuator1 }}>
 //   <Debug showJoints />
 // </MyController>
 ```

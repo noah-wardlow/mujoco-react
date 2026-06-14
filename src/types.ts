@@ -1104,6 +1104,9 @@ export interface MujocoSimAPI {
   getCanvasSnapshot(width?: number, height?: number, mimeType?: string): string;
   captureFrame(options?: MujocoFrameCaptureOptions): Promise<FrameCaptureResult>;
   captureFrameBlob(options?: MujocoFrameCaptureOptions): Promise<FrameCaptureBlobResult>;
+  captureCameraFrame(options?: CameraFrameCaptureOptions): Promise<CameraFrameCaptureResult>;
+  captureCameraFrameBlob(options?: CameraFrameCaptureOptions): Promise<CameraFrameCaptureBlobResult>;
+  recordCameraSequence(options: CameraFrameSequenceOptions): Promise<CameraFrameSequenceResult>;
   project2DTo3D(
     x: number,
     y: number,
@@ -1161,6 +1164,93 @@ export interface FrameCaptureAPI {
   captureBlob: (
     options?: FrameCaptureOptions
   ) => Promise<FrameCaptureBlobResult>;
+  reset: () => void;
+}
+
+export type CameraFrameCaptureVector3 =
+  | THREE.Vector3
+  | readonly [number, number, number];
+
+export type CameraFrameCaptureQuaternion =
+  | THREE.Quaternion
+  | readonly [number, number, number, number];
+
+export interface CameraFrameCaptureOptions {
+  camera?: THREE.Camera;
+  position?: CameraFrameCaptureVector3;
+  lookAt?: CameraFrameCaptureVector3;
+  quaternion?: CameraFrameCaptureQuaternion;
+  up?: CameraFrameCaptureVector3;
+  width?: number;
+  height?: number;
+  type?: string;
+  quality?: number;
+  fov?: number;
+  near?: number;
+  far?: number;
+}
+
+export interface CameraFrameCaptureResult {
+  canvas: HTMLCanvasElement;
+  camera: THREE.Camera;
+  dataUrl: string;
+  type: string;
+  width: number;
+  height: number;
+}
+
+export interface CameraFrameCaptureBlobResult {
+  canvas: HTMLCanvasElement;
+  camera: THREE.Camera;
+  blob: Blob;
+  type: string;
+  width: number;
+  height: number;
+}
+
+export interface CameraFrameCaptureAPI {
+  status: FrameCaptureStatus;
+  error: Error | null;
+  isCapturing: boolean;
+  capture: (
+    options?: CameraFrameCaptureOptions
+  ) => Promise<CameraFrameCaptureResult>;
+  captureBlob: (
+    options?: CameraFrameCaptureOptions
+  ) => Promise<CameraFrameCaptureBlobResult>;
+  reset: () => void;
+}
+
+export interface CameraFrameSequenceCamera extends CameraFrameCaptureOptions {
+  key: string;
+}
+
+export interface CameraFrameSequenceFrame {
+  frameIndex: number;
+  time: number;
+  cameras: Record<string, CameraFrameCaptureResult>;
+}
+
+export interface CameraFrameSequenceOptions {
+  cameras: readonly CameraFrameSequenceCamera[];
+  frames: number;
+  stepsPerFrame?: number;
+  reset?: boolean;
+  captureInitialFrame?: boolean;
+  onFrame?: (frame: CameraFrameSequenceFrame) => void | Promise<void>;
+}
+
+export interface CameraFrameSequenceResult {
+  frames: CameraFrameSequenceFrame[];
+  cameraKeys: string[];
+  frameCount: number;
+}
+
+export interface CameraFrameSequenceRecorderAPI {
+  status: FrameCaptureStatus;
+  error: Error | null;
+  isRecording: boolean;
+  record: (options: CameraFrameSequenceOptions) => Promise<CameraFrameSequenceResult>;
   reset: () => void;
 }
 

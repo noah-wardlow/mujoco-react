@@ -20,6 +20,10 @@ import {
   ActuatedJointInfo,
   ActuatorInfo,
   BodyInfo,
+  CameraFrameCaptureResult,
+  CameraFrameSequenceFrame,
+  CameraFrameSequenceOptions,
+  CameraFrameSequenceResult,
   ControlGroupInfo,
   ControlGroupSelector,
   ContactInfo,
@@ -45,6 +49,10 @@ import {
   captureFrame as captureCanvasFrame,
   captureFrameBlob as captureCanvasFrameBlob,
 } from '../hooks/useFrameCapture';
+import {
+  captureCameraFrame,
+  captureCameraFrameBlob,
+} from '../rendering/cameraFrameCapture';
 import {
   loadScene,
   createSceneConfigFromFiles,
@@ -109,6 +117,12 @@ const _rayVec = new Float64Array(3);
 const _rayGeomId = new Int32Array(1);
 const _projRaycaster = new THREE.Raycaster();
 const _projNdc = new THREE.Vector2();
+
+function waitForNextAnimationFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
 
 // ---- Internal context types ----
 
@@ -256,7 +270,7 @@ export function MujocoSimProvider({
   interpolate,
   children,
 }: MujocoSimProviderProps) {
-  const { gl, camera } = useThree();
+  const { gl, camera, scene } = useThree();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   // --- Refs ---
@@ -547,6 +561,30 @@ export function MujocoSimProvider({
   const step = useCallback((n = 1) => {
     stepsToRunRef.current = n;
   }, []);
+
+  const stepImmediately = useCallback((steps = 1) => {
+    const model = mjModelRef.current;
+    const data = mjDataRef.current;
+    if (!model || !data) return false;
+
+    for (let stepIndex = 0; stepIndex < steps; stepIndex += 1) {
+      for (let i = 0; i < model.nv; i += 1) {
+        data.qfrc_applied[i] = 0;
+      }
+      for (const cb of beforeStepCallbacks.current) {
+        cb({ model, data });
+      }
+      mujoco.mj_step(model, data);
+      for (const cb of afterStepCallbacks.current) {
+        cb({ model, data });
+      }
+      onStepRef.current?.({ time: data.time, model, data });
+    }
+
+    physicsAccumulatorRef.current = 0;
+    interpolationStateRef.current.valid = false;
+    return true;
+  }, [mujoco]);
 
   const getTime = useCallback((): number => {
     return mjDataRef.current?.time ?? 0;
@@ -1041,6 +1079,81 @@ export function MujocoSimProvider({
     [gl]
   );
 
+  const captureCameraFrameApi = useCallback(
+    (options = {}) => {
+      return captureCameraFrame(gl, scene, camera, options);
+    },
+    [camera, gl, scene]
+  );
+
+  const captureCameraFrameBlobApi = useCallback(
+    (options = {}) => {
+      return captureCameraFrameBlob(gl, scene, camera, options);
+    },
+    [camera, gl, scene]
+  );
+
+  const recordCameraSequenceApi = useCallback(
+    async (
+      options: CameraFrameSequenceOptions
+    ): Promise<CameraFrameSequenceResult> => {
+      const frameCount = Math.max(0, Math.floor(options.frames));
+      const stepsPerFrame = Math.max(1, Math.floor(options.stepsPerFrame ?? 1));
+      const cameras = options.cameras;
+      const frames: CameraFrameSequenceFrame[] = [];
+      const wasPaused = pausedRef.current;
+
+      if (frameCount === 0 || cameras.length === 0) {
+        return {
+          frames,
+          cameraKeys: cameras.map((sequenceCamera) => sequenceCamera.key),
+          frameCount: 0,
+        };
+      }
+
+      try {
+        pausedRef.current = true;
+        stepsToRunRef.current = 0;
+        if (options.reset) reset();
+
+        for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+          if (frameIndex > 0 || options.captureInitialFrame === false) {
+            stepImmediately(stepsPerFrame);
+          }
+          await waitForNextAnimationFrame();
+
+          const cameraFrames: Record<string, CameraFrameCaptureResult> = {};
+          for (const sequenceCamera of cameras) {
+            const { key, ...captureOptions } = sequenceCamera;
+            cameraFrames[key] = await captureCameraFrame(
+              gl,
+              scene,
+              camera,
+              captureOptions
+            );
+          }
+
+          const frame = {
+            frameIndex,
+            time: getTime(),
+            cameras: cameraFrames,
+          };
+          frames.push(frame);
+          await options.onFrame?.(frame);
+        }
+      } finally {
+        pausedRef.current = wasPaused;
+      }
+
+      return {
+        frames,
+        cameraKeys: cameras.map((sequenceCamera) => sequenceCamera.key),
+        frameCount: frames.length,
+      };
+    },
+    [camera, getTime, gl, reset, scene, stepImmediately]
+  );
+
   const project2DTo3D = useCallback(
     (x: number, y: number, cameraPos: THREE.Vector3, lookAt: THREE.Vector3): { point: THREE.Vector3; bodyId: number; geomId: number } | null => {
       const virtCam = (camera as THREE.PerspectiveCamera).clone();
@@ -1154,6 +1267,9 @@ export function MujocoSimProvider({
       getCanvasSnapshot,
       captureFrame: captureFrameApi,
       captureFrameBlob: captureFrameBlobApi,
+      captureCameraFrame: captureCameraFrameApi,
+      captureCameraFrameBlob: captureCameraFrameBlobApi,
+      recordCameraSequence: recordCameraSequenceApi,
       project2DTo3D,
       setBodyMass,
       setGeomFriction,
@@ -1172,6 +1288,8 @@ export function MujocoSimProvider({
       raycast, getKeyframeNames, getKeyframeCount, loadSceneApi,
       loadFromFilesApi, addBodyApi, removeBodyApi, recompileApi,
       getCanvas, getCanvasSnapshot, captureFrameApi, captureFrameBlobApi,
+      captureCameraFrameApi, captureCameraFrameBlobApi,
+      recordCameraSequenceApi,
       project2DTo3D,
       setBodyMass, setGeomFriction, setGeomSize,
     ]
