@@ -1100,7 +1100,10 @@ export interface MujocoSimAPI {
   recompile(patches?: XmlPatch[]): Promise<void>;
 
   // Canvas
+  getCanvas(): HTMLCanvasElement | null;
   getCanvasSnapshot(width?: number, height?: number, mimeType?: string): string;
+  captureFrame(options?: MujocoFrameCaptureOptions): Promise<FrameCaptureResult>;
+  captureFrameBlob(options?: MujocoFrameCaptureOptions): Promise<FrameCaptureBlobResult>;
   project2DTo3D(
     x: number,
     y: number,
@@ -1116,6 +1119,49 @@ export interface MujocoSimAPI {
   // Internal refs for advanced use
   readonly mjModelRef: React.RefObject<MujocoModel | null>;
   readonly mjDataRef: React.RefObject<MujocoData | null>;
+}
+
+export type FrameCaptureStatus = 'idle' | 'capturing' | 'captured' | 'error';
+
+export type FrameCaptureTarget =
+  | HTMLCanvasElement
+  | HTMLElement
+  | null
+  | undefined;
+
+export type FrameCaptureTargetRef =
+  React.RefObject<HTMLCanvasElement | HTMLElement | null>;
+
+export interface FrameCaptureOptions {
+  target?: FrameCaptureTarget | FrameCaptureTargetRef;
+  type?: string;
+  quality?: number;
+  waitForAnimationFrame?: boolean;
+}
+
+export type MujocoFrameCaptureOptions = Omit<FrameCaptureOptions, 'target'>;
+
+export interface FrameCaptureResult {
+  canvas: HTMLCanvasElement;
+  dataUrl: string;
+  type: string;
+}
+
+export interface FrameCaptureBlobResult {
+  canvas: HTMLCanvasElement;
+  blob: Blob;
+  type: string;
+}
+
+export interface FrameCaptureAPI {
+  status: FrameCaptureStatus;
+  error: Error | null;
+  isCapturing: boolean;
+  capture: (options?: FrameCaptureOptions) => Promise<FrameCaptureResult>;
+  captureBlob: (
+    options?: FrameCaptureOptions
+  ) => Promise<FrameCaptureBlobResult>;
+  reset: () => void;
 }
 
 // ---- Canvas Props ----

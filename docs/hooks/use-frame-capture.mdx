@@ -30,6 +30,40 @@ useFrameCapture(options?: {
 
 ## Usage
 
+When you use `MujocoCanvas`, the forwarded `MujocoSimAPI` exposes capture
+methods directly:
+
+```tsx
+import { useRef } from "react";
+import { MujocoCanvas } from "mujoco-react";
+import type { MujocoSimAPI } from "mujoco-react";
+
+function SceneCapture({ config }) {
+  const apiRef = useRef<MujocoSimAPI>(null);
+
+  async function saveFrame() {
+    const frame = await apiRef.current?.captureFrame({ type: "image/png" });
+    await fetch("/api/captures/frame", {
+      method: "POST",
+      body: JSON.stringify({ dataUrl: frame?.dataUrl }),
+    });
+  }
+
+  return (
+    <>
+      <MujocoCanvas
+        ref={apiRef}
+        config={config}
+        gl={{ preserveDrawingBuffer: true }}
+      />
+      <button onClick={saveFrame}>Capture frame</button>
+    </>
+  );
+}
+```
+
+Use the hook when you own the canvas or want to capture a container:
+
 ```tsx
 import { useRef } from "react";
 import { MujocoCanvas, useFrameCapture } from "mujoco-react";
@@ -71,6 +105,9 @@ import { captureFrame, captureFrameBlob } from "mujoco-react";
 const image = await captureFrame({ target: containerElement });
 const blob = await captureFrameBlob({ target: canvasElement });
 ```
+
+`MujocoSimAPI` also exposes `getCanvas()`, `captureFrame()`, and
+`captureFrameBlob()` for the common `MujocoCanvas` ref path.
 
 ## Options
 

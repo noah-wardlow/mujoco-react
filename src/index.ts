@@ -82,15 +82,6 @@ export {
   captureFrameBlob,
   useFrameCapture,
 } from './hooks/useFrameCapture';
-export type {
-  FrameCaptureAPI,
-  FrameCaptureBlobResult,
-  FrameCaptureOptions,
-  FrameCaptureResult,
-  FrameCaptureStatus,
-  FrameCaptureTarget,
-  FrameCaptureTargetRef,
-} from './hooks/useFrameCapture';
 export { useCtrlNoise } from './hooks/useCtrlNoise';
 export { useBodyMeshes } from './hooks/useBodyMeshes';
 export { useSelectionHighlight } from './hooks/useSelectionHighlight';
@@ -189,9 +180,17 @@ export type {
   ContactListenerProps,
   // API
   MujocoSimAPI,
+  MujocoFrameCaptureOptions,
   MujocoCanvasProps,
   MujocoContextValue,
   // Hook return types
+  FrameCaptureAPI,
+  FrameCaptureBlobResult,
+  FrameCaptureOptions,
+  FrameCaptureResult,
+  FrameCaptureStatus,
+  FrameCaptureTarget,
+  FrameCaptureTargetRef,
   SitePositionResult,
   SensorResult,
   CtrlHandle,

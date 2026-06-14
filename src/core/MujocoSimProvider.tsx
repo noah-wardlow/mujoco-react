@@ -42,6 +42,10 @@ import {
   XmlPatch,
 } from '../types';
 import {
+  captureFrame as captureCanvasFrame,
+  captureFrameBlob as captureCanvasFrameBlob,
+} from '../hooks/useFrameCapture';
+import {
   loadScene,
   createSceneConfigFromFiles,
   findKeyframeByName,
@@ -1019,6 +1023,24 @@ export function MujocoSimProvider({
     [gl]
   );
 
+  const getCanvas = useCallback((): HTMLCanvasElement | null => {
+    return gl.domElement ?? null;
+  }, [gl]);
+
+  const captureFrameApi = useCallback(
+    (options = {}) => {
+      return captureCanvasFrame({ ...options, target: gl.domElement });
+    },
+    [gl]
+  );
+
+  const captureFrameBlobApi = useCallback(
+    (options = {}) => {
+      return captureCanvasFrameBlob({ ...options, target: gl.domElement });
+    },
+    [gl]
+  );
+
   const project2DTo3D = useCallback(
     (x: number, y: number, cameraPos: THREE.Vector3, lookAt: THREE.Vector3): { point: THREE.Vector3; bodyId: number; geomId: number } | null => {
       const virtCam = (camera as THREE.PerspectiveCamera).clone();
@@ -1128,7 +1150,10 @@ export function MujocoSimProvider({
       addBody: addBodyApi,
       removeBody: removeBodyApi,
       recompile: recompileApi,
+      getCanvas,
       getCanvasSnapshot,
+      captureFrame: captureFrameApi,
+      captureFrameBlob: captureFrameBlobApi,
       project2DTo3D,
       setBodyMass,
       setGeomFriction,
@@ -1146,7 +1171,8 @@ export function MujocoSimProvider({
       getActuatorsApi, getSensors, getModelOption, setGravity, setTimestepApi,
       raycast, getKeyframeNames, getKeyframeCount, loadSceneApi,
       loadFromFilesApi, addBodyApi, removeBodyApi, recompileApi,
-      getCanvasSnapshot, project2DTo3D,
+      getCanvas, getCanvasSnapshot, captureFrameApi, captureFrameBlobApi,
+      project2DTo3D,
       setBodyMass, setGeomFriction, setGeomSize,
     ]
   );

@@ -6,48 +6,14 @@
  */
 
 import { useCallback, useState } from 'react';
-import type React from 'react';
-
-export type FrameCaptureStatus = 'idle' | 'capturing' | 'captured' | 'error';
-
-export type FrameCaptureTarget =
-  | HTMLCanvasElement
-  | HTMLElement
-  | null
-  | undefined;
-
-export type FrameCaptureTargetRef =
-  React.RefObject<HTMLCanvasElement | HTMLElement | null>;
-
-export interface FrameCaptureOptions {
-  target?: FrameCaptureTarget | FrameCaptureTargetRef;
-  type?: string;
-  quality?: number;
-  waitForAnimationFrame?: boolean;
-}
-
-export interface FrameCaptureResult {
-  canvas: HTMLCanvasElement;
-  dataUrl: string;
-  type: string;
-}
-
-export interface FrameCaptureBlobResult {
-  canvas: HTMLCanvasElement;
-  blob: Blob;
-  type: string;
-}
-
-export interface FrameCaptureAPI {
-  status: FrameCaptureStatus;
-  error: Error | null;
-  isCapturing: boolean;
-  capture: (options?: FrameCaptureOptions) => Promise<FrameCaptureResult>;
-  captureBlob: (
-    options?: FrameCaptureOptions
-  ) => Promise<FrameCaptureBlobResult>;
-  reset: () => void;
-}
+import type {
+  FrameCaptureAPI,
+  FrameCaptureBlobResult,
+  FrameCaptureOptions,
+  FrameCaptureResult,
+  FrameCaptureStatus,
+  FrameCaptureTargetRef,
+} from '../types';
 
 function isTargetRef(
   target: FrameCaptureOptions['target']

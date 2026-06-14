@@ -983,6 +983,20 @@ const video = useVideoRecorder({ fps: 30, mimeType: "video/webm" });
 // video.start(), video.stop() -> returns Blob
 ```
 
+### Frame Capture
+
+Capture dataset/debug stills from the rendered MuJoCo canvas:
+
+```tsx
+const apiRef = useRef<MujocoSimAPI>(null);
+
+const frame = await apiRef.current?.captureFrame({ type: "image/png" });
+const blob = await apiRef.current?.captureFrameBlob({ type: "image/png" });
+```
+
+Use `useFrameCapture()` or the standalone `captureFrame()` helpers when you own
+the canvas or want to capture a custom container.
+
 ### `useCtrlNoise(config)`
 
 Apply Gaussian noise to controls for robustness testing:
@@ -1104,7 +1118,10 @@ The full API object available via `ref` or `useMujoco()` (when `isReady`):
 |--------|-------------|
 | `raycast(origin, direction, maxDist?)` | Physics raycast via `mj_ray` |
 | `project2DTo3D(x, y, camPos, lookAt)` | Screen-to-world raycast (returns bodyId + geomId) |
+| `getCanvas()` | Return the underlying R3F canvas element |
 | `getCanvasSnapshot(w?, h?, mime?)` | Base64 screenshot |
+| `captureFrame(options?)` | Capture the canvas as a data URL |
+| `captureFrameBlob(options?)` | Capture the canvas as a Blob |
 
 ### Scene Management
 
