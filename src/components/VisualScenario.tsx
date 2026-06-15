@@ -468,9 +468,9 @@ export function getSplatEnvironmentReadiness({
 }
 
 /**
- * Convert a generic visual scenario splat block into a paired visual/physics
- * environment config. Returns undefined until both the splat asset and MJCF
- * collision proxy are present.
+ * Convert a generic visual scenario splat block into a composable splat
+ * environment config. Visual-only splats are valid; readiness reports whether
+ * a paired MJCF collision proxy is required before training/physics handoff.
  */
 export function createPairedSplatEnvironment(
   scenario: Pick<VisualScenarioConfig, 'id' | 'label' | 'environment' | 'splat'>,
@@ -484,7 +484,7 @@ export function createPairedSplatEnvironment(
   const splat = scenario.splat;
   const collisionProxy = splat?.collisionProxy;
 
-  if (!splat?.enabled || !splat.src || !collisionProxy?.xmlPath) {
+  if (!splat?.enabled || !splat.src) {
     return undefined;
   }
 
@@ -501,15 +501,22 @@ export function createPairedSplatEnvironment(
       format: splat.format ?? 'spz',
       renderer: options.renderer,
     },
-    collisionProxy: {
-      ...collisionProxy,
-      xmlPath: collisionProxy.xmlPath,
-    },
+    collisionProxy: collisionProxy?.xmlPath
+      ? {
+          ...collisionProxy,
+          xmlPath: collisionProxy.xmlPath,
+        }
+      : undefined,
   };
 }
 
 function isPairedSplatEnvironment(input: SplatSceneInput): input is PairedSplatEnvironmentConfig {
-  return !!input && 'collisionProxy' in input && 'splat' in input;
+  return (
+    !!input &&
+    'splat' in input &&
+    !!input.splat &&
+    !('enabled' in input.splat)
+  );
 }
 
 function sceneRelativePath(sceneConfig: SceneConfig, path: string): string {
@@ -549,7 +556,7 @@ export function withSplatEnvironment(
     : input
       ? createPairedSplatEnvironment(input, options)
       : undefined;
-  const xmlPath = environment?.collisionProxy.xmlPath;
+  const xmlPath = environment?.collisionProxy?.xmlPath;
   if (!xmlPath) return sceneConfig;
 
   return {

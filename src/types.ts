@@ -928,8 +928,8 @@ export interface PairedSplatEnvironmentConfig {
   description?: string;
   /** Visual-only Gaussian splat asset. */
   splat: SplatAssetConfig;
-  /** MJCF/XML contact geometry paired with the visual splat. */
-  collisionProxy: SplatCollisionProxyConfig & { xmlPath: string };
+  /** Optional MJCF/XML contact geometry paired with the visual splat. */
+  collisionProxy?: SplatCollisionProxyConfig & { xmlPath: string };
 }
 
 export const SplatEnvironmentReadinessStatus = {

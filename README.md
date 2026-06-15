@@ -162,7 +162,9 @@ import { ScenarioLighting, VisualScenarioEffects } from "mujoco-react";
 
 Use the renderer-agnostic boundary from the main package. If your app stores
 visual scenarios as data, pass the scenario directly; the component resolves the
-splat asset and paired MJCF collision proxy metadata for you.
+splat asset and any paired MJCF collision proxy metadata for you. Visual-only
+splats are valid, and readiness tells you whether a collision proxy is required
+for your training/physics handoff.
 
 ```tsx
 import { MujocoCanvas, SplatEnvironment, useSplatSceneConfig } from "mujoco-react";
@@ -181,7 +183,7 @@ const splat = useSplatSceneConfig({ sceneConfig, scenario });
 Use `splat.readiness` or `getSplatEnvironmentReadiness(scenario)` to gate
 authoring and import flows. The status distinguishes disabled scenarios,
 missing splat assets, missing MJCF collision proxies, unsupported Spark formats,
-and ready paired environments.
+and ready visual or paired environments.
 
 For MuJoCo + 3DGS composition, derive the collision environment from the same
 splat metadata and pass the resulting config to `<MujocoCanvas>`:
