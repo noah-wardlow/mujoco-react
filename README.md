@@ -143,7 +143,7 @@ Use it as a child of `<MujocoCanvas>`:
 
 ## Gaussian Splat Environments
 
-Gaussian splats are visual context; MuJoCo XML remains the source of physics, contacts, and task fixtures. Pair each splat asset with collision proxy metadata so scene variants, rollouts, and datasets preserve both sides of the environment.
+Gaussian splats are visual context; MuJoCo XML remains the source of physics, contacts, and task fixtures. Use visual-only splats when you only need rendered environment context, and add collision proxy metadata when a workflow needs simplified contact geometry.
 
 Use `VisualScenarioEffects` when the same MuJoCo task should render under
 different camera exposure, fog/background, and deterministic material variants:
@@ -185,8 +185,8 @@ authoring and import flows. The status distinguishes disabled scenarios,
 missing splat assets, missing MJCF collision proxies, unsupported Spark formats,
 and ready visual or paired environments.
 
-For MuJoCo + 3DGS composition, derive the collision environment from the same
-splat metadata and pass the resulting config to `<MujocoCanvas>`:
+For MuJoCo + 3DGS composition, derive the optional collision environment from
+the same splat metadata and pass the resulting config to `<MujocoCanvas>`:
 
 ```tsx
 const sceneConfig = withSplatEnvironment(
@@ -554,7 +554,7 @@ interface SceneConfig {
 }
 ```
 
-Use `environmentFiles` to compose reusable physics/collision layers with a robot model. For Gaussian splat scenes, keep the `.spz` as a parallel visual layer and point `environmentFiles` at the paired MJCF proxy scene:
+Use `environmentFiles` to compose reusable physics/collision layers with a robot model. For Gaussian splat scenes, keep the `.spz` as a parallel visual layer and point `environmentFiles` at a paired MJCF proxy scene only when contact geometry is needed:
 
 ```tsx
 const kitchenRobot: SceneConfig = {
