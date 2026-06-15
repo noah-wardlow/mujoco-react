@@ -84,7 +84,9 @@ const config = {
 };
 ```
 
-This works well with Gaussian splats: keep the `.spz` as a visual-only layer and keep the paired `scene.xml` as the collision/physics layer.
+This works well with Gaussian splats: keep the `.spz` as a visual-only layer,
+and add a paired `scene.xml` collision/physics layer only when the splat-backed
+workflow needs contact geometry.
 
 ## addBody(body), removeBody(name), recompile(patches?)
 
