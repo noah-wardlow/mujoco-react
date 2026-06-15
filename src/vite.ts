@@ -38,7 +38,7 @@ export interface MujocoRegisterCodegenResult {
   counts: Record<RegisterKey, number>;
 }
 
-type RegisterKey = 'actuators' | 'sensors' | 'bodies' | 'joints' | 'sites' | 'geoms' | 'keyframes';
+type RegisterKey = 'actuators' | 'sensors' | 'bodies' | 'joints' | 'sites' | 'geoms' | 'keyframes' | 'cameras';
 export type ModelInput = string | readonly string[] | Record<string, string>;
 
 interface ModelEntry {
@@ -47,7 +47,7 @@ interface ModelEntry {
   names: Record<RegisterKey, Set<string>>;
 }
 
-const REGISTER_KEYS: RegisterKey[] = ['actuators', 'sensors', 'bodies', 'joints', 'sites', 'geoms', 'keyframes'];
+const REGISTER_KEYS: RegisterKey[] = ['actuators', 'sensors', 'bodies', 'joints', 'sites', 'geoms', 'keyframes', 'cameras'];
 const MODEL_EXTENSIONS = new Set(['.xml', '.mjcf', '.urdf']);
 
 function createEmptyNames(): Record<RegisterKey, Set<string>> {
@@ -59,6 +59,7 @@ function createEmptyNames(): Record<RegisterKey, Set<string>> {
     sites: new Set(),
     geoms: new Set(),
     keyframes: new Set(),
+    cameras: new Set(),
   };
 }
 
@@ -166,6 +167,7 @@ async function scanModel(
   collectSimpleTagNames(xml, 'joint', names.joints);
   collectSimpleTagNames(xml, 'site', names.sites);
   collectSimpleTagNames(xml, 'geom', names.geoms);
+  collectSimpleTagNames(xml, 'camera', names.cameras);
   collectSimpleTagNames(xml, 'key', names.keyframes);
   collectSectionNames(xml, 'actuator', names.actuators);
   collectSectionNames(xml, 'sensor', names.sensors);
@@ -300,6 +302,7 @@ function renderNamespaceAliases(models: readonly ModelEntry[]): string {
     sites: 'RobotSites',
     geoms: 'RobotGeoms',
     keyframes: 'RobotKeyframes',
+    cameras: 'RobotCameras',
   };
 
   const blocks = REGISTER_KEYS

@@ -54,8 +54,9 @@ export type RobotJoints<TRobot extends string> = RobotResource<TRobot, 'joints'>
 export type RobotSites<TRobot extends string> = RobotResource<TRobot, 'sites'>;
 export type RobotGeoms<TRobot extends string> = RobotResource<TRobot, 'geoms'>;
 export type RobotKeyframes<TRobot extends string> = RobotResource<TRobot, 'keyframes'>;
+export type RobotCameras<TRobot extends string> = RobotResource<TRobot, 'cameras'>;
 
-export type RegisterResourceKey = 'actuators' | 'sensors' | 'bodies' | 'joints' | 'sites' | 'geoms' | 'keyframes';
+export type RegisterResourceKey = 'actuators' | 'sensors' | 'bodies' | 'joints' | 'sites' | 'geoms' | 'keyframes' | 'cameras';
 export type RobotResourceObject<TRobot extends string, TKey extends RegisterResourceKey> =
   string extends RobotResource<TRobot, TKey>
     ? Record<string, string>
@@ -73,7 +74,7 @@ type RuntimeRobotResources = Record<string, Record<RegisterResourceKey, Record<s
 type RuntimeRobotResourceRegistration = Readonly<Record<string, Readonly<Record<RegisterResourceKey, Readonly<Record<string, string>>>>>>;
 
 const runtimeRobotResources: RuntimeRobotResources = {};
-const REGISTER_RESOURCE_KEYS: RegisterResourceKey[] = ['actuators', 'sensors', 'bodies', 'joints', 'sites', 'geoms', 'keyframes'];
+const REGISTER_RESOURCE_KEYS: RegisterResourceKey[] = ['actuators', 'sensors', 'bodies', 'joints', 'sites', 'geoms', 'keyframes', 'cameras'];
 
 function createEmptyRuntimeResources(): Record<RegisterResourceKey, Record<string, string>> {
   return {
@@ -84,6 +85,7 @@ function createEmptyRuntimeResources(): Record<RegisterResourceKey, Record<strin
     sites: {},
     geoms: {},
     keyframes: {},
+    cameras: {},
   };
 }
 
@@ -134,6 +136,7 @@ export const RobotJoints: RobotResourceCategory<'joints'> = createResourceCatego
 export const RobotSites: RobotResourceCategory<'sites'> = createResourceCategory('sites');
 export const RobotGeoms: RobotResourceCategory<'geoms'> = createResourceCategory('geoms');
 export const RobotKeyframes: RobotResourceCategory<'keyframes'> = createResourceCategory('keyframes');
+export const RobotCameras: RobotResourceCategory<'cameras'> = createResourceCategory('cameras');
 
 export type Actuators = Register extends { actuators: infer T extends string } ? T : string;
 export type Sensors = Register extends { sensors: infer T extends string } ? T : string;
@@ -142,6 +145,7 @@ export type Joints = Register extends { joints: infer T extends string } ? T : s
 export type Sites = Register extends { sites: infer T extends string } ? T : string;
 export type Geoms = Register extends { geoms: infer T extends string } ? T : string;
 export type Keyframes = Register extends { keyframes: infer T extends string } ? T : string;
+export type Cameras = Register extends { cameras: infer T extends string } ? T : string;
 
 // ---- MuJoCo WASM Types ----
 
@@ -209,6 +213,7 @@ export interface MujocoModel {
   nflex: number;
   nmesh: number;
   nmat: number;
+  ncam?: number;
 
   // Name tables
   names: Int8Array;
@@ -220,6 +225,7 @@ export interface MujocoModel {
   name_keyadr: Int32Array;
   name_sensoradr: Int32Array;
   name_tendonadr: Int32Array;
+  name_camadr?: Int32Array;
 
   // Body
   body_mass: Float64Array;
@@ -307,6 +313,12 @@ export interface MujocoModel {
   light_exponent: Float32Array;
   light_intensity: Float32Array;
 
+  // Camera
+  cam_bodyid?: Int32Array;
+  cam_pos?: Float64Array;
+  cam_quat?: Float64Array;
+  cam_fovy?: Float64Array;
+
   // Tendon
   ten_wrapadr: Int32Array;
   ten_wrapnum: Int32Array;
@@ -350,6 +362,9 @@ export interface MujocoData {
   qfrc_bias: Float64Array;
   site_xpos: Float64Array;
   site_xmat: Float64Array;
+  cam_xpos?: Float64Array;
+  cam_xmat?: Float64Array;
+  xmat?: Float64Array;
   sensordata: Float64Array;
   ncon: number;
   contact: MujocoContactArray;
@@ -683,6 +698,15 @@ export interface SensorInfo {
   adr: number;
 }
 
+export interface CameraInfo {
+  id: number;
+  name: string;
+  bodyId: number;
+  fov: number | null;
+  position: [number, number, number] | null;
+  quaternion: [number, number, number, number] | null;
+}
+
 // ---- Contacts (spec 2.4, 2.5) ----
 
 export interface ContactInfo {
@@ -908,6 +932,27 @@ export interface PairedSplatEnvironmentConfig {
   collisionProxy: SplatCollisionProxyConfig & { xmlPath: string };
 }
 
+export const SplatEnvironmentReadinessStatus = {
+  Disabled: 'disabled',
+  MissingSplat: 'missing-splat',
+  MissingCollisionProxy: 'missing-collision-proxy',
+  UnsupportedFormat: 'unsupported-format',
+  Ready: 'ready',
+} as const;
+
+export type SplatEnvironmentReadinessStatus =
+  (typeof SplatEnvironmentReadinessStatus)[keyof typeof SplatEnvironmentReadinessStatus];
+
+export interface SplatEnvironmentReadiness {
+  status: SplatEnvironmentReadinessStatus;
+  ready: boolean;
+  requiresCollisionProxy: boolean;
+  missing: Array<'splat' | 'collisionProxy'>;
+  format?: SplatFormat;
+  renderer?: SplatRendererKind;
+  message: string;
+}
+
 export interface SplatEnvironmentMetadataInput {
   environment?: PairedSplatEnvironmentConfig;
   scenario?: VisualScenarioConfig;
@@ -921,6 +966,7 @@ export interface SplatEnvironmentMetadata {
   src?: string;
   format: SplatFormat;
   collisionProxy?: SplatCollisionProxyConfig;
+  readiness: SplatEnvironmentReadiness;
   userData: Record<string, unknown>;
 }
 
@@ -929,6 +975,21 @@ export type SplatSceneInput =
   | VisualScenarioConfig
   | undefined
   | null;
+
+export interface SplatSceneConfigInput {
+  sceneConfig: SceneConfig;
+  scenario?: VisualScenarioConfig;
+  environment?: PairedSplatEnvironmentConfig;
+  enabled?: boolean;
+  renderer?: SplatRendererKind;
+}
+
+export interface SplatSceneConfigState {
+  environment: PairedSplatEnvironmentConfig | undefined;
+  sceneConfig: SceneConfig;
+  enabled: boolean;
+  readiness: SplatEnvironmentReadiness;
+}
 
 export interface VisualScenarioConfig {
   id?: string;
@@ -1079,6 +1140,7 @@ export interface MujocoSimAPI {
   getSites(): SiteInfo[];
   getActuators(): ActuatorInfo[];
   getSensors(): SensorInfo[];
+  getCameras(): CameraInfo[];
 
   // Model parameters (spec 5.3)
   getModelOption(): ModelOptions;
@@ -1176,7 +1238,14 @@ export type CameraFrameCaptureQuaternion =
   | readonly [number, number, number, number];
 
 export interface CameraFrameCaptureOptions {
+  /** Existing Three camera to clone before applying pose overrides. */
   camera?: THREE.Camera;
+  /** Named MuJoCo `<camera>` to render from when available in the loaded model. */
+  cameraName?: Cameras;
+  /** Named MuJoCo site to use as the rendered camera pose. Useful for robot-mounted optical frames. */
+  siteName?: Sites;
+  /** Named MuJoCo body to use as the rendered camera pose. */
+  bodyName?: Bodies;
   position?: CameraFrameCaptureVector3;
   lookAt?: CameraFrameCaptureVector3;
   quaternion?: CameraFrameCaptureQuaternion;
@@ -1188,7 +1257,17 @@ export interface CameraFrameCaptureOptions {
   fov?: number;
   near?: number;
   far?: number;
+  /** Provenance for the camera pose used by the capture. Usually set by the MuJoCo provider. */
+  source?: CameraFrameCaptureSource;
 }
+
+export type CameraFrameCaptureSource =
+  | { kind: 'mujoco-camera'; cameraName: Cameras }
+  | { kind: 'mujoco-site'; siteName: Sites }
+  | { kind: 'mujoco-body'; bodyName: Bodies }
+  | { kind: 'custom-camera' }
+  | { kind: 'explicit-pose' }
+  | { kind: 'fallback-camera' };
 
 export interface CameraFrameCaptureResult {
   canvas: HTMLCanvasElement;
@@ -1197,6 +1276,7 @@ export interface CameraFrameCaptureResult {
   type: string;
   width: number;
   height: number;
+  source: CameraFrameCaptureSource;
 }
 
 export interface CameraFrameCaptureBlobResult {
@@ -1206,6 +1286,7 @@ export interface CameraFrameCaptureBlobResult {
   type: string;
   width: number;
   height: number;
+  source: CameraFrameCaptureSource;
 }
 
 export interface CameraFrameCaptureAPI {
@@ -1231,18 +1312,57 @@ export interface CameraFrameSequenceFrame {
   cameras: Record<string, CameraFrameCaptureResult>;
 }
 
+export interface CameraFrameSequenceCameraSummary {
+  key: string;
+  width: number;
+  height: number;
+  source: CameraFrameCaptureSource;
+  frameCount: number;
+  firstFrameIndex: number | null;
+  lastFrameIndex: number | null;
+  firstTimestamp: number | null;
+  lastTimestamp: number | null;
+}
+
+export interface CameraFrameSequenceSampleInput extends PhysicsStepInput {
+  frameIndex: number;
+  time: number;
+}
+
+export interface CameraFrameSequenceStepInput extends PhysicsStepInput {
+  frameIndex: number;
+  stepIndex: number;
+  time: number;
+}
+
 export interface CameraFrameSequenceOptions {
   cameras: readonly CameraFrameSequenceCamera[];
   frames: number;
+  /** Number of MuJoCo steps between captured frames. Use 0 for static camera provenance captures. */
   stepsPerFrame?: number;
   reset?: boolean;
   captureInitialFrame?: boolean;
+  retainFrames?: boolean;
+  /**
+   * Require each recorded stream to resolve from exactly one mounted MuJoCo
+   * camera/site/body selector. Defaults to true because sequence recording is
+   * intended for dataset/policy camera streams.
+   */
+  requireMountedSources?: boolean;
+  signal?: AbortSignal;
+  /** Called after stepping and before image capture for this frame. Use this to record synchronized state/action rows. */
+  onSample?: (input: CameraFrameSequenceSampleInput) => void | Promise<void>;
+  /** Called before each MuJoCo step inside sequence recording. Use this to apply policy/control actions. */
+  onBeforeStep?: (input: CameraFrameSequenceStepInput) => void | Promise<void>;
+  /** Called after each MuJoCo step inside sequence recording. Use this for step-level telemetry. */
+  onAfterStep?: (input: CameraFrameSequenceStepInput) => void | Promise<void>;
   onFrame?: (frame: CameraFrameSequenceFrame) => void | Promise<void>;
 }
 
 export interface CameraFrameSequenceResult {
   frames: CameraFrameSequenceFrame[];
   cameraKeys: string[];
+  cameraSummaries: Record<string, CameraFrameSequenceCameraSummary>;
   frameCount: number;
 }
 

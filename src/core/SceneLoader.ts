@@ -111,6 +111,19 @@ export function findSensorByName(mjModel: MujocoModel, name: string): number {
 }
 
 /**
+ * Find a camera by name in the MuJoCo model. Returns -1 if not found.
+ */
+export function findCameraByName(mjModel: MujocoModel, name: string): number {
+  const ncam = mjModel.ncam ?? 0;
+  const addresses = mjModel.name_camadr;
+  if (!addresses) return -1;
+  for (let i = 0; i < ncam; i++) {
+    if (getName(mjModel, addresses[i]) === name) return i;
+  }
+  return -1;
+}
+
+/**
  * Find a tendon by name in the MuJoCo model. Returns -1 if not found.
  */
 export function findTendonByName(mjModel: MujocoModel, name: string): number {

@@ -20,10 +20,13 @@ import {
   ActuatedJointInfo,
   ActuatorInfo,
   BodyInfo,
+  CameraFrameCaptureOptions,
   CameraFrameCaptureResult,
+  CameraFrameCaptureSource,
   CameraFrameSequenceFrame,
   CameraFrameSequenceOptions,
   CameraFrameSequenceResult,
+  CameraInfo,
   ControlGroupInfo,
   ControlGroupSelector,
   ContactInfo,
@@ -52,15 +55,22 @@ import {
 import {
   captureCameraFrame,
   captureCameraFrameBlob,
+  createCameraFrameCaptureSession,
 } from '../rendering/cameraFrameCapture';
+import {
+  getCameraFrameCaptureSourceTarget,
+  isMountedCameraFrameCaptureSource,
+} from '../rendering/cameraFrameSource';
 import {
   loadScene,
   createSceneConfigFromFiles,
   findKeyframeByName,
   findBodyByName,
+  findSiteByName,
   findGeomByName,
   findSensorByName,
   findActuatorByName,
+  findCameraByName,
   getActuatedScalarQposAdr,
   getActuatedJoints as getActuatedJointsFromModel,
   getControlMap as getControlMapFromModel,
@@ -122,6 +132,98 @@ function waitForNextAnimationFrame() {
   return new Promise<void>((resolve) => {
     requestAnimationFrame(() => resolve());
   });
+}
+
+function throwIfCameraSequenceAborted(signal: AbortSignal | undefined) {
+  if (!signal?.aborted) return;
+
+  if (typeof signal.reason === 'object' && signal.reason instanceof Error) {
+    throw signal.reason;
+  }
+
+  throw new DOMException('Camera sequence recording was aborted.', 'AbortError');
+}
+
+function vector3FromArray(values: ArrayLike<number>, offset: number): [number, number, number] {
+  return [values[offset], values[offset + 1], values[offset + 2]];
+}
+
+function quaternionFromArray(values: ArrayLike<number>, offset: number): [number, number, number, number] {
+  return [
+    values[offset],
+    values[offset + 1],
+    values[offset + 2],
+    values[offset + 3],
+  ];
+}
+
+function quaternionFromXmat(values: ArrayLike<number>, offset: number): [number, number, number, number] {
+  const matrix = new THREE.Matrix4();
+  matrix.set(
+    values[offset],
+    values[offset + 1],
+    values[offset + 2],
+    0,
+    values[offset + 3],
+    values[offset + 4],
+    values[offset + 5],
+    0,
+    values[offset + 6],
+    values[offset + 7],
+    values[offset + 8],
+    0,
+    0,
+    0,
+    0,
+    1
+  );
+  const quaternion = new THREE.Quaternion().setFromRotationMatrix(matrix);
+  return [quaternion.x, quaternion.y, quaternion.z, quaternion.w];
+}
+
+function omitResolvedCameraSelectors(
+  options: CameraFrameCaptureOptions
+): CameraFrameCaptureOptions {
+  const { cameraName, siteName, bodyName, ...rest } = options;
+  return rest;
+}
+
+function countMountedCameraSelectors(options: CameraFrameCaptureOptions) {
+  return Number(Boolean(options.cameraName)) +
+    Number(Boolean(options.siteName)) +
+    Number(Boolean(options.bodyName));
+}
+
+function assertMatchingMountedCameraSource(
+  key: string,
+  requested: CameraFrameCaptureOptions,
+  source: CameraFrameCaptureSource
+) {
+  const selectorCount = countMountedCameraSelectors(requested);
+  if (selectorCount !== 1) {
+    throw new Error(
+      `Camera sequence stream "${key}" must provide exactly one mounted MuJoCo cameraName, siteName, or bodyName selector.`
+    );
+  }
+
+  if (!isMountedCameraFrameCaptureSource(source)) {
+    throw new Error(
+      `Camera sequence stream "${key}" resolved to ${source.kind}; use a MuJoCo-mounted camera, site, or body selector for sequence recording.`
+    );
+  }
+
+  if (
+    (requested.cameraName &&
+      (source.kind !== 'mujoco-camera' || source.cameraName !== requested.cameraName)) ||
+    (requested.siteName &&
+      (source.kind !== 'mujoco-site' || source.siteName !== requested.siteName)) ||
+    (requested.bodyName &&
+      (source.kind !== 'mujoco-body' || source.bodyName !== requested.bodyName))
+  ) {
+    throw new Error(
+      `Camera sequence stream "${key}" resolved to ${source.kind}:${getCameraFrameCaptureSourceTarget(source)} instead of the requested mounted selector.`
+    );
+  }
 }
 
 // ---- Internal context types ----
@@ -308,6 +410,7 @@ export function MujocoSimProvider({
   const bodyReloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { configRef.current = config; }, [config]);
+  useEffect(() => { mujocoRef.current = mujoco; }, [mujoco]);
 
   // Sync declarative props to refs
   useEffect(() => { pausedRef.current = paused ?? false; }, [paused]);
@@ -359,6 +462,7 @@ export function MujocoSimProvider({
           return;
         }
 
+        mujocoRef.current = mujoco;
         mjModelRef.current = result.mjModel;
         mjDataRef.current = result.mjData;
         physicsAccumulatorRef.current = 0;
@@ -438,7 +542,7 @@ export function MujocoSimProvider({
       // Step physics with substeps
       if (stepsToRunRef.current > 0) {
         for (let s = 0; s < stepsToRunRef.current; s++) {
-          mujoco.mj_step(model, data);
+          mujocoRef.current.mj_step(model, data);
         }
         stepsToRunRef.current = 0;
       } else {
@@ -447,7 +551,7 @@ export function MujocoSimProvider({
         const frameTime = clampedDelta * speedRef.current;
         while (data.time - startSimTime < frameTime) {
           for (let s = 0; s < numSubsteps; s++) {
-            mujoco.mj_step(model, data);
+            mujocoRef.current.mj_step(model, data);
           }
         }
       }
@@ -455,7 +559,7 @@ export function MujocoSimProvider({
       ensureInterpolationBuffers(model);
       copyBodyPose(data, interpolationStateRef.current.previousXpos, interpolationStateRef.current.previousXquat);
       for (let s = 0; s < stepsToRunRef.current; s++) {
-        mujoco.mj_step(model, data);
+        mujocoRef.current.mj_step(model, data);
       }
       copyBodyPose(data, interpolationStateRef.current.currentXpos, interpolationStateRef.current.currentXquat);
       interpolationStateRef.current.alpha = 1;
@@ -471,7 +575,7 @@ export function MujocoSimProvider({
       while (physicsAccumulatorRef.current >= stepDt) {
         copyBodyPose(data, interpolationStateRef.current.previousXpos, interpolationStateRef.current.previousXquat);
         for (let s = 0; s < numSubsteps; s++) {
-          mujoco.mj_step(model, data);
+          mujocoRef.current.mj_step(model, data);
         }
         copyBodyPose(data, interpolationStateRef.current.currentXpos, interpolationStateRef.current.currentXquat);
         physicsAccumulatorRef.current -= stepDt;
@@ -522,7 +626,7 @@ export function MujocoSimProvider({
     const data = mjDataRef.current;
     if (!model || !data) return;
 
-    mujoco.mj_resetData(model, data);
+    mujocoRef.current.mj_resetData(model, data);
 
     const homeJoints = configRef.current.homeJoints;
     if (homeJoints) {
@@ -537,7 +641,7 @@ export function MujocoSimProvider({
     }
 
     configRef.current.onReset?.({ model, data });
-    mujoco.mj_forward(model, data);
+    mujocoRef.current.mj_forward(model, data);
 
     // Notify composable plugins (e.g. IkController)
     for (const cb of resetCallbacks.current) {
@@ -574,7 +678,7 @@ export function MujocoSimProvider({
       for (const cb of beforeStepCallbacks.current) {
         cb({ model, data });
       }
-      mujoco.mj_step(model, data);
+      mujocoRef.current.mj_step(model, data);
       for (const cb of afterStepCallbacks.current) {
         cb({ model, data });
       }
@@ -617,7 +721,7 @@ export function MujocoSimProvider({
     data.ctrl.set(snapshot.ctrl);
     if (snapshot.act.length > 0) data.act.set(snapshot.act);
     data.qfrc_applied.set(snapshot.qfrc_applied);
-    mujoco.mj_forward(model, data);
+    mujocoRef.current.mj_forward(model, data);
   }, [mujoco]);
 
   const setQpos = useCallback((values: Float64Array | number[]) => {
@@ -626,7 +730,7 @@ export function MujocoSimProvider({
     if (!model || !data) return;
     const arr = values instanceof Float64Array ? values : new Float64Array(values);
     data.qpos.set(arr.subarray(0, Math.min(arr.length, model.nq)));
-    mujoco.mj_forward(model, data);
+    mujocoRef.current.mj_forward(model, data);
   }, [mujoco]);
 
   const setQvel = useCallback((values: Float64Array | number[]) => {
@@ -869,6 +973,113 @@ export function MujocoSimProvider({
     return result;
   }, []);
 
+  const getCameras = useCallback((): CameraInfo[] => {
+    const model = mjModelRef.current;
+    if (!model) return [];
+    const ncam = model.ncam ?? 0;
+    const nameAddresses = model.name_camadr;
+    if (!ncam || !nameAddresses) return [];
+
+    const result: CameraInfo[] = [];
+    for (let i = 0; i < ncam; i += 1) {
+      const posOffset = i * 3;
+      const quatOffset = i * 4;
+      result.push({
+        id: i,
+        name: getName(model, nameAddresses[i]),
+        bodyId: model.cam_bodyid?.[i] ?? -1,
+        fov: model.cam_fovy?.[i] ?? null,
+        position: model.cam_pos
+          ? vector3FromArray(model.cam_pos, posOffset)
+          : null,
+        quaternion: model.cam_quat
+          ? quaternionFromArray(model.cam_quat, quatOffset)
+          : null,
+      });
+    }
+    return result;
+  }, []);
+
+  const resolveCameraCaptureOptions = useCallback(
+    (options: CameraFrameCaptureOptions = {}): CameraFrameCaptureOptions => {
+      const model = mjModelRef.current;
+      const data = mjDataRef.current;
+      if (!model || !data) {
+        return options;
+      }
+
+      const baseOptions = omitResolvedCameraSelectors(options);
+
+      if (options.cameraName) {
+        const cameraId = findCameraByName(model, options.cameraName);
+        if (cameraId < 0) {
+          throw new Error(`MuJoCo camera "${options.cameraName}" was not found.`);
+        }
+
+        const position = data.cam_xpos
+          ? vector3FromArray(data.cam_xpos, cameraId * 3)
+          : model.cam_pos
+            ? vector3FromArray(model.cam_pos, cameraId * 3)
+            : undefined;
+        const quaternion = data.cam_xmat
+          ? quaternionFromXmat(data.cam_xmat, cameraId * 9)
+          : model.cam_quat
+            ? quaternionFromArray(model.cam_quat, cameraId * 4)
+            : undefined;
+
+        if (!position || !quaternion) {
+          throw new Error(
+            `MuJoCo camera "${options.cameraName}" does not expose a capture pose.`
+          );
+        }
+
+        return {
+          ...baseOptions,
+          position,
+          quaternion,
+          fov: options.fov ?? model.cam_fovy?.[cameraId],
+          source: { kind: 'mujoco-camera', cameraName: options.cameraName },
+        };
+      }
+
+      if (options.siteName) {
+        const siteId = findSiteByName(model, options.siteName);
+        if (siteId < 0) {
+          throw new Error(`MuJoCo site "${options.siteName}" was not found.`);
+        }
+
+        return {
+          ...baseOptions,
+          position: vector3FromArray(data.site_xpos, siteId * 3),
+          quaternion: quaternionFromXmat(data.site_xmat, siteId * 9),
+          source: { kind: 'mujoco-site', siteName: options.siteName },
+        };
+      }
+
+      if (options.bodyName) {
+        const bodyId = findBodyByName(model, options.bodyName);
+        if (bodyId < 0) {
+          throw new Error(`MuJoCo body "${options.bodyName}" was not found.`);
+        }
+        if (!data.xmat) {
+          throw new Error(
+            `MuJoCo body "${options.bodyName}" does not expose world orientation data.`
+          );
+        }
+
+        return {
+          ...baseOptions,
+          position: vector3FromArray(data.xpos, bodyId * 3),
+          quaternion: quaternionFromXmat(data.xmat, bodyId * 9),
+          source: { kind: 'mujoco-body', bodyName: options.bodyName },
+        };
+      }
+
+      return options;
+    },
+    []
+  );
+
   const getModelOption = useCallback((): ModelOptions => {
     const model = mjModelRef.current;
     if (!model?.opt) return { timestep: 0.002, gravity: [0, 0, -9.81], integrator: 0 };
@@ -951,7 +1162,7 @@ export function MujocoSimProvider({
       for (let i = 0; i < model.nv; i++) data.qvel[i] = model.key_qvel[qvelOffset + i];
     }
 
-    mujoco.mj_forward(model, data);
+    mujocoRef.current.mj_forward(model, data);
 
     // Notify composable plugins
     for (const cb of resetCallbacks.current) {
@@ -1081,16 +1292,26 @@ export function MujocoSimProvider({
 
   const captureCameraFrameApi = useCallback(
     (options = {}) => {
-      return captureCameraFrame(gl, scene, camera, options);
+      return captureCameraFrame(
+        gl,
+        scene,
+        camera,
+        resolveCameraCaptureOptions(options)
+      );
     },
-    [camera, gl, scene]
+    [camera, gl, resolveCameraCaptureOptions, scene]
   );
 
   const captureCameraFrameBlobApi = useCallback(
     (options = {}) => {
-      return captureCameraFrameBlob(gl, scene, camera, options);
+      return captureCameraFrameBlob(
+        gl,
+        scene,
+        camera,
+        resolveCameraCaptureOptions(options)
+      );
     },
-    [camera, gl, scene]
+    [camera, gl, resolveCameraCaptureOptions, scene]
   );
 
   const recordCameraSequenceApi = useCallback(
@@ -1098,18 +1319,97 @@ export function MujocoSimProvider({
       options: CameraFrameSequenceOptions
     ): Promise<CameraFrameSequenceResult> => {
       const frameCount = Math.max(0, Math.floor(options.frames));
-      const stepsPerFrame = Math.max(1, Math.floor(options.stepsPerFrame ?? 1));
+      const stepsPerFrame = Math.max(0, Math.floor(options.stepsPerFrame ?? 1));
       const cameras = options.cameras;
       const frames: CameraFrameSequenceFrame[] = [];
+      const cameraSummaries: CameraFrameSequenceResult['cameraSummaries'] = {};
       const wasPaused = pausedRef.current;
+      const retainFrames = options.retainFrames ?? true;
+      const requireMountedSources = options.requireMountedSources ?? true;
+      let recordedFrameCount = 0;
+
+      async function stepCameraSequence(frameIndex: number, steps: number) {
+        const model = mjModelRef.current;
+        const data = mjDataRef.current;
+        if (!model || !data) {
+          throw new Error('MuJoCo scene is not ready for camera sequence stepping.');
+        }
+
+        for (let stepIndex = 0; stepIndex < steps; stepIndex += 1) {
+          for (let i = 0; i < model.nv; i += 1) {
+            data.qfrc_applied[i] = 0;
+          }
+          await options.onBeforeStep?.({
+            frameIndex,
+            stepIndex,
+            time: data.time,
+            model,
+            data,
+          });
+          for (const cb of beforeStepCallbacks.current) {
+            cb({ model, data });
+          }
+          mujocoRef.current.mj_step(model, data);
+          for (const cb of afterStepCallbacks.current) {
+            cb({ model, data });
+          }
+          onStepRef.current?.({ time: data.time, model, data });
+          await options.onAfterStep?.({
+            frameIndex,
+            stepIndex,
+            time: data.time,
+            model,
+            data,
+          });
+        }
+
+        physicsAccumulatorRef.current = 0;
+        interpolationStateRef.current.valid = false;
+      }
 
       if (frameCount === 0 || cameras.length === 0) {
         return {
           frames,
           cameraKeys: cameras.map((sequenceCamera) => sequenceCamera.key),
+          cameraSummaries,
           frameCount: 0,
         };
       }
+
+      throwIfCameraSequenceAborted(options.signal);
+
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        if (mjModelRef.current && mjDataRef.current) break;
+        await waitForNextAnimationFrame();
+        throwIfCameraSequenceAborted(options.signal);
+      }
+      if (!mjModelRef.current || !mjDataRef.current) {
+        throw new Error('MuJoCo scene is not ready for camera sequence recording.');
+      }
+
+      const captureSessions = cameras.map((sequenceCamera) => {
+        const { key, ...captureOptions } = sequenceCamera;
+        const initialCaptureOptions = resolveCameraCaptureOptions(captureOptions);
+        const mountedSource = initialCaptureOptions.source;
+        if (requireMountedSources) {
+          assertMatchingMountedCameraSource(
+            key,
+            captureOptions,
+            mountedSource ?? { kind: 'fallback-camera' }
+          );
+        }
+        return {
+          key,
+          captureOptions,
+          mountedSource,
+          session: createCameraFrameCaptureSession(
+            gl,
+            scene,
+            camera,
+            initialCaptureOptions
+          ),
+        };
+      });
 
       try {
         pausedRef.current = true;
@@ -1117,20 +1417,56 @@ export function MujocoSimProvider({
         if (options.reset) reset();
 
         for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
-          if (frameIndex > 0 || options.captureInitialFrame === false) {
-            stepImmediately(stepsPerFrame);
+          throwIfCameraSequenceAborted(options.signal);
+          if (
+            stepsPerFrame > 0 &&
+            (frameIndex > 0 || options.captureInitialFrame === false)
+          ) {
+            await stepCameraSequence(frameIndex, stepsPerFrame);
           }
           await waitForNextAnimationFrame();
+          throwIfCameraSequenceAborted(options.signal);
+
+          const model = mjModelRef.current;
+          const data = mjDataRef.current;
+          if (!model || !data) {
+            throw new Error('MuJoCo scene is not ready for camera sequence sampling.');
+          }
+          await options.onSample?.({
+            frameIndex,
+            time: data.time,
+            model,
+            data,
+          });
 
           const cameraFrames: Record<string, CameraFrameCaptureResult> = {};
-          for (const sequenceCamera of cameras) {
-            const { key, ...captureOptions } = sequenceCamera;
-            cameraFrames[key] = await captureCameraFrame(
-              gl,
-              scene,
-              camera,
-              captureOptions
-            );
+          for (const { key, captureOptions, mountedSource, session } of captureSessions) {
+            const resolvedCaptureOptions = resolveCameraCaptureOptions(captureOptions);
+            const cameraFrame = session.captureDataUrl({
+              ...resolvedCaptureOptions,
+              source: mountedSource ?? resolvedCaptureOptions.source,
+            });
+            if (requireMountedSources) {
+              assertMatchingMountedCameraSource(
+                key,
+                captureOptions,
+                cameraFrame.source
+              );
+            }
+            cameraSummaries[key] = {
+              key,
+              width: cameraFrame.width,
+              height: cameraFrame.height,
+              source: cameraFrame.source,
+              frameCount: (cameraSummaries[key]?.frameCount ?? 0) + 1,
+              firstFrameIndex:
+                cameraSummaries[key]?.firstFrameIndex ?? frameIndex,
+              lastFrameIndex: frameIndex,
+              firstTimestamp:
+                cameraSummaries[key]?.firstTimestamp ?? data.time,
+              lastTimestamp: data.time,
+            };
+            cameraFrames[key] = cameraFrame;
           }
 
           const frame = {
@@ -1138,20 +1474,27 @@ export function MujocoSimProvider({
             time: getTime(),
             cameras: cameraFrames,
           };
-          frames.push(frame);
+          if (retainFrames) {
+            frames.push(frame);
+          }
+          recordedFrameCount += 1;
           await options.onFrame?.(frame);
         }
       } finally {
+        for (const { session } of captureSessions) {
+          session.dispose();
+        }
         pausedRef.current = wasPaused;
       }
 
       return {
         frames,
         cameraKeys: cameras.map((sequenceCamera) => sequenceCamera.key),
-        frameCount: frames.length,
+        cameraSummaries,
+        frameCount: recordedFrameCount,
       };
     },
-    [camera, getTime, gl, reset, scene, stepImmediately]
+    [camera, getTime, gl, mujoco, reset, resolveCameraCaptureOptions, scene]
   );
 
   const project2DTo3D = useCallback(
@@ -1252,6 +1595,7 @@ export function MujocoSimProvider({
       getSites,
       getActuators: getActuatorsApi,
       getSensors,
+      getCameras,
       getModelOption,
       setGravity,
       setTimestep: setTimestepApi,
@@ -1284,7 +1628,7 @@ export function MujocoSimProvider({
       getControlMapApi, getActuatedJointsApi, resolveControlGroupApi,
       applyForce, applyTorqueApi, setExternalForce, applyGeneralizedForce,
       getSensorData, getContacts, getBodies, getJoints, getGeoms, getSites,
-      getActuatorsApi, getSensors, getModelOption, setGravity, setTimestepApi,
+      getActuatorsApi, getSensors, getCameras, getModelOption, setGravity, setTimestepApi,
       raycast, getKeyframeNames, getKeyframeCount, loadSceneApi,
       loadFromFilesApi, addBodyApi, removeBodyApi, recompileApi,
       getCanvas, getCanvasSnapshot, captureFrameApi, captureFrameBlobApi,

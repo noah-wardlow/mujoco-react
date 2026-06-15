@@ -5,8 +5,8 @@ icon: "camera"
 ---
 
 Capture a still image from a specific camera pose without moving the user's
-interactive viewport. This is useful for fixed dataset cameras, policy rollout
-reports, thumbnails, and visual regression checks.
+interactive viewport. This is useful for MuJoCo-mounted dataset cameras, policy
+rollout reports, thumbnails, and visual regression checks.
 
 Unlike `useFrameCapture`, this renders the scene to an offscreen render target.
 It does not require `preserveDrawingBuffer`.
@@ -16,6 +16,9 @@ It does not require `preserveDrawingBuffer`.
 ```tsx
 useCameraFrameCapture(options?: {
   camera?: THREE.Camera
+  cameraName?: string
+  siteName?: string
+  bodyName?: string
   position?: THREE.Vector3 | readonly [number, number, number]
   lookAt?: THREE.Vector3 | readonly [number, number, number]
   quaternion?: THREE.Quaternion | readonly [number, number, number, number]
@@ -37,6 +40,11 @@ useCameraFrameCapture(options?: {
 }
 ```
 
+`CameraFrameCaptureResult` and `CameraFrameCaptureBlobResult` include
+`source.kind`, which is one of `mujoco-camera`, `mujoco-site`, `mujoco-body`,
+`custom-camera`, `explicit-pose`, or `fallback-camera`. Dataset recorders should
+prefer the MuJoCo-mounted source kinds.
+
 ## Usage
 
 ```tsx
@@ -46,8 +54,7 @@ function DatasetCaptureButton() {
   const capture = useCameraFrameCapture({
     width: 1024,
     height: 1024,
-    position: [1.4, -1.2, 1.1],
-    lookAt: [0.35, -0.3, 0.75],
+    siteName: "head_camera_rgb_optical_frame",
     type: "image/png",
   });
 
@@ -72,21 +79,24 @@ function DatasetCaptureButton() {
 const frame = await apiRef.current?.captureCameraFrame({
   width: 1024,
   height: 1024,
-  position: [1.4, -1.2, 1.1],
-  lookAt: [0.35, -0.3, 0.75],
+  cameraName: "head_camera",
 });
+if (frame?.source.kind !== "mujoco-camera") {
+  throw new Error("Expected a mounted MuJoCo camera frame.");
+}
 
 const blob = await apiRef.current?.captureCameraFrameBlob({
   width: 1024,
   height: 1024,
-  position: [1.4, -1.2, 1.1],
-  lookAt: [0.35, -0.3, 0.75],
+  siteName: "wrist_camera_rgb_optical_frame",
 });
 ```
 
 ## Notes
 
-- Use `position` + `lookAt` for dataset cameras.
+- Use `cameraName` for MuJoCo `<camera>` elements, or `siteName` / `bodyName`
+  for robot-mounted camera frames.
+- Use `position` + `lookAt` only for synthetic fixed debug cameras.
 - Use `quaternion` when replaying a recorded camera pose.
 - Use `camera` to clone an existing `THREE.Camera`.
 - The returned canvas is generated from an offscreen render target.

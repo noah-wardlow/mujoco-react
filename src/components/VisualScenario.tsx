@@ -8,15 +8,19 @@ import type { ThreeElements } from '@react-three/fiber';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
+import { SplatEnvironmentReadinessStatus } from '../types';
 import type {
   PairedSplatEnvironmentConfig,
   ScenarioMaterialConfig,
   SceneConfig,
   SplatCollisionProxyConfig,
+  SplatEnvironmentReadiness,
   SplatEnvironmentMetadata,
   SplatEnvironmentMetadataInput,
   SplatFormat,
   SplatRendererKind,
+  SplatSceneConfigInput,
+  SplatSceneConfigState,
   SplatSceneInput,
   ScenarioLightingPreset,
   ScenarioLightingProps,
@@ -277,21 +281,190 @@ export function useSplatEnvironment({
     scenarioEnvironment?.collisionProxy ??
     scenario?.splat?.collisionProxy ??
     undefined;
+  const readiness = useMemo(
+    () =>
+      getSplatEnvironmentReadiness({
+        environment: scenarioEnvironment,
+        scenario,
+        renderer,
+        src: resolvedSrc,
+        format: resolvedFormat,
+        collisionProxy: resolvedCollisionProxy,
+      }),
+    [
+      collisionProxy,
+      renderer,
+      resolvedCollisionProxy,
+      resolvedFormat,
+      resolvedSrc,
+      scenario,
+      scenarioEnvironment,
+    ]
+  );
 
   return useMemo(
     () => ({
       src: resolvedSrc,
       format: resolvedFormat,
       collisionProxy: resolvedCollisionProxy,
+      readiness,
       userData: createSplatEnvironmentUserData({
         environment: scenarioEnvironment,
         src: resolvedSrc,
         format: resolvedFormat,
         collisionProxy: resolvedCollisionProxy,
+        readiness,
       }),
     }),
-    [scenarioEnvironment, resolvedSrc, resolvedFormat, resolvedCollisionProxy]
+    [
+      scenarioEnvironment,
+      resolvedSrc,
+      resolvedFormat,
+      resolvedCollisionProxy,
+      readiness,
+    ]
   );
+}
+
+/**
+ * Resolve a visual scenario's paired splat environment and compose its MJCF
+ * collision proxy into a MuJoCo scene config.
+ *
+ * This hook is renderer-agnostic: apps can use it with Spark, another 3DGS
+ * renderer, or their own Three scene objects while keeping physics collision
+ * files paired with the visual splat metadata.
+ */
+export function useSplatSceneConfig({
+  sceneConfig,
+  scenario,
+  environment,
+  enabled = true,
+  renderer,
+}: SplatSceneConfigInput): SplatSceneConfigState {
+  const resolvedEnvironment = useMemo(
+    () =>
+      enabled
+        ? environment ??
+          (scenario
+            ? createPairedSplatEnvironment(scenario, { renderer })
+            : undefined)
+        : undefined,
+    [enabled, environment, renderer, scenario]
+  );
+  const readiness = useMemo(
+    () =>
+      getSplatEnvironmentReadiness({
+        environment: resolvedEnvironment,
+        scenario,
+        renderer,
+        enabled,
+      }),
+    [enabled, renderer, resolvedEnvironment, scenario]
+  );
+  const resolvedSceneConfig = useMemo(
+    () =>
+      resolvedEnvironment
+        ? withSplatEnvironment(sceneConfig, resolvedEnvironment)
+        : sceneConfig,
+    [resolvedEnvironment, sceneConfig]
+  );
+
+  return useMemo(
+    () => ({
+      environment: resolvedEnvironment,
+      sceneConfig: resolvedSceneConfig,
+      enabled: enabled && readiness.status !== SplatEnvironmentReadinessStatus.Disabled,
+      readiness,
+    }),
+    [enabled, readiness, resolvedEnvironment, resolvedSceneConfig]
+  );
+}
+
+export function getSplatEnvironmentReadiness({
+  environment,
+  scenario,
+  renderer,
+  src,
+  format,
+  collisionProxy,
+  enabled = true,
+}: {
+  environment?: PairedSplatEnvironmentConfig;
+  scenario?: Pick<VisualScenarioConfig, 'splat'>;
+  renderer?: SplatRendererKind;
+  src?: string;
+  format?: SplatFormat;
+  collisionProxy?: SplatCollisionProxyConfig;
+  enabled?: boolean;
+}): SplatEnvironmentReadiness {
+  const splat = scenario?.splat;
+  const resolvedSrc = src ?? environment?.splat.src ?? splat?.src;
+  const resolvedFormat =
+    format ?? environment?.splat.format ?? splat?.format ?? 'spz';
+  const resolvedRenderer = renderer ?? environment?.splat.renderer;
+  const resolvedCollisionProxy =
+    collisionProxy ?? environment?.collisionProxy ?? splat?.collisionProxy ?? undefined;
+  const requiresCollisionProxy = splat?.requiresCollisionProxy ?? true;
+
+  if (!enabled || (splat && splat.enabled === false && !environment)) {
+    return {
+      status: SplatEnvironmentReadinessStatus.Disabled,
+      ready: false,
+      requiresCollisionProxy,
+      missing: [],
+      format: resolvedFormat,
+      renderer: resolvedRenderer,
+      message: 'Splat environment is disabled.',
+    };
+  }
+
+  if (!resolvedSrc) {
+    return {
+      status: SplatEnvironmentReadinessStatus.MissingSplat,
+      ready: false,
+      requiresCollisionProxy,
+      missing: ['splat'],
+      format: resolvedFormat,
+      renderer: resolvedRenderer,
+      message: 'Splat environment is missing a visual asset source.',
+    };
+  }
+
+  if (resolvedRenderer === 'spark' && resolvedFormat !== 'spz') {
+    return {
+      status: SplatEnvironmentReadinessStatus.UnsupportedFormat,
+      ready: false,
+      requiresCollisionProxy,
+      missing: [],
+      format: resolvedFormat,
+      renderer: resolvedRenderer,
+      message: `Spark splat rendering requires .spz assets; received ${resolvedFormat}.`,
+    };
+  }
+
+  if (requiresCollisionProxy && !resolvedCollisionProxy?.xmlPath) {
+    return {
+      status: SplatEnvironmentReadinessStatus.MissingCollisionProxy,
+      ready: false,
+      requiresCollisionProxy,
+      missing: ['collisionProxy'],
+      format: resolvedFormat,
+      renderer: resolvedRenderer,
+      message: 'Splat environment is missing paired MJCF collision proxy XML.',
+    };
+  }
+
+  return {
+    status: SplatEnvironmentReadinessStatus.Ready,
+    ready: true,
+    requiresCollisionProxy,
+    missing: [],
+    format: resolvedFormat,
+    renderer: resolvedRenderer,
+    message: requiresCollisionProxy
+      ? 'Splat environment has visual asset and collision proxy metadata.'
+      : 'Splat environment has a visual asset and does not require collision proxy metadata.',
+  };
 }
 
 /**
@@ -393,11 +566,13 @@ export function createSplatEnvironmentUserData({
   src,
   format = 'spz',
   collisionProxy,
+  readiness,
 }: {
   environment?: PairedSplatEnvironmentConfig;
   src?: string;
   format?: SplatFormat;
   collisionProxy?: SplatCollisionProxyConfig;
+  readiness?: SplatEnvironmentReadiness;
 }) {
   return {
     role: 'splat-environment',
@@ -409,6 +584,8 @@ export function createSplatEnvironmentUserData({
     collisionProxyStatus: collisionProxy?.status ?? 'missing',
     collisionProxyXmlPath: collisionProxy?.xmlPath,
     collisionProxyPrimitives: collisionProxy?.primitives ?? [],
+    readinessStatus: readiness?.status,
+    readinessMessage: readiness?.message,
   };
 }
 

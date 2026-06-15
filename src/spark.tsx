@@ -15,9 +15,14 @@ import * as THREE from 'three';
 import {
   SplatEnvironment,
   useSplatEnvironment,
+  useSplatSceneConfig,
 } from './components/VisualScenario';
 import type {
+  PairedSplatEnvironmentConfig,
+  SceneConfig,
   SplatEnvironmentProps,
+  SplatEnvironmentReadiness,
+  VisualScenarioConfig,
 } from './types';
 
 type SparkModule = typeof import('@sparkjsdev/spark');
@@ -26,8 +31,21 @@ type SparkSplatMeshInstance = InstanceType<SparkModule['SplatMesh']>;
 type SparkDisposable = {
   dispose?: () => unknown;
 };
+type SparkWorkerMessage = {
+  reject?: (error: unknown) => void;
+};
+type SparkWorkerLike = {
+  messages?: Record<string, SparkWorkerMessage>;
+};
+type SparkResourceWithWorkers = SparkDisposable & {
+  worker?: SparkWorkerLike;
+  sortWorker?: SparkWorkerLike;
+  lodWorker?: SparkWorkerLike;
+};
 
 export type SparkSplatStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+let sparkDisposeRejectionHandlerRegistered = false;
 
 export interface SparkSplatLifecycle {
   status: SparkSplatStatus;
@@ -37,6 +55,18 @@ export interface SparkSplatLifecycle {
   isError: boolean;
   props: Pick<SparkSplatEnvironmentProps, 'onStatusChange' | 'onError'>;
   reset: () => void;
+}
+
+export interface SparkSplatEnvironmentState {
+  environment: PairedSplatEnvironmentConfig | undefined;
+  sceneConfig: SceneConfig;
+  readiness: SplatEnvironmentReadiness;
+  lifecycle: SparkSplatLifecycle;
+  props: Pick<
+    SparkSplatEnvironmentProps,
+    'environment' | 'scenario' | 'src' | 'format' | 'onStatusChange' | 'onError'
+  >;
+  enabled: boolean;
 }
 
 export interface SparkSplatEnvironmentProps extends SplatEnvironmentProps {
@@ -51,6 +81,67 @@ export interface SparkSplatEnvironmentProps extends SplatEnvironmentProps {
   onStatusChange?: (status: SparkSplatStatus) => void;
   onLoad?: (mesh: SparkSplatMeshInstance) => void;
   onError?: (error: Error) => void;
+}
+
+/**
+ * Resolve a visual scenario's paired splat environment, compose its MJCF
+ * collision proxy into the MuJoCo scene config, and expose Spark lifecycle
+ * props for `<SparkSplatEnvironment />`.
+ */
+export function useSparkSplatEnvironment({
+  sceneConfig,
+  scenario,
+  environment,
+  enabled = true,
+  renderer = 'spark',
+  onError,
+  onStatusChange,
+}: {
+  sceneConfig: SceneConfig;
+  scenario?: VisualScenarioConfig;
+  environment?: PairedSplatEnvironmentConfig;
+  enabled?: boolean;
+  renderer?: 'spark';
+  onError?: (error: Error) => void;
+  onStatusChange?: (status: SparkSplatStatus) => void;
+}): SparkSplatEnvironmentState {
+  const splatScene = useSplatSceneConfig({
+    sceneConfig,
+    scenario,
+    environment,
+    enabled,
+    renderer,
+  });
+  const metadata = useSplatEnvironment({
+    scenario,
+    environment: splatScene.environment,
+    renderer,
+  });
+  const renderEnabled = enabled && Boolean(metadata.src);
+  const readiness = enabled ? metadata.readiness : splatScene.readiness;
+  const lifecycle = useSparkSplatLifecycle({
+    enabled: renderEnabled,
+    onError,
+    onStatusChange,
+  });
+
+  return useMemo(
+    () => ({
+      environment: splatScene.environment,
+      sceneConfig: splatScene.sceneConfig,
+      readiness,
+      lifecycle,
+      props: {
+        environment: splatScene.environment,
+        scenario: enabled ? scenario : undefined,
+        src: enabled ? metadata.src : undefined,
+        format: metadata.format,
+        ...lifecycle.props,
+      },
+      enabled: renderEnabled,
+    }),
+    [enabled, lifecycle, metadata, readiness, renderEnabled, scenario, splatScene]
+  );
 }
 
 /**
@@ -177,6 +268,7 @@ export function SparkSplatEnvironment({
 
   useEffect(() => {
     let disposed = false;
+    ensureSparkDisposeRejectionHandler();
 
     function setLifecycleStatus(nextStatus: SparkSplatStatus) {
       setStatus(nextStatus);
@@ -306,6 +398,7 @@ export function SparkSplatEnvironment({
 
 function safelyDisposeSparkResource(resource: SparkDisposable) {
   try {
+    silenceSparkWorkerTerminateRejections(resource);
     const result = resource.dispose?.();
     if (isPromiseLike(result)) {
       void Promise.resolve(result).catch(handleSparkDisposeError);
@@ -324,6 +417,33 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   );
 }
 
+function silenceSparkWorkerTerminateRejections(resource: SparkDisposable) {
+  const workers = getSparkWorkers(resource);
+  for (const worker of workers) {
+    if (!worker.messages) continue;
+
+    for (const message of Object.values(worker.messages)) {
+      const reject = message.reject;
+      if (!reject) continue;
+
+      message.reject = (error: unknown) => {
+        if (!isSparkWorkerTerminateError(error)) {
+          reject(error);
+        }
+      };
+    }
+  }
+}
+
+function getSparkWorkers(resource: SparkDisposable): SparkWorkerLike[] {
+  const sparkResource = resource as SparkResourceWithWorkers;
+  return [
+    sparkResource.worker,
+    sparkResource.sortWorker,
+    sparkResource.lodWorker,
+  ].filter((worker): worker is SparkWorkerLike => Boolean(worker));
+}
+
 function handleSparkDisposeError(error: unknown) {
   if (
     error instanceof Error &&
@@ -333,4 +453,28 @@ function handleSparkDisposeError(error: unknown) {
   }
 
   console.warn('[mujoco-react] Spark resource disposal failed.', error);
+}
+
+function ensureSparkDisposeRejectionHandler() {
+  if (
+    sparkDisposeRejectionHandlerRegistered ||
+    typeof window === 'undefined' ||
+    typeof window.addEventListener !== 'function'
+  ) {
+    return;
+  }
+
+  sparkDisposeRejectionHandlerRegistered = true;
+  window.addEventListener('unhandledrejection', (event) => {
+    if (isSparkWorkerTerminateError(event.reason)) {
+      event.preventDefault();
+    }
+  });
+}
+
+function isSparkWorkerTerminateError(reason: unknown) {
+  return (
+    reason instanceof Error &&
+    reason.message.toLowerCase().includes('worker terminate')
+  );
 }

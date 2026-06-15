@@ -4,13 +4,24 @@ description: "Record fixed-camera image sequences while stepping simulation"
 icon: "video"
 ---
 
-Record a short simulation sequence from one or more fixed camera poses. This is
-useful for dataset camera streams, policy rollout videos, visual regression
-clips, and LeRobot-style MP4 shard generation.
+Record a short simulation sequence from one or more named MuJoCo cameras,
+sites, bodies, or fixed camera poses. This is useful for dataset camera streams,
+policy rollout videos, visual regression clips, and LeRobot-style MP4 shard
+generation.
 
 The recorder pauses the interactive simulation while it records, optionally
 resets the model, steps MuJoCo between frames, waits for the scene graph to
 sync, and renders every requested camera into an offscreen image.
+
+The returned result includes `cameraSummaries` even when `retainFrames: false`,
+so dataset pipelines can stream images through `onFrame` while still recording
+camera-source provenance, dimensions, per-stream frame counts, frame ranges,
+and simulation timestamps.
+
+For named dataset streams, `recordMountedCameraFrameSequence()` adds a
+`readiness` summary and requires every requested `cameraKey` by default. This
+prevents LeRobot/Forge pipelines from silently recording a partial set of
+camera streams.
 
 ## Signature
 
@@ -30,6 +41,9 @@ useCameraSequenceRecorder(): {
 {
   cameras: Array<{
     key: string
+    cameraName?: string
+    siteName?: string
+    bodyName?: string
     position?: THREE.Vector3 | readonly [number, number, number]
     lookAt?: THREE.Vector3 | readonly [number, number, number]
     quaternion?: THREE.Quaternion | readonly [number, number, number, number]
@@ -46,6 +60,29 @@ useCameraSequenceRecorder(): {
   stepsPerFrame?: number
   reset?: boolean
   captureInitialFrame?: boolean
+  retainFrames?: boolean
+  requireMountedSources?: boolean
+  signal?: AbortSignal
+  onSample?: (input: {
+    frameIndex: number
+    time: number
+    model: MujocoModel
+    data: MujocoData
+  }) => void | Promise<void>
+  onBeforeStep?: (input: {
+    frameIndex: number
+    stepIndex: number
+    time: number
+    model: MujocoModel
+    data: MujocoData
+  }) => void | Promise<void>
+  onAfterStep?: (input: {
+    frameIndex: number
+    stepIndex: number
+    time: number
+    model: MujocoModel
+    data: MujocoData
+  }) => void | Promise<void>
   onFrame?: (frame: CameraFrameSequenceFrame) => void | Promise<void>
 }
 ```
@@ -53,33 +90,72 @@ useCameraSequenceRecorder(): {
 ## Usage
 
 ```tsx
-import { useCameraSequenceRecorder } from "mujoco-react";
+import {
+  isMountedCameraFrameCaptureSource,
+  resolveMountedCameraFrameSource,
+  useCameraSequenceRecorder,
+  useMujoco,
+} from "mujoco-react";
 
 function RecordDatasetClip() {
+  const mujoco = useMujoco();
   const recorder = useCameraSequenceRecorder();
 
   async function record() {
+    if (!mujoco.api) return;
+    const aliases = {
+      head: [{ siteName: "head_camera_rgb_optical_frame" }],
+      wrist: [{ siteName: "wrist_camera_rgb_optical_frame" }],
+    } as const;
+    const resources = {
+      cameras: mujoco.api.getCameras(),
+      sites: mujoco.api.getSites(),
+      bodies: mujoco.api.getBodies(),
+      aliases,
+    };
+    const head = resolveMountedCameraFrameSource("head", {
+      ...resources,
+    });
+    const wrist = resolveMountedCameraFrameSource("wrist", {
+      ...resources,
+    });
+
+    if (!head || !wrist) {
+      throw new Error("dataset cameras must resolve to MuJoCo cameras, sites, or bodies");
+    }
+
     await recorder.record({
       frames: 32,
       stepsPerFrame: 2,
+      retainFrames: false,
+      requireMountedSources: true,
+      onSample: ({ frameIndex, time, data }) => {
+        appendLeRobotRow({
+          frameIndex,
+          timestamp: time,
+          state: Array.from(data.qpos),
+          action: Array.from(data.ctrl),
+        });
+      },
       cameras: [
         {
           key: "head",
           width: 640,
           height: 480,
-          position: [1.4, -1.2, 1.1],
-          lookAt: [0.35, -0.3, 0.75],
+          ...head.selector,
         },
         {
           key: "wrist",
           width: 640,
           height: 480,
-          position: [0.55, -0.55, 0.95],
-          lookAt: [0.35, -0.3, 0.75],
+          ...wrist.selector,
         },
       ],
       onFrame: async (frame) => {
         for (const [cameraKey, image] of Object.entries(frame.cameras)) {
+          if (!isMountedCameraFrameCaptureSource(image.source)) {
+            throw new Error(`${cameraKey} is not a mounted MuJoCo source.`);
+          }
           await uploadFrame({
             cameraKey,
             frameIndex: frame.frameIndex,
@@ -106,17 +182,134 @@ function RecordDatasetClip() {
 await apiRef.current?.recordCameraSequence({
   frames: 16,
   cameras: [
-    { key: "head", position: [1, -1, 1], lookAt: [0, 0, 0.5] },
+    { key: "head", cameraName: "head_camera" },
+    { key: "wrist", siteName: "wrist_camera_rgb_optical_frame" },
   ],
 });
+```
+
+## Policy And Dataset Rows
+
+`onBeforeStep`, `onAfterStep`, and `onSample` use object callback arguments and
+receive the live MuJoCo `model` and `data` references:
+
+- Use `onBeforeStep` to run policy inference or write `data.ctrl` before MuJoCo
+  advances.
+- Use `onAfterStep` for step-level telemetry.
+- Use `onSample` to record the synchronized LeRobot row for the captured
+  timestep. It runs after stepping and before the camera images are rendered for
+  that frame.
+
+```tsx
+const result = await recorder.record({
+  frames: 300,
+  stepsPerFrame: 1,
+  retainFrames: false,
+  cameras,
+  onBeforeStep: ({ model, data }) => {
+    const observation = buildObservation(model, data);
+    const action = policy.run(observation);
+    applyAction(action, data);
+  },
+  onSample: ({ frameIndex, time, model, data }) => {
+    rows.push({
+      frame_index: frameIndex,
+      timestamp: time,
+      observation: buildObservation(model, data),
+      action: Array.from(data.ctrl),
+    });
+  },
+  onFrame: async (frame) => {
+    await uploadCameraFrames(frame.cameras);
+  },
+});
+
+await saveCameraProvenance(result.cameraSummaries);
+```
+
+## Mounted Camera Readiness
+
+Use the mounted-camera helpers when task camera names differ from MuJoCo
+resource names. The readiness object is stable metadata for UI preflight,
+dataset manifests, and runner handoff checks.
+
+```tsx
+import {
+  createMountedCameraFrameSequencePlan,
+  createMountedCameraFrameSequenceReadiness,
+  recordMountedCameraFrameSequence,
+} from "mujoco-react";
+
+const plan = createMountedCameraFrameSequencePlan(["head", "wrist"], {
+  cameras: api.getCameras(),
+  sites: api.getSites(),
+  bodies: api.getBodies(),
+  aliases: {
+    head: [{ siteName: "head_camera_rgb_optical_frame" }],
+    wrist: [{ siteName: "wrist_camera_rgb_optical_frame" }],
+  },
+});
+
+const readiness = createMountedCameraFrameSequenceReadiness(plan);
+
+if (!readiness.ready) {
+  throw new Error(readiness.message);
+}
+
+const result = await recordMountedCameraFrameSequence(api, {
+  cameraKeys: ["head", "wrist"],
+  aliases: {
+    head: [{ siteName: "head_camera_rgb_optical_frame" }],
+    wrist: [{ siteName: "wrist_camera_rgb_optical_frame" }],
+  },
+  frames: 300,
+  stepsPerFrame: 1,
+  retainFrames: false,
+  onFrame: async (frame) => {
+    await uploadCameraFrames(frame.cameras);
+  },
+});
+
+await saveCameraProvenance(result.readiness, result.cameraSummaries);
 ```
 
 ## Notes
 
 - Use `onFrame` for long sequences so you can stream frames to storage instead
   of keeping all images in memory.
+- Set `retainFrames: false` when streaming. The returned result will report the
+  completed `frameCount`, camera keys, and `cameraSummaries` without retaining
+  every encoded image.
+- Use `result.cameraSummaries[cameraKey]` to persist source provenance,
+  dimensions, recorded frame counts, first/last frame indices, and first/last
+  simulation timestamps next to LeRobot/Forge handoff metadata.
+- Use `result.readiness` or `createMountedCameraFrameSequenceReadiness(plan)` to
+  persist which task camera streams resolved before recording.
+- Pass `signal` to cancel a long recording from app UI.
+- Use `onSample` for synchronized state/action rows instead of deriving dataset
+  rows from a later UI callback.
+- Use `onBeforeStep` when sequence recording is also driving a policy or
+  scripted controller.
 - `captureInitialFrame` defaults to `true`; set it to `false` to step before
   frame zero.
-- `stepsPerFrame` defaults to `1`.
+- `stepsPerFrame` defaults to `1`. Use `0` when you need repeated camera
+  captures from the current simulation state without advancing physics, such as
+  recording camera-source provenance frames.
+- Use `cameraName` for MuJoCo `<camera>` elements, or `siteName` / `bodyName`
+  for robot-mounted camera frames. These selectors are resolved every recorded
+  frame, so mounted cameras follow simulation state.
+- `requireMountedSources` defaults to `true`. Sequence recording throws unless
+  each camera provides exactly one mounted MuJoCo `cameraName`, `siteName`, or
+  `bodyName` selector.
+- Use `resolveMountedCameraFrameSource()` when dataset stream names need aliases
+  to actual MuJoCo cameras, sites, or bodies.
+- `recordMountedCameraFrameSequence()` defaults `requireAll` to `true`; set it
+  to `false` only for partial-coverage tools, not train/eval dataset capture.
+- Each image result includes `source.kind`, so dataset pipelines can require
+  mounted MuJoCo streams and reject `explicit-pose` / `fallback-camera` frames.
+- Use `captureCameraFrame()` with `position` + `lookAt` or `quaternion` for
+  synthetic fixed debug stills. For sequence recording, pass
+  `requireMountedSources: false` only for local visualization experiments that
+  will not be used as dataset or training evidence.
 - Camera keys are application-defined, so they can map cleanly to dataset
   feature names such as `observation.images.head`.

@@ -8,23 +8,37 @@ icon: "scan"
 For realistic robot workflows, pair each `.spz`, `.ply`, or `.splat` visual asset with MJCF
 collision geometry that provides contacts, friction, and task fixtures.
 
+If a splat is intentionally visual-only, set `requiresCollisionProxy: false` on
+the scenario. `useSparkSplatEnvironment` will still pass the visual `src` and
+`format` to the renderer, while `withSplatEnvironment` leaves the MuJoCo
+`sceneConfig` unchanged because there is no collision XML to add.
+
 ## Renderer-Agnostic Boundary
 
-Use `SplatEnvironment` from the main package when the app owns the renderer or when you want
-metadata and collision proxy composition without adding a splat renderer dependency.
-For scenario-driven apps, pass the scenario directly; the component resolves the visual asset
-and MJCF collision proxy metadata without app-side prop reshaping.
+Use `useSplatSceneConfig` and `SplatEnvironment` from the main package when the
+app owns the renderer or when you want metadata and collision proxy composition
+without adding a splat renderer dependency. For scenario-driven apps, pass the
+scenario directly; the hook resolves the visual asset and MJCF collision proxy
+metadata without app-side prop reshaping.
 
 ```tsx
-import { SplatEnvironment } from "mujoco-react";
+import { MujocoCanvas, SplatEnvironment, useSplatSceneConfig } from "mujoco-react";
 
-function VisualEnvironment({ scenario }) {
+function Scene({ config, scenario }) {
+  const splat = useSplatSceneConfig({ sceneConfig: config, scenario });
+
   return (
-    <SplatEnvironment
-      scenario={scenario}
-      renderer="custom"
-      collisionProxy={<LabCollisionPreview />}
-    />
+    <MujocoCanvas config={splat.sceneConfig}>
+      {splat.environment ? (
+        <SplatEnvironment
+          environment={splat.environment}
+          renderer="custom"
+          collisionProxy={<LabCollisionPreview />}
+        >
+          <MySplatRenderer src={splat.environment.splat.src} />
+        </SplatEnvironment>
+      ) : null}
+    </MujocoCanvas>
   );
 }
 ```
@@ -78,20 +92,21 @@ Then import the optional adapter from `mujoco-react/spark`:
 import { MujocoCanvas } from "mujoco-react";
 import {
   SparkSplatEnvironment,
-  useSparkSplatLifecycle,
+  useSparkSplatEnvironment,
 } from "mujoco-react/spark";
 
 function Scene({ scenario }) {
-  const splat = useSparkSplatLifecycle();
+  const splat = useSparkSplatEnvironment({ sceneConfig: config, scenario });
 
   return (
-    <MujocoCanvas config={config} gl={{ preserveDrawingBuffer: true }}>
-      <SparkSplatEnvironment
-        scenario={scenario}
-        hideGroundMeshes
-        {...splat.props}
+    <MujocoCanvas config={splat.sceneConfig} gl={{ preserveDrawingBuffer: true }}>
+      {splat.props.src ? (
+        <SparkSplatEnvironment hideGroundMeshes {...splat.props} />
+      ) : null}
+      <StatusBadge
+        status={splat.lifecycle.status}
+        error={splat.lifecycle.error}
       />
-      <StatusBadge status={splat.status} error={splat.error} />
     </MujocoCanvas>
   );
 }
@@ -107,8 +122,28 @@ Spark rendering currently supports `.spz` assets. If a scenario points at `.ply`
 show a clear unsupported-format state. Keep using `SplatEnvironment` for renderer-agnostic metadata
 or when integrating a different splat renderer.
 
-Use `useSparkSplatLifecycle` when the app needs status badges, loading affordances, or error
-messages around the splat renderer. The hook returns:
+Use `useSparkSplatEnvironment` for the Spark path. It builds on
+`useSplatSceneConfig`, adds paired collision proxy XML to the MuJoCo
+`sceneConfig`, and returns lifecycle props for `SparkSplatEnvironment`. For
+visual-only scenarios with `requiresCollisionProxy: false`, it returns the
+original `sceneConfig` and passes `scenario`, `src`, and `format` through
+`props` so the splat renderer can still load the visual layer.
+
+`useSplatSceneConfig`, `useSparkSplatEnvironment`, and
+`getSplatEnvironmentReadiness` expose the same readiness contract:
+
+- `disabled`
+- `missing-splat`
+- `missing-collision-proxy`
+- `unsupported-format`
+- `ready`
+
+Use this status for import screens and scenario editors instead of treating a
+missing environment as a generic falsey value.
+
+Use `useSparkSplatLifecycle` directly when the app owns scene-config composition
+but still needs status badges, loading affordances, or error messages around the
+splat renderer. The hook returns:
 
 - `status: "idle" | "loading" | "ready" | "error"`
 - `error: Error | null`

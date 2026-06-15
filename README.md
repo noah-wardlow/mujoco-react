@@ -165,10 +165,23 @@ visual scenarios as data, pass the scenario directly; the component resolves the
 splat asset and paired MJCF collision proxy metadata for you.
 
 ```tsx
-import { SplatEnvironment, withSplatEnvironment } from "mujoco-react";
+import { MujocoCanvas, SplatEnvironment, useSplatSceneConfig } from "mujoco-react";
 
-<SplatEnvironment scenario={scenario} renderer="custom" />;
+const splat = useSplatSceneConfig({ sceneConfig, scenario });
+
+<MujocoCanvas config={splat.sceneConfig}>
+  {splat.environment ? (
+    <SplatEnvironment environment={splat.environment} renderer="custom">
+      <MySplatRenderer src={splat.environment.splat.src} />
+    </SplatEnvironment>
+  ) : null}
+</MujocoCanvas>;
 ```
+
+Use `splat.readiness` or `getSplatEnvironmentReadiness(scenario)` to gate
+authoring and import flows. The status distinguishes disabled scenarios,
+missing splat assets, missing MJCF collision proxies, unsupported Spark formats,
+and ready paired environments.
 
 For MuJoCo + 3DGS composition, derive the collision environment from the same
 splat metadata and pass the resulting config to `<MujocoCanvas>`:
@@ -192,16 +205,18 @@ npm install @sparkjsdev/spark
 ```tsx
 import {
   SparkSplatEnvironment,
-  useSparkSplatLifecycle,
+  useSparkSplatEnvironment,
 } from "mujoco-react/spark";
 
 function Scene() {
-  const splat = useSparkSplatLifecycle();
+  const splat = useSparkSplatEnvironment({ sceneConfig, scenario });
 
   return (
-    <MujocoCanvas config={sceneConfig} gl={{ preserveDrawingBuffer: true }}>
-      <SparkSplatEnvironment scenario={scenario} hideGroundMeshes {...splat.props} />
-      <StatusBadge status={splat.status} error={splat.error} />
+    <MujocoCanvas config={splat.sceneConfig} gl={{ preserveDrawingBuffer: true }}>
+      {splat.environment ? (
+        <SparkSplatEnvironment hideGroundMeshes {...splat.props} />
+      ) : null}
+      <StatusBadge status={splat.lifecycle.status} error={splat.lifecycle.error} />
     </MujocoCanvas>
   );
 }
@@ -1009,11 +1024,82 @@ Use `useFrameCapture()` or the standalone `captureFrame()` helpers when you own
 the canvas or want to capture a custom container.
 
 Use `captureCameraFrame()` / `captureCameraFrameBlob()` when dataset generation
-needs a fixed offscreen camera pose or resolution without moving the user's
-interactive viewport.
+needs an offscreen camera render at a stable resolution without moving the
+user's interactive viewport. Pass `cameraName`, `siteName`, or `bodyName` to
+record true MuJoCo-mounted camera frames; the returned image includes
+`source.kind` so dataset pipelines can reject fallback or synthetic fixed poses.
 
 Use `recordCameraSequence()` / `useCameraSequenceRecorder()` to step policy
-rollouts and capture synchronized frames from one or more fixed camera configs.
+rollouts and capture synchronized per-camera frames from one or more MuJoCo
+camera configs. Sequence recording requires mounted MuJoCo camera, site, or
+body selectors by default; use still capture APIs for synthetic debug poses.
+
+For LeRobot-style datasets, prefer the named-camera wrapper. It resolves task
+camera keys to MuJoCo cameras/sites/bodies, records the sequence, and returns
+the plan and readiness summary alongside frame provenance:
+
+```tsx
+const sequence = await recordMountedCameraFrameSequence(api, {
+  cameraKeys: ["head", "left_wrist", "right_wrist"],
+  aliases: {
+    head: [{ siteName: "head_camera_rgb_optical_frame" }],
+    left_wrist: [{ siteName: "left_wrist_camera_optical_frame" }],
+    right_wrist: [{ siteName: "right_wrist_camera_optical_frame" }],
+  },
+  defaults: {
+    width: 640,
+    height: 480,
+    type: "image/png",
+    fov: 45,
+    near: 0.01,
+    far: 100,
+  },
+  frames: 16,
+  stepsPerFrame: 1,
+  retainFrames: false,
+  requireMountedSources: true,
+  onFrame: ({ frameIndex, cameras }) => {
+    queueLeRobotImages(frameIndex, cameras);
+  },
+});
+
+sequence.readiness.ready; // true when every requested stream resolved
+sequence.plan.missingKeys; // unresolved task cameras, if requireAll is false
+sequence.cameraSummaries.head.source; // mounted source provenance
+```
+
+`recordMountedCameraFrameSequence()` requires all requested `cameraKeys` by
+default so dataset recording cannot silently omit a camera stream. Set
+`requireAll: false` only for exploratory tooling that can tolerate partial
+camera coverage.
+
+Inside `<MujocoCanvas>` children, `useMountedCameraSequenceRecorder()` exposes
+the same planning and recording surface with React status/error state.
+
+Use `resolveMountedCameraFrameSource()` when dataset feature names need to map
+to named MuJoCo cameras, sites, or bodies before recording. The helper accepts
+the model resource lists plus app-level aliases and returns both the capture
+selector and the mounted-source provenance that should be stored beside the
+dataset:
+
+```tsx
+const resolved = resolveMountedCameraFrameSource("head", {
+  cameras: api.getCameras(),
+  sites: api.getSites(),
+  bodies: api.getBodies(),
+  aliases: {
+    head: [{ siteName: "head_camera_rgb_optical_frame" }],
+  },
+});
+
+if (!resolved) throw new Error("head does not resolve to a MuJoCo source");
+
+await api.recordCameraSequence({
+  frames: 16,
+  requireMountedSources: true,
+  cameras: [{ key: "head", width: 640, height: 480, ...resolved.selector }],
+});
+```
 
 ### `useCtrlNoise(config)`
 

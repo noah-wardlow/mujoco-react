@@ -48,9 +48,11 @@ export {
   createPairedSplatEnvironment,
   createSparkSplatViewerUrl,
   createSplatEnvironmentUserData,
+  getSplatEnvironmentReadiness,
   getScenarioBackground,
   getScenarioCameraPosition,
   useSplatEnvironment,
+  useSplatSceneConfig,
   useVisualScenarioEffects,
   withSplatEnvironment,
 } from './components/VisualScenario';
@@ -84,11 +86,47 @@ export {
 } from './hooks/useFrameCapture';
 export { useCameraFrameCapture } from './hooks/useCameraFrameCapture';
 export { useCameraSequenceRecorder } from './hooks/useCameraSequenceRecorder';
+export { useMountedCameraSequenceRecorder } from './hooks/useMountedCameraSequenceRecorder';
+export type {
+  MountedCameraSequencePlanOptions,
+  MountedCameraSequenceRecorderAPI,
+  MountedCameraSequenceRecordOptions,
+  MountedCameraSequenceRecordResult,
+} from './hooks/useMountedCameraSequenceRecorder';
 export {
   captureCameraFrame,
   captureCameraFrameBlob,
+  createCameraFrameCaptureSession,
   renderCameraFrameToCanvas,
 } from './rendering/cameraFrameCapture';
+export {
+  createMountedCameraFrameSequenceReadiness,
+  MountedCameraFrameSequenceReadinessStatus,
+  createMountedCameraFrameSequencePlanFromApi,
+  createMountedCameraFrameSequencePlan,
+  getCameraFrameCaptureSourceTarget,
+  getMountedCameraFrameCaptureSource,
+  isMountedCameraFrameCaptureSource,
+  recordMountedCameraFrameSequence,
+  resolveMountedCameraFrameSource,
+} from './rendering/cameraFrameSource';
+export type {
+  CameraFrameMountSelector,
+  CreateMountedCameraFrameSequencePlanOptions,
+  MountedCameraFrameCaptureSource,
+  MountedCameraFrameSequencePlanOptions,
+  MountedCameraFrameSequenceRecorderTarget,
+  MountedCameraFrameSequenceCameraOptions,
+  MountedCameraFrameSequenceDefaults,
+  MountedCameraFrameSequencePlan,
+  MountedCameraFrameSequenceReadiness,
+  MountedCameraFrameSequenceRecordOptions,
+  MountedCameraFrameSequenceRecordResult,
+  MountedCameraFrameSequenceSourceReadiness,
+  NamedCameraFrameResource,
+  ResolveMountedCameraFrameSourceOptions,
+  ResolvedMountedCameraFrameSource,
+} from './rendering/cameraFrameSource';
 export { useCtrlNoise } from './hooks/useCtrlNoise';
 export { useBodyMeshes } from './hooks/useBodyMeshes';
 export { useSelectionHighlight } from './hooks/useSelectionHighlight';
@@ -130,6 +168,7 @@ export type {
   SiteInfo,
   ActuatorInfo,
   SensorInfo,
+  CameraInfo,
   // Contacts
   ContactInfo,
   // Raycast
@@ -172,8 +211,11 @@ export type {
   SplatScenarioConfig,
   SplatCollisionProxyConfig,
   PairedSplatEnvironmentConfig,
+  SplatEnvironmentReadiness,
   SplatEnvironmentMetadataInput,
   SplatEnvironmentMetadata,
+  SplatSceneConfigInput,
+  SplatSceneConfigState,
   SplatSceneInput,
   VisualScenarioConfig,
   ScenarioLightingProps,
@@ -193,12 +235,16 @@ export type {
   CameraFrameCaptureOptions,
   CameraFrameCaptureQuaternion,
   CameraFrameCaptureResult,
+  CameraFrameCaptureSource,
   CameraFrameCaptureVector3,
   CameraFrameSequenceCamera,
+  CameraFrameSequenceCameraSummary,
   CameraFrameSequenceFrame,
   CameraFrameSequenceOptions,
   CameraFrameSequenceRecorderAPI,
   CameraFrameSequenceResult,
+  CameraFrameSequenceSampleInput,
+  CameraFrameSequenceStepInput,
   MujocoCanvasProps,
   MujocoContextValue,
   // Hook return types
@@ -227,6 +273,7 @@ export type {
   Sites,
   Geoms,
   Keyframes,
+  Cameras,
 } from './types';
 
 export {
@@ -239,6 +286,8 @@ export {
   RobotSites,
   RobotGeoms,
   RobotKeyframes,
+  RobotCameras,
+  SplatEnvironmentReadinessStatus,
 } from './types';
 
 // Re-export MuJoCo types for convenience
