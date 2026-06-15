@@ -1,3 +1,10 @@
+# [9.3.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.2.0...v9.3.0) (2026-06-15)
+
+
+### Features
+
+* add mounted camera dataset capture ([1b9dfc7](https://github.com/noah-wardlow/mujoco-react/commit/1b9dfc7d49ff52eac64c71a5ffb0235969a112bd))
+
 # [9.2.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.1.0...v9.2.0) (2026-06-14)
 
 
