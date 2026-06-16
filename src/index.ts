@@ -56,6 +56,21 @@ export {
   useVisualScenarioEffects,
   withSplatEnvironment,
 } from './components/VisualScenario';
+export {
+  canFetchSplatCollisionProxyXml,
+  fetchSplatCollisionProxyXml,
+  parseSplatCollisionProxyGeoms,
+  SplatCollisionProxyPreview,
+  useSplatCollisionProxyGeoms,
+} from './components/SplatCollisionProxyPreview';
+export type {
+  SplatCollisionProxyGeomPreview,
+  SplatCollisionProxyGeomsState,
+  SplatCollisionProxyPreviewProps,
+  SplatCollisionProxyPreviewStatus,
+  SplatCollisionProxyPreviewVector3,
+  UseSplatCollisionProxyGeomsOptions,
+} from './components/SplatCollisionProxyPreview';
 export { Debug } from './components/Debug';
 export { TendonRenderer } from './components/TendonRenderer';
 export { FlexRenderer } from './components/FlexRenderer';
