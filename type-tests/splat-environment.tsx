@@ -1,13 +1,18 @@
 import {
+  SplatCollisionProxyPreview,
   SplatEnvironment,
   createPairedSplatEnvironment,
   getSplatEnvironmentReadiness,
+  parseSplatCollisionProxyGeoms,
+  useSplatCollisionProxyGeoms,
   useSplatSceneConfig,
   withSplatEnvironment,
 } from '../src';
 import type {
   PairedSplatEnvironmentConfig,
   SceneConfig,
+  SplatCollisionProxyGeomPreview,
+  SplatCollisionProxyPreviewStatus,
   SplatEnvironmentReadinessStatus,
   VisualScenarioConfig,
 } from '../src';
@@ -126,16 +131,46 @@ function RendererAgnosticSplatHarness() {
   });
   const readinessReady: boolean = splat.readiness.ready;
   void readinessReady;
+  const proxy = splat.environment?.collisionProxy;
 
   return (
     <SplatEnvironment
       environment={splat.environment}
       renderer="custom"
+      collisionProxy={
+        proxy ? <SplatCollisionProxyPreview collisionProxy={proxy} /> : undefined
+      }
       position={[0, 0, 0]}
       showPlaceholder={false}
     >
       <group userData={{ renderer: 'app-owned' }} />
     </SplatEnvironment>
+  );
+}
+
+function SplatCollisionProxyPreviewHarness() {
+  const proxy = kitchen.splat.collisionProxy;
+  const state = useSplatCollisionProxyGeoms({
+    collisionProxy: proxy,
+    xmlText: '<mujoco><worldbody><geom name="floor" type="plane" size="2 2 0.05"/></worldbody></mujoco>',
+  });
+  const status: SplatCollisionProxyPreviewStatus = state.status;
+  const firstGeom: SplatCollisionProxyGeomPreview | undefined = state.geoms[0];
+  const parsed = parseSplatCollisionProxyGeoms(
+    '<mujoco><worldbody><body pos="1 0 0"><geom type="box" size="0.2 0.3 0.4"/></body></worldbody></mujoco>',
+  );
+  const parsedGeom: SplatCollisionProxyGeomPreview | undefined = parsed[0];
+  void status;
+  void firstGeom;
+  void parsedGeom;
+
+  return (
+    <SplatCollisionProxyPreview
+      collisionProxy={proxy}
+      xmlText='<mujoco><worldbody><geom type="sphere" size="0.1"/></worldbody></mujoco>'
+      color="#f97316"
+      opacity={0.2}
+    />
   );
 }
 
@@ -181,5 +216,6 @@ function VisualOnlySparkSplatHarness() {
 }
 
 void RendererAgnosticSplatHarness;
+void SplatCollisionProxyPreviewHarness;
 void SparkSplatHarness;
 void VisualOnlySparkSplatHarness;

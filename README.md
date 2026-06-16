@@ -180,6 +180,42 @@ const splat = useSplatSceneConfig({ sceneConfig, scenario });
 </MujocoCanvas>;
 ```
 
+When a splat scenario includes paired MJCF collision proxy metadata, render a
+generic wireframe preview from that XML with `SplatCollisionProxyPreview`. The
+component parses MJCF primitives such as planes, boxes, spheres, capsules, and
+mesh placeholders from any fetchable proxy XML; the tabletop example is just one
+possible environment.
+
+```tsx
+import {
+  SplatCollisionProxyPreview,
+  SplatEnvironment,
+  useSplatCollisionProxyGeoms,
+  useSplatSceneConfig,
+} from "mujoco-react";
+
+const splat = useSplatSceneConfig({ sceneConfig, scenario });
+const proxy = splat.environment?.collisionProxy;
+
+<SplatEnvironment
+  environment={splat.environment}
+  collisionProxy={
+    proxy ? <SplatCollisionProxyPreview collisionProxy={proxy} /> : undefined
+  }
+/>;
+```
+
+Use `useSplatCollisionProxyGeoms()` when your app wants to inspect or style the
+proxy primitives itself:
+
+```tsx
+const proxyPreview = useSplatCollisionProxyGeoms({
+  collisionProxy: splat.environment?.collisionProxy,
+});
+
+proxyPreview.geoms.map((geom) => geom.type);
+```
+
 Use `splat.readiness` or `getSplatEnvironmentReadiness(scenario)` to gate
 authoring and import flows. The status distinguishes disabled scenarios,
 missing splat assets, missing MJCF collision proxies, unsupported Spark formats,
