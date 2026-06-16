@@ -1112,7 +1112,47 @@ default so dataset recording cannot silently omit a camera stream. Set
 camera coverage.
 
 Inside `<MujocoCanvas>` children, `useMountedCameraSequenceRecorder()` exposes
-the same planning and recording surface with React status/error state.
+the same planning and recording surface with React status/error/result state.
+Use `checkReadiness()` before recording when the UI needs a preflight gate for
+LeRobot camera streams:
+
+```tsx
+function DatasetRecorder() {
+  const recorder = useMountedCameraSequenceRecorder({
+    defaults: { width: 640, height: 480, type: "image/png" },
+    aliases: {
+      head: { cameraName: "head" },
+      left_wrist: { siteName: "left_wrist_camera_optical_frame" },
+      right_wrist: { siteName: "right_wrist_camera_optical_frame" },
+    },
+  });
+
+  async function recordDatasetEpisode() {
+    const cameraKeys = ["head", "left_wrist", "right_wrist"];
+    const readiness = recorder.checkReadiness(cameraKeys);
+    if (!readiness.ready) return;
+
+    await recorder.record({
+      cameraKeys,
+      frames: 16,
+      retainFrames: false,
+      onFrame: ({ frameIndex, cameras }) => {
+        queueLeRobotImages(frameIndex, cameras);
+      },
+    });
+  }
+
+  return (
+    <button disabled={recorder.isRecording} onClick={recordDatasetEpisode}>
+      Record camera streams
+    </button>
+  );
+}
+```
+
+`recorder.readiness` keeps the latest preflight result, and
+`recorder.result?.readiness` keeps the readiness that shipped with the most
+recent recording.
 
 Use `resolveMountedCameraFrameSource()` when dataset feature names need to map
 to named MuJoCo cameras, sites, or bodies before recording. The helper accepts

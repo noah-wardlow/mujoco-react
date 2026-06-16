@@ -105,6 +105,7 @@ export { useMountedCameraSequenceRecorder } from './hooks/useMountedCameraSequen
 export type {
   MountedCameraSequencePlanOptions,
   MountedCameraSequenceRecorderAPI,
+  MountedCameraSequenceReadiness,
   MountedCameraSequenceRecordOptions,
   MountedCameraSequenceRecordResult,
 } from './hooks/useMountedCameraSequenceRecorder';
