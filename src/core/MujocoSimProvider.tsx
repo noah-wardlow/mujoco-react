@@ -1471,7 +1471,7 @@ export function MujocoSimProvider({
 
           const frame = {
             frameIndex,
-            time: getTime(),
+            time: data.time,
             cameras: cameraFrames,
           };
           if (retainFrames) {
