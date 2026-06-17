@@ -1,3 +1,10 @@
+# [9.4.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.3.0...v9.4.0) (2026-06-17)
+
+
+### Features
+
+* release splat and camera workflow APIs ([004b5d8](https://github.com/noah-wardlow/mujoco-react/commit/004b5d85edc0b4b250af90b6743e07663e7f1b93))
+
 # [9.3.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.2.0...v9.3.0) (2026-06-15)
 
 
