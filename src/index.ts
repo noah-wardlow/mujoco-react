@@ -48,6 +48,7 @@ export {
   createPairedSplatEnvironment,
   createSparkSplatViewerUrl,
   createSplatEnvironmentUserData,
+  createSplatSceneConfig,
   createVisualScenarioExecutionContext,
   getSplatEnvironmentReadiness,
   getScenarioBackground,

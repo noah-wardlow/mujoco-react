@@ -421,43 +421,55 @@ export function useSplatSceneConfig({
   enabled = true,
   renderer,
 }: SplatSceneConfigInput): SplatSceneConfigState {
-  const resolvedEnvironment = useMemo(
-    () =>
-      enabled
-        ? environment ??
-          (scenario
-            ? createPairedSplatEnvironment(scenario, { renderer })
-            : undefined)
-        : undefined,
-    [enabled, environment, renderer, scenario]
-  );
-  const readiness = useMemo(
-    () =>
-      getSplatEnvironmentReadiness({
-        environment: resolvedEnvironment,
-        scenario,
-        renderer,
-        enabled,
-      }),
-    [enabled, renderer, resolvedEnvironment, scenario]
-  );
-  const resolvedSceneConfig = useMemo(
-    () =>
-      resolvedEnvironment
-        ? withSplatEnvironment(sceneConfig, resolvedEnvironment)
-        : sceneConfig,
-    [resolvedEnvironment, sceneConfig]
-  );
-
   return useMemo(
-    () => ({
-      environment: resolvedEnvironment,
-      sceneConfig: resolvedSceneConfig,
-      enabled: enabled && readiness.status !== SplatEnvironmentReadinessStatus.Disabled,
-      readiness,
-    }),
-    [enabled, readiness, resolvedEnvironment, resolvedSceneConfig]
+    () =>
+      createSplatSceneConfig({
+        sceneConfig,
+        scenario,
+        environment,
+        enabled,
+        renderer,
+      }),
+    [enabled, environment, renderer, scenario, sceneConfig]
   );
+}
+
+/**
+ * Resolve a visual scenario's paired splat environment without requiring React.
+ *
+ * Use this in codegen, import validators, backend handoff metadata, or app code
+ * that needs the same behavior as `useSplatSceneConfig` outside a component.
+ */
+export function createSplatSceneConfig({
+  sceneConfig,
+  scenario,
+  environment,
+  enabled = true,
+  renderer,
+}: SplatSceneConfigInput): SplatSceneConfigState {
+  const resolvedEnvironment = enabled
+    ? environment ??
+      (scenario
+        ? createPairedSplatEnvironment(scenario, { renderer })
+        : undefined)
+    : undefined;
+  const readiness = getSplatEnvironmentReadiness({
+    environment: resolvedEnvironment,
+    scenario,
+    renderer,
+    enabled,
+  });
+  const resolvedSceneConfig = resolvedEnvironment
+    ? withSplatEnvironment(sceneConfig, resolvedEnvironment, { renderer })
+    : sceneConfig;
+
+  return {
+    environment: resolvedEnvironment,
+    sceneConfig: resolvedSceneConfig,
+    enabled:
+      enabled && readiness.status !== SplatEnvironmentReadinessStatus.Disabled,
+    readiness,
+  };
 }
 
 export function getSplatEnvironmentReadiness({

@@ -218,8 +218,22 @@ proxyPreview.geoms.map((geom) => geom.type);
 
 Use `splat.readiness` or `getSplatEnvironmentReadiness(scenario)` to gate
 authoring and import flows. The status distinguishes disabled scenarios,
-missing splat assets, missing MJCF collision proxies, unsupported Spark formats,
-and ready visual or paired environments.
+missing visual assets, missing collision proxies, unsupported renderer formats,
+and ready environments.
+
+Use `createSplatSceneConfig()` when the same scene composition needs to run
+outside React, such as codegen, import validation, backend handoff metadata, or
+tests:
+
+```tsx
+import { createSplatSceneConfig } from "mujoco-react";
+
+const splat = createSplatSceneConfig({
+  sceneConfig,
+  scenario,
+  renderer: "spark",
+});
+```
 
 Use `createVisualScenarioExecutionContext()` or
 `useVisualScenarioExecutionContext()` when recording rollouts or exporting

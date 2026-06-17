@@ -43,6 +43,19 @@ function Scene({ config, scenario }) {
 }
 ```
 
+Use `createSplatSceneConfig` for the same resolution behavior outside React,
+such as import validators, codegen, backend handoff metadata, or tests:
+
+```tsx
+import { createSplatSceneConfig } from "mujoco-react";
+
+const splat = createSplatSceneConfig({
+  sceneConfig: config,
+  scenario,
+  renderer: "spark",
+});
+```
+
 `SplatEnvironment` writes stable `userData` onto its group:
 
 - `role: "splat-environment"`
