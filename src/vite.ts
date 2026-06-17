@@ -158,7 +158,7 @@ async function scanModel(
   seen: Set<string>,
   names: Record<RegisterKey, Set<string>>
 ) {
-  const normalized = path.normalize(filePath);
+  const normalized = path.resolve(filePath);
   if (seen.has(normalized)) return;
   seen.add(normalized);
 
@@ -174,7 +174,7 @@ async function scanModel(
 
   for (const includePath of collectIncludePaths(xml)) {
     const next = path.resolve(path.dirname(normalized), includePath);
-    if (next.startsWith(root)) await scanModel(next, root, seen, names);
+    if (isPathInsideRoot(next, root)) await scanModel(next, root, seen, names);
   }
 }
 
@@ -346,7 +346,7 @@ function shouldInjectRegisterImport(id: string, root: string, generatedRegister:
   if (file.includes(`${path.sep}node_modules${path.sep}`)) return false;
   const absolute = path.resolve(file);
   if (absolute === generatedRegister) return false;
-  return absolute.startsWith(root);
+  return isPathInsideRoot(absolute, root);
 }
 
 function renderGeneratedImport(id: string, generatedRegister: string): string {
@@ -395,5 +395,10 @@ function shouldRegenerate(file: string, watchedFiles: string[], models: readonly
   if (watchedFiles.includes(absolute)) return true;
   if (!MODEL_EXTENSIONS.has(path.extname(absolute).toLowerCase())) return false;
   const modelDirs = models.map((model) => path.dirname(path.resolve(root, model.file)));
-  return modelDirs.some((dir) => absolute.startsWith(dir));
+  return modelDirs.some((dir) => isPathInsideRoot(absolute, dir));
+}
+
+function isPathInsideRoot(filePath: string, root: string): boolean {
+  const relative = path.relative(path.resolve(root), path.resolve(filePath));
+  return relative === '' || (relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative));
 }
