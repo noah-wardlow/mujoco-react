@@ -141,6 +141,22 @@ original `sceneConfig` and passes `scenario`, `src`, and `format` through
 Use this status for import screens and scenario editors instead of treating a
 missing environment as a generic falsey value.
 
+Use `createVisualScenarioExecutionContext()` when the app needs a serializable
+record of the visual conditions used for a rollout, dataset episode, or training
+handoff. The helper resolves camera exposure/noise/blur/jitter, material
+randomization, splat source, collision proxy metadata, and readiness from the
+same scenario object used by `SplatEnvironment`.
+
+```tsx
+import { createVisualScenarioExecutionContext } from "mujoco-react";
+
+const visualExecutionContext = createVisualScenarioExecutionContext({
+  scenario,
+  renderer: "spark",
+  variantId,
+});
+```
+
 Use `useSparkSplatLifecycle` directly when the app owns scene-config composition
 but still needs status badges, loading affordances, or error messages around the
 splat renderer. The hook returns:

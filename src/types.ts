@@ -970,6 +970,48 @@ export interface SplatEnvironmentMetadata {
   userData: Record<string, unknown>;
 }
 
+export interface ResolvedScenarioCameraConfig {
+  jitter: number;
+  exposure: number;
+  noise: number;
+  blur: number;
+}
+
+export interface ResolvedScenarioMaterialConfig {
+  randomizeObjectColors: boolean;
+  randomizeTableMaterial: boolean;
+  roughness?: number;
+  metalness?: number;
+}
+
+export interface VisualScenarioExecutionContext {
+  scenarioId: string;
+  scenarioLabel: string;
+  variantId?: string;
+  seed: number;
+  lighting: ScenarioLightingPreset;
+  environment?: string;
+  camera: ResolvedScenarioCameraConfig;
+  materials: ResolvedScenarioMaterialConfig;
+  splatEnabled: boolean;
+  splatSrc?: string;
+  splatFormat: SplatFormat;
+  splatRenderer?: SplatRendererKind;
+  collisionProxyXmlPath?: string;
+  collisionProxyStatus?: SplatCollisionProxyConfig['status'];
+  collisionProxyPrimitives: SplatCollisionPrimitive[];
+  readiness: SplatEnvironmentReadiness;
+  transformSource: 'visualScenario.camera';
+}
+
+export interface VisualScenarioExecutionContextInput {
+  scenario?: VisualScenarioConfig;
+  environment?: PairedSplatEnvironmentConfig;
+  renderer?: SplatRendererKind;
+  variantId?: string;
+  enabled?: boolean;
+}
+
 export type SplatSceneInput =
   | PairedSplatEnvironmentConfig
   | VisualScenarioConfig

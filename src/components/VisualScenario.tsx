@@ -26,6 +26,8 @@ import type {
   ScenarioLightingProps,
   SplatEnvironmentProps,
   VisualScenarioConfig,
+  VisualScenarioExecutionContext,
+  VisualScenarioExecutionContextInput,
   VisualScenarioEffectsProps,
 } from '../types';
 
@@ -112,6 +114,84 @@ export function getScenarioCameraPosition(
     Number((y - jitter * 0.4).toFixed(3)),
     Number((z + jitter * 0.25).toFixed(3)),
   ];
+}
+
+export function useVisualScenarioExecutionContext({
+  scenario,
+  environment,
+  renderer,
+  variantId,
+  enabled,
+}: VisualScenarioExecutionContextInput): VisualScenarioExecutionContext {
+  return useMemo(
+    () =>
+      createVisualScenarioExecutionContext({
+        scenario,
+        environment,
+        renderer,
+        variantId,
+        enabled,
+      }),
+    [enabled, environment, renderer, scenario, variantId]
+  );
+}
+
+export function createVisualScenarioExecutionContext({
+  scenario,
+  environment,
+  renderer,
+  variantId,
+  enabled = true,
+}: VisualScenarioExecutionContextInput): VisualScenarioExecutionContext {
+  const pairedEnvironment =
+    environment ??
+    (scenario ? createPairedSplatEnvironment(scenario, { renderer }) : undefined);
+  const splat = scenario?.splat;
+  const collisionProxy =
+    pairedEnvironment?.collisionProxy ?? splat?.collisionProxy ?? undefined;
+  const readiness = getSplatEnvironmentReadiness({
+    environment: pairedEnvironment,
+    scenario,
+    renderer,
+    enabled,
+  });
+  const format =
+    pairedEnvironment?.splat.format ?? splat?.format ?? readiness.format ?? 'spz';
+
+  return {
+    scenarioId: scenario?.id ?? pairedEnvironment?.id ?? 'visual-scenario',
+    scenarioLabel:
+      scenario?.label ?? pairedEnvironment?.label ?? 'Visual scenario',
+    variantId,
+    seed: scenario?.seed ?? 0,
+    lighting: scenario?.lighting ?? 'studio',
+    environment: scenario?.environment,
+    camera: {
+      jitter: scenario?.camera?.jitter ?? 0,
+      exposure: scenario?.camera?.exposure ?? 1,
+      noise: scenario?.camera?.noise ?? 0,
+      blur: scenario?.camera?.blur ?? 0,
+    },
+    materials: {
+      randomizeObjectColors: Boolean(
+        scenario?.materials?.randomizeObjectColors
+      ),
+      randomizeTableMaterial: Boolean(
+        scenario?.materials?.randomizeTableMaterial
+      ),
+      roughness: scenario?.materials?.roughness,
+      metalness: scenario?.materials?.metalness,
+    },
+    splatEnabled: Boolean(splat?.enabled || pairedEnvironment),
+    splatSrc: pairedEnvironment?.splat.src ?? splat?.src,
+    splatFormat: format,
+    splatRenderer: renderer ?? pairedEnvironment?.splat.renderer,
+    collisionProxyXmlPath: collisionProxy?.xmlPath,
+    collisionProxyStatus: collisionProxy?.status,
+    collisionProxyPrimitives: collisionProxy?.primitives ?? [],
+    readiness,
+    transformSource: 'visualScenario.camera',
+  };
 }
 
 export function VisualScenarioEffects(props: VisualScenarioEffectsProps) {

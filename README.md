@@ -221,6 +221,27 @@ authoring and import flows. The status distinguishes disabled scenarios,
 missing splat assets, missing MJCF collision proxies, unsupported Spark formats,
 and ready visual or paired environments.
 
+Use `createVisualScenarioExecutionContext()` or
+`useVisualScenarioExecutionContext()` when recording rollouts or exporting
+LeRobot/HF Jobs handoff artifacts. It resolves the scenario seed, camera
+exposure/noise/blur/jitter, material randomization, splat source, collision
+proxy, and readiness into one serializable object.
+
+```tsx
+import { createVisualScenarioExecutionContext } from "mujoco-react";
+
+const visualContext = createVisualScenarioExecutionContext({
+  scenario,
+  renderer: "spark",
+  variantId,
+});
+
+writeEpisodeManifest({
+  task,
+  visualExecutionContext: visualContext,
+});
+```
+
 For MuJoCo + 3DGS composition, derive the optional collision environment from
 the same splat metadata and pass the resulting config to `<MujocoCanvas>`:
 
