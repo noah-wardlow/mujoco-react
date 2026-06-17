@@ -1165,9 +1165,10 @@ recent recording.
 Use `resolveMountedCameraFrameSource()` when dataset feature names need to map
 to named MuJoCo cameras, sites, or bodies before recording. The helper first
 checks exact names and aliases, then falls back to normalized/prefix/suffix
-matches such as `left_wrist` -> `left_wrist_camera_optical_frame`. It returns
-both the capture selector and the mounted-source provenance that should be
-stored beside the dataset:
+matches such as `left_wrist` -> `left_wrist_camera_optical_frame`, and
+token-contained imported-model names such as `observation.images.head` ->
+`robot_head_camera`. It returns both the capture selector and the
+mounted-source provenance that should be stored beside the dataset:
 
 ```tsx
 const resolved = resolveMountedCameraFrameSource("head", {

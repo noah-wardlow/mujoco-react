@@ -62,6 +62,7 @@ export const MountedCameraFrameSourceSuggestionMatch = {
   Normalized: 'normalized',
   Prefix: 'prefix',
   Suffix: 'suffix',
+  Contains: 'contains',
 } as const;
 
 export type MountedCameraFrameSourceSuggestionMatch =
@@ -249,6 +250,20 @@ function normalizeCameraSourceName(value: string) {
     .replace(/^_+|_+$/g, '');
 }
 
+function createCameraSourceKeyVariants(key: string) {
+  const candidates = [
+    key,
+    key.startsWith('observation.images.')
+      ? key.slice('observation.images.'.length)
+      : '',
+    key.includes('.') ? key.split('.').at(-1) ?? '' : '',
+    key.includes('/') ? key.split('/').at(-1) ?? '' : '',
+  ];
+  return candidates
+    .map((candidate) => candidate.trim())
+    .filter((candidate, index, items) => candidate && items.indexOf(candidate) === index);
+}
+
 function getSelectorKey(selector: CameraFrameMountSelector) {
   if (selector.cameraName) return `camera:${selector.cameraName}`;
   if (selector.siteName) return `site:${selector.siteName}`;
@@ -329,17 +344,26 @@ function getCameraFrameResourceMatch(
 ): MountedCameraFrameSourceSuggestionMatch | null {
   if (resourceName === key) return MountedCameraFrameSourceSuggestionMatch.Direct;
 
-  const normalizedKey = normalizeCameraSourceName(key);
   const normalizedResource = normalizeCameraSourceName(resourceName);
-  if (!normalizedKey || !normalizedResource) return null;
-  if (normalizedResource === normalizedKey) {
-    return MountedCameraFrameSourceSuggestionMatch.Normalized;
-  }
-  if (normalizedResource.startsWith(`${normalizedKey}_`)) {
-    return MountedCameraFrameSourceSuggestionMatch.Prefix;
-  }
-  if (normalizedResource.endsWith(`_${normalizedKey}`)) {
-    return MountedCameraFrameSourceSuggestionMatch.Suffix;
+  if (!normalizedResource) return null;
+
+  for (const variant of createCameraSourceKeyVariants(key)) {
+    if (resourceName === variant) return MountedCameraFrameSourceSuggestionMatch.Direct;
+
+    const normalizedKey = normalizeCameraSourceName(variant);
+    if (!normalizedKey) continue;
+    if (normalizedResource === normalizedKey) {
+      return MountedCameraFrameSourceSuggestionMatch.Normalized;
+    }
+    if (normalizedResource.startsWith(`${normalizedKey}_`)) {
+      return MountedCameraFrameSourceSuggestionMatch.Prefix;
+    }
+    if (normalizedResource.endsWith(`_${normalizedKey}`)) {
+      return MountedCameraFrameSourceSuggestionMatch.Suffix;
+    }
+    if (normalizedResource.includes(`_${normalizedKey}_`)) {
+      return MountedCameraFrameSourceSuggestionMatch.Contains;
+    }
   }
   return null;
 }

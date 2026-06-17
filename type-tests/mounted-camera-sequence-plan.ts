@@ -69,6 +69,18 @@ const inferredImportedPlan = createMountedCameraFrameSequencePlan(
 const normalizedCameraSource = resolveMountedCameraFrameSource('overhead camera', {
   cameras: [{ name: 'overhead_camera' }],
 });
+const lerobotFeatureCameraSource = resolveMountedCameraFrameSource(
+  'observation.images.head',
+  {
+    cameras: [{ name: 'robot_head_camera' }],
+  }
+);
+const namespacedWristCameraSource = resolveMountedCameraFrameSource(
+  'observation.images.left_wrist',
+  {
+    cameras: [{ name: 'camera_left_wrist_rgb' }],
+  }
+);
 const inferredBeforeFallbackSource = resolveMountedCameraFrameSource('left_wrist', {
   cameras: [],
   sites: [{ name: 'left_wrist_camera_optical_frame' }],
@@ -91,4 +103,6 @@ fallbackPlan.resolved.head?.selector.cameraName?.toUpperCase();
 inferredImportedPlan.resolved.left_wrist?.selector.siteName?.toUpperCase();
 inferredImportedPlan.resolved.right_wrist?.source.kind.toUpperCase();
 normalizedCameraSource?.selector.cameraName?.toUpperCase();
+lerobotFeatureCameraSource?.selector.cameraName?.toUpperCase();
+namespacedWristCameraSource?.selector.cameraName?.toUpperCase();
 inferredBeforeFallbackSource?.selector.siteName?.toUpperCase();
