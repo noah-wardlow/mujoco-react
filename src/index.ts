@@ -116,8 +116,10 @@ export {
   renderCameraFrameToCanvas,
 } from './rendering/cameraFrameCapture';
 export {
+  createMountedCameraFrameSequenceManifest,
   createMountedCameraFrameSequenceReadiness,
   createMountedCameraFrameSourceSuggestions,
+  MountedCameraFrameSequenceManifestStatus,
   MountedCameraFrameSequenceReadinessStatus,
   MountedCameraFrameSourceSuggestionMatch,
   createMountedCameraFrameSequencePlanFromApi,
@@ -130,8 +132,10 @@ export {
 } from './rendering/cameraFrameSource';
 export type {
   CameraFrameMountSelector,
+  CreateMountedCameraFrameSequenceManifestOptions,
   CreateMountedCameraFrameSequencePlanOptions,
   MountedCameraFrameCaptureSource,
+  MountedCameraFrameSequenceManifest,
   MountedCameraFrameSequencePlanOptions,
   MountedCameraFrameSequenceRecorderTarget,
   MountedCameraFrameSequenceCameraOptions,
@@ -141,6 +145,7 @@ export type {
   MountedCameraFrameSequenceRecordOptions,
   MountedCameraFrameSequenceRecordResult,
   MountedCameraFrameSequenceSourceReadiness,
+  MountedCameraFrameSequenceStreamSummary,
   MountedCameraFrameSourceSuggestion,
   NamedCameraFrameResource,
   ResolveMountedCameraFrameSourceOptions,

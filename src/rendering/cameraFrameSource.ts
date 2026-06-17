@@ -143,6 +143,57 @@ export interface MountedCameraFrameSequenceRecordResult
   readiness: MountedCameraFrameSequenceReadiness;
 }
 
+export const MountedCameraFrameSequenceManifestStatus = {
+  Complete: 'complete',
+  Partial: 'partial',
+  Missing: 'missing',
+} as const;
+
+export type MountedCameraFrameSequenceManifestStatus =
+  (typeof MountedCameraFrameSequenceManifestStatus)[keyof typeof MountedCameraFrameSequenceManifestStatus];
+
+export interface MountedCameraFrameSequenceStreamSummary {
+  key: string;
+  ready: boolean;
+  complete: boolean;
+  status: MountedCameraFrameSequenceManifestStatus;
+  source?: CameraFrameCaptureSource;
+  selector?: CameraFrameMountSelector;
+  target?: string;
+  width?: number;
+  height?: number;
+  expectedFrameCount: number;
+  recordedFrameCount: number;
+  missingFrameCount: number;
+  firstFrameIndex: number | null;
+  lastFrameIndex: number | null;
+  firstTimestamp: number | null;
+  lastTimestamp: number | null;
+  message: string;
+}
+
+export interface CreateMountedCameraFrameSequenceManifestOptions {
+  expectedFrameCount?: number;
+  cameraKeys?: readonly string[];
+}
+
+export interface MountedCameraFrameSequenceManifest {
+  schema: 'mujoco-react/mounted-camera-frame-sequence-manifest@1';
+  ready: boolean;
+  complete: boolean;
+  status: MountedCameraFrameSequenceManifestStatus;
+  cameraKeys: string[];
+  resolvedKeys: string[];
+  missingKeys: string[];
+  expectedFrameCount: number;
+  recordedFrameCount: number;
+  missingFrameCount: number;
+  streamSummaries: Record<string, MountedCameraFrameSequenceStreamSummary>;
+  streams: MountedCameraFrameSequenceStreamSummary[];
+  readiness: MountedCameraFrameSequenceReadiness;
+  message: string;
+}
+
 export type MountedCameraFrameSequenceRecorderTarget = Pick<
   MujocoSimAPI,
   'getCameras' | 'getSites' | 'getBodies' | 'recordCameraSequence'
@@ -513,6 +564,122 @@ export function createMountedCameraFrameSequenceReadiness(
       : `Missing mounted MuJoCo source${
           missingKeys.length === 1 ? '' : 's'
         } for ${missingKeys.join(', ')}.`,
+  };
+}
+
+function normalizeFrameCount(frameCount: number | undefined) {
+  return Number.isFinite(frameCount) && frameCount !== undefined
+    ? Math.max(0, Math.floor(frameCount))
+    : 0;
+}
+
+export function createMountedCameraFrameSequenceManifest(
+  result: MountedCameraFrameSequenceRecordResult,
+  options: CreateMountedCameraFrameSequenceManifestOptions = {}
+): MountedCameraFrameSequenceManifest {
+  const cameraKeys = [
+    ...(options.cameraKeys ??
+      result.readiness.cameraKeys ??
+      result.plan.cameraKeys ??
+      result.cameraKeys),
+  ];
+  const expectedFrameCount = normalizeFrameCount(
+    options.expectedFrameCount ?? result.frameCount
+  );
+  const recordedFrameCount = normalizeFrameCount(result.frameCount);
+  const streamSummaries: Record<string, MountedCameraFrameSequenceStreamSummary> =
+    {};
+  const streams: MountedCameraFrameSequenceStreamSummary[] = [];
+  let missingFrameCount = 0;
+  let completeStreamCount = 0;
+  let resolvedOrRecordedStreamCount = 0;
+
+  for (const key of cameraKeys) {
+    const summary = result.cameraSummaries[key];
+    const readiness = result.readiness.cameras[key];
+    const source = summary?.source ?? readiness?.source;
+    const ready = readiness?.ready ?? Boolean(summary);
+    const recorded = normalizeFrameCount(summary?.frameCount);
+    const missing = Math.max(expectedFrameCount - recorded, 0);
+    const complete = ready && missing === 0;
+    const status = complete
+      ? MountedCameraFrameSequenceManifestStatus.Complete
+      : ready || recorded > 0
+        ? MountedCameraFrameSequenceManifestStatus.Partial
+        : MountedCameraFrameSequenceManifestStatus.Missing;
+    const target = source
+      ? getCameraFrameCaptureSourceTarget(source)
+      : readiness?.message
+        ? undefined
+        : 'missing MuJoCo camera';
+    const message = complete
+      ? `Camera stream "${key}" recorded ${recorded} of ${expectedFrameCount} frame${
+          expectedFrameCount === 1 ? '' : 's'
+        }.`
+      : ready || recorded > 0
+        ? `Camera stream "${key}" recorded ${recorded} of ${expectedFrameCount} frame${
+            expectedFrameCount === 1 ? '' : 's'
+          }.`
+        : readiness?.message ??
+          `Camera stream "${key}" did not record any frames.`;
+    const stream = {
+      key,
+      ready,
+      complete,
+      status,
+      source,
+      selector: readiness?.selector,
+      target,
+      width: summary?.width,
+      height: summary?.height,
+      expectedFrameCount,
+      recordedFrameCount: recorded,
+      missingFrameCount: missing,
+      firstFrameIndex: summary?.firstFrameIndex ?? null,
+      lastFrameIndex: summary?.lastFrameIndex ?? null,
+      firstTimestamp: summary?.firstTimestamp ?? null,
+      lastTimestamp: summary?.lastTimestamp ?? null,
+      message,
+    };
+
+    streamSummaries[key] = stream;
+    streams.push(stream);
+    missingFrameCount += missing;
+    if (complete) completeStreamCount += 1;
+    if (ready || recorded > 0) resolvedOrRecordedStreamCount += 1;
+  }
+
+  const complete =
+    result.readiness.ready &&
+    streams.length === completeStreamCount &&
+    missingFrameCount === 0;
+  const status = complete
+    ? MountedCameraFrameSequenceManifestStatus.Complete
+    : resolvedOrRecordedStreamCount > 0
+      ? MountedCameraFrameSequenceManifestStatus.Partial
+      : MountedCameraFrameSequenceManifestStatus.Missing;
+
+  return {
+    schema: 'mujoco-react/mounted-camera-frame-sequence-manifest@1',
+    ready: result.readiness.ready,
+    complete,
+    status,
+    cameraKeys,
+    resolvedKeys: [...result.readiness.resolvedKeys],
+    missingKeys: [...result.readiness.missingKeys],
+    expectedFrameCount,
+    recordedFrameCount,
+    missingFrameCount,
+    streamSummaries,
+    streams,
+    readiness: result.readiness,
+    message: complete
+      ? `All ${cameraKeys.length} camera stream${
+          cameraKeys.length === 1 ? '' : 's'
+        } recorded ${expectedFrameCount} frame${
+          expectedFrameCount === 1 ? '' : 's'
+        }.`
+      : `Mounted camera sequence coverage is ${status}.`,
   };
 }
 

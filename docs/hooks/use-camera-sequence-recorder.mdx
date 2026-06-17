@@ -235,6 +235,7 @@ dataset manifests, and runner handoff checks.
 
 ```tsx
 import {
+  createMountedCameraFrameSequenceManifest,
   createMountedCameraFrameSequencePlan,
   createMountedCameraFrameSequenceReadiness,
   recordMountedCameraFrameSequence,
@@ -270,7 +271,9 @@ const result = await recordMountedCameraFrameSequence(api, {
   },
 });
 
-await saveCameraProvenance(result.readiness, result.cameraSummaries);
+const manifest = createMountedCameraFrameSequenceManifest(result);
+
+await saveCameraProvenance(manifest);
 ```
 
 ## Notes
@@ -283,6 +286,9 @@ await saveCameraProvenance(result.readiness, result.cameraSummaries);
 - Use `result.cameraSummaries[cameraKey]` to persist source provenance,
   dimensions, recorded frame counts, first/last frame indices, and first/last
   simulation timestamps next to LeRobot/Forge handoff metadata.
+- Use `createMountedCameraFrameSequenceManifest(result)` when downstream
+  tooling needs one stable artifact with readiness, source targets, dimensions,
+  frame coverage, first/last frame indices, and missing-frame counts per stream.
 - Use `result.readiness` or `createMountedCameraFrameSequenceReadiness(plan)` to
   persist which task camera streams resolved before recording.
 - Pass `signal` to cancel a long recording from app UI.

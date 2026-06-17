@@ -1104,12 +1104,20 @@ const sequence = await recordMountedCameraFrameSequence(api, {
 sequence.readiness.ready; // true when every requested stream resolved
 sequence.plan.missingKeys; // unresolved task cameras, if requireAll is false
 sequence.cameraSummaries.head.source; // mounted source provenance
+
+const manifest = createMountedCameraFrameSequenceManifest(sequence);
+manifest.streamSummaries.head.complete; // per-camera frame coverage
+manifest.status; // "complete", "partial", or "missing"
 ```
 
 `recordMountedCameraFrameSequence()` requires all requested `cameraKeys` by
 default so dataset recording cannot silently omit a camera stream. Set
 `requireAll: false` only for exploratory tooling that can tolerate partial
 camera coverage.
+
+Use `createMountedCameraFrameSequenceManifest()` after recording to persist a
+stable dataset-facing manifest with readiness, source targets, dimensions,
+first/last frame indices, timestamps, and per-camera missing-frame counts.
 
 Inside `<MujocoCanvas>` children, `useMountedCameraSequenceRecorder()` exposes
 the same planning and recording surface with React status/error/result state.
