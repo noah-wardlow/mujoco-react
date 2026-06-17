@@ -117,7 +117,9 @@ export {
 } from './rendering/cameraFrameCapture';
 export {
   createMountedCameraFrameSequenceReadiness,
+  createMountedCameraFrameSourceSuggestions,
   MountedCameraFrameSequenceReadinessStatus,
+  MountedCameraFrameSourceSuggestionMatch,
   createMountedCameraFrameSequencePlanFromApi,
   createMountedCameraFrameSequencePlan,
   getCameraFrameCaptureSourceTarget,
@@ -139,6 +141,7 @@ export type {
   MountedCameraFrameSequenceRecordOptions,
   MountedCameraFrameSequenceRecordResult,
   MountedCameraFrameSequenceSourceReadiness,
+  MountedCameraFrameSourceSuggestion,
   NamedCameraFrameResource,
   ResolveMountedCameraFrameSourceOptions,
   ResolvedMountedCameraFrameSource,
