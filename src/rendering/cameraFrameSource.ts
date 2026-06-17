@@ -407,6 +407,15 @@ export function resolveMountedCameraFrameSource(
     return { key, selector, source };
   }
 
+  const [suggestion] = createMountedCameraFrameSourceSuggestions(key, options);
+  if (suggestion) {
+    return {
+      key,
+      selector: suggestion.selector,
+      source: suggestion.source,
+    };
+  }
+
   if (options.allowAliasFallback) {
     for (const selector of aliasCandidates) {
       const source = getMountedCameraFrameCaptureSource(selector);

@@ -301,8 +301,10 @@ await saveCameraProvenance(result.readiness, result.cameraSummaries);
 - `requireMountedSources` defaults to `true`. Sequence recording throws unless
   each camera provides exactly one mounted MuJoCo `cameraName`, `siteName`, or
   `bodyName` selector.
-- Use `resolveMountedCameraFrameSource()` when dataset stream names need aliases
-  to actual MuJoCo cameras, sites, or bodies.
+- Use `resolveMountedCameraFrameSource()` when dataset stream names need to map
+  to actual MuJoCo cameras, sites, or bodies. Exact names and aliases are tried
+  first; then normalized/prefix/suffix matches such as `left_wrist` to
+  `left_wrist_camera_optical_frame` are used for imported models.
 - `recordMountedCameraFrameSequence()` defaults `requireAll` to `true`; set it
   to `false` only for partial-coverage tools, not train/eval dataset capture.
 - Each image result includes `source.kind`, so dataset pipelines can require

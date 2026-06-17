@@ -1155,19 +1155,17 @@ function DatasetRecorder() {
 recent recording.
 
 Use `resolveMountedCameraFrameSource()` when dataset feature names need to map
-to named MuJoCo cameras, sites, or bodies before recording. The helper accepts
-the model resource lists plus app-level aliases and returns both the capture
-selector and the mounted-source provenance that should be stored beside the
-dataset:
+to named MuJoCo cameras, sites, or bodies before recording. The helper first
+checks exact names and aliases, then falls back to normalized/prefix/suffix
+matches such as `left_wrist` -> `left_wrist_camera_optical_frame`. It returns
+both the capture selector and the mounted-source provenance that should be
+stored beside the dataset:
 
 ```tsx
 const resolved = resolveMountedCameraFrameSource("head", {
   cameras: api.getCameras(),
   sites: api.getSites(),
   bodies: api.getBodies(),
-  aliases: {
-    head: [{ siteName: "head_camera_rgb_optical_frame" }],
-  },
 });
 
 if (!resolved) throw new Error("head does not resolve to a MuJoCo source");
@@ -1178,6 +1176,10 @@ await api.recordCameraSequence({
   cameras: [{ key: "head", width: 640, height: 480, ...resolved.selector }],
 });
 ```
+
+Pass `aliases` when multiple MuJoCo resources could match a dataset stream key
+or when the model uses names that do not share a normalized prefix/suffix with
+the LeRobot camera feature.
 
 ### `useCtrlNoise(config)`
 

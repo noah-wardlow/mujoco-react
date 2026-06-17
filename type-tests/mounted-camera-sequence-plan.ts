@@ -1,6 +1,7 @@
 import {
   createMountedCameraFrameSequenceReadiness,
   createMountedCameraFrameSequencePlan,
+  resolveMountedCameraFrameSource,
   type CameraFrameSequenceCamera,
   type MountedCameraFrameSequencePlan,
   type MountedCameraFrameSequenceReadiness,
@@ -53,6 +54,30 @@ const fallbackPlan = createMountedCameraFrameSequencePlan(['head'], {
   },
   allowAliasFallback: true,
 });
+const inferredImportedPlan = createMountedCameraFrameSequencePlan(
+  ['head', 'left_wrist', 'right_wrist'],
+  {
+    cameras: [{ name: 'overhead_camera' }],
+    sites: [
+      { name: 'head_camera_rgb_optical_frame' },
+      { name: 'left_wrist_camera_optical_frame' },
+      { name: 'right_wrist_camera_optical_frame' },
+    ],
+    bodies: [{ name: 'camera_mount_right_wrist' }],
+  }
+);
+const normalizedCameraSource = resolveMountedCameraFrameSource('overhead camera', {
+  cameras: [{ name: 'overhead_camera' }],
+});
+const inferredBeforeFallbackSource = resolveMountedCameraFrameSource('left_wrist', {
+  cameras: [],
+  sites: [{ name: 'left_wrist_camera_optical_frame' }],
+  bodies: [],
+  aliases: {
+    left_wrist: [{ cameraName: 'left_wrist' }],
+  },
+  allowAliasFallback: true,
+});
 
 if (mountedCamera?.source?.kind === 'mujoco-site') {
   mountedCamera.source.siteName.toUpperCase();
@@ -63,3 +88,7 @@ readiness.cameras.head?.source?.kind.toUpperCase();
 readiness.resolvedKeys.includes('head');
 missingPlan.missingKeys.includes('missing');
 fallbackPlan.resolved.head?.selector.cameraName?.toUpperCase();
+inferredImportedPlan.resolved.left_wrist?.selector.siteName?.toUpperCase();
+inferredImportedPlan.resolved.right_wrist?.source.kind.toUpperCase();
+normalizedCameraSource?.selector.cameraName?.toUpperCase();
+inferredBeforeFallbackSource?.selector.siteName?.toUpperCase();
