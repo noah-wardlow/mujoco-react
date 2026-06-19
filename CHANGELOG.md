@@ -1,3 +1,10 @@
+# [9.5.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.4.0...v9.5.0) (2026-06-19)
+
+
+### Features
+
+* improve mounted camera capture ([f33e445](https://github.com/noah-wardlow/mujoco-react/commit/f33e445645a5daedcfe5689bfa33a63a349ca08f))
+
 # [9.4.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.3.0...v9.4.0) (2026-06-17)
 
 
