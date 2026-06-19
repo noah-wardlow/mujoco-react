@@ -8,6 +8,7 @@ import type { ThreeElements } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useMujocoContext, useBeforePhysicsStep } from '../core/MujocoSimProvider';
+import { CAPTURE_EXCLUDE_KEY } from '../rendering/cameraFrameCapture';
 import type { DragInteractionProps } from '../types';
 
 // Preallocated temps to avoid GC pressure
@@ -60,6 +61,7 @@ export function DragInteraction({
       0.1,
       0xff4444,
     );
+    arrow.userData[CAPTURE_EXCLUDE_KEY] = true;
     arrow.visible = false;
     // Make arrow semi-transparent
     (arrow.line.material as THREE.LineBasicMaterial).transparent = true;

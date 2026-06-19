@@ -471,9 +471,8 @@ export function resolveMountedCameraFrameSource(
     { bodyName: key },
   ];
   const aliasCandidates = normalizeAliasCandidates(options.aliases?.[key]);
-  const candidates = [...directCandidates, ...aliasCandidates];
 
-  for (const selector of candidates) {
+  for (const selector of aliasCandidates) {
     if (!isSelectorMounted(selector, cameraNames, siteNames, bodyNames)) {
       continue;
     }
@@ -497,6 +496,15 @@ export function resolveMountedCameraFrameSource(
       if (!source) continue;
       return { key, selector, source };
     }
+  }
+
+  for (const selector of directCandidates) {
+    if (!isSelectorMounted(selector, cameraNames, siteNames, bodyNames)) {
+      continue;
+    }
+    const source = getMountedCameraFrameCaptureSource(selector);
+    if (!source) continue;
+    return { key, selector, source };
   }
 
   return null;

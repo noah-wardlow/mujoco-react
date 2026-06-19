@@ -90,6 +90,14 @@ const inferredBeforeFallbackSource = resolveMountedCameraFrameSource('left_wrist
   },
   allowAliasFallback: true,
 });
+const aliasBeatsDirectBodyPlan = createMountedCameraFrameSequencePlan(['wrist'], {
+  cameras: [{ name: 'wrist_cam' }],
+  sites: [],
+  bodies: [{ name: 'wrist' }],
+  aliases: {
+    wrist: { cameraName: 'wrist_cam' },
+  },
+});
 
 if (mountedCamera?.source?.kind === 'mujoco-site') {
   mountedCamera.source.siteName.toUpperCase();
@@ -106,3 +114,4 @@ normalizedCameraSource?.selector.cameraName?.toUpperCase();
 lerobotFeatureCameraSource?.selector.cameraName?.toUpperCase();
 namespacedWristCameraSource?.selector.cameraName?.toUpperCase();
 inferredBeforeFallbackSource?.selector.siteName?.toUpperCase();
+aliasBeatsDirectBodyPlan.resolved.wrist?.selector.cameraName?.toUpperCase();

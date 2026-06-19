@@ -193,6 +193,21 @@ function SparkSplatHarness() {
     <SparkSplatEnvironment
       {...splat.props}
       hideGroundMeshes
+      renderTuning={{
+        lodSplatScale: 0.75,
+        lodRenderScale: 1.1,
+        minSortIntervalMs: 50,
+      }}
+      captureTuning={{
+        lodSplatScale: 1.4,
+        lodRenderScale: 0.45,
+        minSortIntervalMs: 0,
+        maxWarmupFrames: 6,
+        blankSampleCount: 768,
+        blankAlphaThreshold: 6,
+        blankVisibleRatio: 0.01,
+        blankAverageColor: 2,
+      }}
       onLoad={(mesh) => {
         mesh.visible = true;
       }}

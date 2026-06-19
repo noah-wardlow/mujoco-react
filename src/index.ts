@@ -113,6 +113,7 @@ export type {
   MountedCameraSequenceRecordResult,
 } from './hooks/useMountedCameraSequenceRecorder';
 export {
+  CAPTURE_EXCLUDE_KEY,
   captureCameraFrame,
   captureCameraFrameBlob,
   createCameraFrameCaptureSession,

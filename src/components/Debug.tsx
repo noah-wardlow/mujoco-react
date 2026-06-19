@@ -11,6 +11,7 @@ import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMujocoContext } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
+import { CAPTURE_EXCLUDE_KEY } from '../rendering/cameraFrameCapture';
 import { getContact, withContacts } from '../types';
 import type { DebugProps } from '../types';
 
@@ -25,9 +26,20 @@ const JOINT_COLORS: Record<number, number> = {
 const _v3a = new THREE.Vector3();
 const _v3b = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
+const _cameraMatrix = new THREE.Matrix4();
 const _contactPos = new THREE.Vector3();
 const _contactNormal = new THREE.Vector3();
 const MAX_CONTACT_ARROWS = 50;
+const CAMERA_DEBUG_LENGTH = 0.12;
+const CAMERA_DEBUG_FRUSTUM_DEPTH = 0.08;
+
+type CameraDebugObject = THREE.Group & {
+  userData: {
+    cameraId: number;
+    frustum: THREE.LineSegments;
+    label?: THREE.Sprite;
+  };
+};
 
 /**
  * Declarative debug visualization component.
@@ -37,6 +49,7 @@ export function Debug({
   showGeoms = false,
   showSites = false,
   showJoints = false,
+  showCameras = false,
   showContacts = false,
   showCOM = false,
   showInertia = false,
@@ -55,6 +68,7 @@ export function Debug({
     const geoms: THREE.Object3D[] = [];
     const sites: THREE.Object3D[] = [];
     const joints: THREE.Object3D[] = [];
+    const cameras: CameraDebugObject[] = [];
     const comMarkers: THREE.Object3D[] = [];
 
     // Wireframe geoms
@@ -179,6 +193,83 @@ export function Debug({
       }
     }
 
+    if (showCameras && model.ncam && model.name_camadr) {
+      for (let i = 0; i < model.ncam; i++) {
+        const group = new THREE.Group() as CameraDebugObject;
+        group.userData.cameraId = i;
+        group.renderOrder = 999;
+        group.frustumCulled = false;
+
+        const marker = new THREE.Mesh(
+          new THREE.BoxGeometry(0.014, 0.009, 0.006),
+          new THREE.MeshBasicMaterial({ color: 0x38bdf8, depthTest: false })
+        );
+        marker.renderOrder = 999;
+        marker.frustumCulled = false;
+        group.add(marker);
+
+        const forward = new THREE.ArrowHelper(
+          new THREE.Vector3(0, 0, -1),
+          new THREE.Vector3(),
+          CAMERA_DEBUG_LENGTH,
+          0x38bdf8,
+          CAMERA_DEBUG_LENGTH * 0.24,
+          CAMERA_DEBUG_LENGTH * 0.11
+        );
+        forward.renderOrder = 999;
+        forward.frustumCulled = false;
+        forward.line.material = new THREE.LineBasicMaterial({
+          color: 0x38bdf8,
+          depthTest: false,
+        });
+        (forward.cone.material as THREE.MeshBasicMaterial).depthTest = false;
+        group.add(forward);
+
+        const frustumGeometry = new THREE.BufferGeometry();
+        frustumGeometry.setAttribute(
+          'position',
+          new THREE.Float32BufferAttribute(new Float32Array(8 * 2 * 3), 3)
+        );
+        const frustum = new THREE.LineSegments(
+          frustumGeometry,
+          new THREE.LineBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.8,
+            depthTest: false,
+          })
+        );
+        frustum.renderOrder = 999;
+        frustum.frustumCulled = false;
+        group.userData.frustum = frustum;
+        group.add(frustum);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 32px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(getName(model, model.name_camadr[i]), 128, 42);
+        const texture = new THREE.CanvasTexture(canvas);
+        const sprite = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: texture,
+            depthTest: false,
+            transparent: true,
+          })
+        );
+        sprite.position.set(0, 0.014, 0.01);
+        sprite.scale.set(0.04, 0.01, 1);
+        sprite.renderOrder = 999;
+        group.userData.label = sprite;
+        group.add(sprite);
+
+        cameras.push(group);
+      }
+    }
+
     // COM markers
     if (showCOM) {
       for (let i = 1; i < model.nbody; i++) {
@@ -190,8 +281,8 @@ export function Debug({
       }
     }
 
-    return { geoms, sites, joints, comMarkers };
-  }, [status, mjModelRef, showGeoms, showSites, showJoints, showCOM]);
+    return { geoms, sites, joints, cameras, comMarkers };
+  }, [status, mjModelRef, showGeoms, showSites, showJoints, showCameras, showCOM]);
 
   // Add/remove debug objects from scene
   useEffect(() => {
@@ -202,6 +293,7 @@ export function Debug({
       ...debugGeometry.geoms,
       ...debugGeometry.sites,
       ...debugGeometry.joints,
+      ...debugGeometry.cameras,
       ...debugGeometry.comMarkers,
     ];
     for (const obj of allObjects) group.add(obj);
@@ -278,6 +370,59 @@ export function Debug({
         _v3a.set(jntAxis[3 * jid], jntAxis[3 * jid + 1], jntAxis[3 * jid + 2])
           .applyQuaternion(_quat).normalize();
         arrow.setDirection(_v3a);
+      }
+    }
+
+    const camXpos = data.cam_xpos;
+    const camXmat = data.cam_xmat;
+    if (camXpos && camXmat) {
+      for (const group of debugGeometry.cameras) {
+        const cameraId = group.userData.cameraId;
+        const i3 = cameraId * 3;
+        const i9 = cameraId * 9;
+        group.position.set(
+          camXpos[i3],
+          camXpos[i3 + 1],
+          camXpos[i3 + 2]
+        );
+        _cameraMatrix.set(
+          camXmat[i9], camXmat[i9 + 1], camXmat[i9 + 2], 0,
+          camXmat[i9 + 3], camXmat[i9 + 4], camXmat[i9 + 5], 0,
+          camXmat[i9 + 6], camXmat[i9 + 7], camXmat[i9 + 8], 0,
+          0, 0, 0, 1
+        );
+        group.quaternion.setFromRotationMatrix(_cameraMatrix);
+
+        const fovy = model.cam_fovy?.[cameraId] ?? 45;
+        const halfHeight = Math.tan(THREE.MathUtils.degToRad(fovy) / 2) *
+          CAMERA_DEBUG_FRUSTUM_DEPTH;
+        const halfWidth = halfHeight * 4 / 3;
+        const positions = group.userData.frustum.geometry.attributes.position;
+        const array = positions.array as Float32Array;
+        const points = [
+          [0, 0, 0],
+          [-halfWidth, halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+          [0, 0, 0],
+          [halfWidth, halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+          [0, 0, 0],
+          [halfWidth, -halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+          [0, 0, 0],
+          [-halfWidth, -halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+          [-halfWidth, halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+          [halfWidth, halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+          [halfWidth, halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+          [halfWidth, -halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+          [halfWidth, -halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+          [-halfWidth, -halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+          [-halfWidth, -halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+          [-halfWidth, halfHeight, -CAMERA_DEBUG_FRUSTUM_DEPTH],
+        ];
+        for (let i = 0; i < points.length; i += 1) {
+          array[i * 3] = points[i][0];
+          array[i * 3 + 1] = points[i][1];
+          array[i * 3 + 2] = points[i][2];
+        }
+        positions.needsUpdate = true;
       }
     }
 
@@ -358,7 +503,13 @@ export function Debug({
   if (status !== 'ready') return null;
 
   return (
-    <group {...groupProps}>
+    <group
+      {...groupProps}
+      userData={{
+        ...groupProps.userData,
+        [CAPTURE_EXCLUDE_KEY]: true,
+      }}
+    >
       <group ref={groupRef} />
       {showContacts && <group ref={contactGroupRef} />}
     </group>

@@ -13,6 +13,7 @@ import { useFrame } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMujocoContext } from '../core/MujocoSimProvider';
+import { CAPTURE_EXCLUDE_KEY } from '../rendering/cameraFrameCapture';
 import { getContact, withContacts } from '../types';
 
 const _dummy = new THREE.Object3D();
@@ -70,7 +71,13 @@ export function ContactMarkers({
   if (status !== 'ready') return null;
 
   return (
-    <group {...groupProps}>
+    <group
+      {...groupProps}
+      userData={{
+        ...groupProps.userData,
+        [CAPTURE_EXCLUDE_KEY]: true,
+      }}
+    >
       <instancedMesh ref={meshRef} args={[undefined, undefined, maxContacts]} frustumCulled={false} renderOrder={999}>
         <sphereGeometry args={[radius, 8, 8]} />
         <meshBasicMaterial color={color} depthTest={false} />

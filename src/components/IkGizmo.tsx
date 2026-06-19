@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useMujocoContext } from '../core/MujocoSimProvider';
 import { findSiteByName } from '../core/SceneLoader';
+import { CAPTURE_EXCLUDE_KEY } from '../rendering/cameraFrameCapture';
 import type { IkGizmoProps } from '../types';
 
 // Preallocated temps to avoid GC pressure in useFrame
@@ -83,7 +84,10 @@ export function IkGizmo({ controller, siteName, scale = 0.18, onDrag }: IkGizmoP
   if (status !== 'ready') return null;
 
   return (
-    <group ref={wrapperRef}>
+    <group
+      ref={wrapperRef}
+      userData={{ [CAPTURE_EXCLUDE_KEY]: true }}
+    >
       <PivotControls
         ref={pivotRef}
         autoTransform

@@ -4,7 +4,7 @@ description: "Visualization overlays for debugging simulations"
 icon: "bug"
 ---
 
-Renders debug overlays for MuJoCo simulation elements — geom wireframes, site markers, joint axes, contact forces, center of mass, and more.
+Renders debug overlays for MuJoCo simulation elements — geom wireframes, site markers, joint axes, camera frustums, contact forces, center of mass, and more.
 
 ## Usage
 
@@ -30,6 +30,10 @@ Renders debug overlays for MuJoCo simulation elements — geom wireframes, site 
 
 <ParamField body="showContacts" type="boolean" default="false">
   Show contact force vectors as arrows.
+</ParamField>
+
+<ParamField body="showCameras" type="boolean" default="false">
+  Show MuJoCo camera positions, frustums, labels, and forward rays from the live `cam_xpos` / `cam_xmat` frame.
 </ParamField>
 
 <ParamField body="showCOM" type="boolean" default="false">
@@ -64,6 +68,7 @@ Renders debug overlays for MuJoCo simulation elements — geom wireframes, site 
 
 - **Static geometry** (geoms, sites, joints) is created once when the model loads
 - **Positions** are updated every frame using preallocated temp vectors to minimize GC pressure
+- **Camera frustums** are derived from MuJoCo camera state and are excluded from mounted camera captures
 - **Contact arrows** use a pre-created pool of 50 `ArrowHelper` objects — they are shown/hidden and repositioned each frame rather than created and disposed
 
 ## Example: Debug Panel Toggle
@@ -71,7 +76,7 @@ Renders debug overlays for MuJoCo simulation elements — geom wireframes, site 
 ```tsx
 function App() {
   const [debug, setDebug] = useState({
-    sites: false, joints: false, contacts: false,
+    sites: false, joints: false, contacts: false, cameras: false,
   });
 
   return (
@@ -80,6 +85,7 @@ function App() {
         showSites={debug.sites}
         showJoints={debug.joints}
         showContacts={debug.contacts}
+        showCameras={debug.cameras}
       />
     </MujocoCanvas>
   );

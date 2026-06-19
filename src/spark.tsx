@@ -17,6 +17,13 @@ import {
   useSplatEnvironment,
   useSplatSceneConfig,
 } from './components/VisualScenario';
+import {
+  CAMERA_FRAME_CAPTURE_RENDER_USER_DATA_KEY,
+} from './rendering/cameraFrameCapture';
+import type {
+  CameraFrameCaptureRenderInput,
+  CameraFrameCaptureRenderResult,
+} from './rendering/cameraFrameCapture';
 import type {
   PairedSplatEnvironmentConfig,
   SceneConfig,
@@ -30,6 +37,11 @@ type SparkRendererInstance = InstanceType<SparkModule['SparkRenderer']>;
 type SparkSplatMeshInstance = InstanceType<SparkModule['SplatMesh']>;
 type SparkDisposable = {
   dispose?: () => unknown;
+};
+type SparkCaptureRenderer = {
+  renderer: SparkRendererInstance;
+  width: number;
+  height: number;
 };
 type SparkWorkerMessage = {
   reject?: (error: unknown) => void;
@@ -46,6 +58,123 @@ type SparkResourceWithWorkers = SparkDisposable & {
 export type SparkSplatStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 let sparkDisposeRejectionHandlerRegistered = false;
+
+export interface SparkSplatRenderTuning {
+  /** Scale Spark's LoD splat budget for the live viewport. */
+  lodSplatScale?: number;
+  /** Minimum rendered LoD splat size. Higher values trade detail for speed. */
+  lodRenderScale?: number;
+  /** Minimum delay between Spark sort passes for the live viewport. */
+  minSortIntervalMs?: number;
+}
+
+export interface SparkSplatCaptureTuning extends SparkSplatRenderTuning {
+  /** Maximum animation frames to wait for first-capture Spark warm-up. Default: 4. */
+  maxWarmupFrames?: number;
+  /** Number of pixels sampled when deciding whether a capture is blank. Default: 512. */
+  blankSampleCount?: number;
+  /** Alpha threshold used by the blank-capture detector. Default: 8. */
+  blankAlphaThreshold?: number;
+  /** Minimum visible sampled-pixel ratio before retrying capture. Default: 0.02. */
+  blankVisibleRatio?: number;
+  /** Minimum average sampled RGB sum before retrying capture. Default: 3. */
+  blankAverageColor?: number;
+}
+
+type ResolvedSparkSplatCaptureTuning = Required<
+  Pick<
+    SparkSplatCaptureTuning,
+    | 'maxWarmupFrames'
+    | 'blankSampleCount'
+    | 'blankAlphaThreshold'
+    | 'blankVisibleRatio'
+    | 'blankAverageColor'
+  >
+> &
+  SparkSplatRenderTuning;
+
+function getDefaultLiveRenderTuning(
+  lod: SparkSplatEnvironmentProps['lod']
+): SparkSplatRenderTuning {
+  return {
+    lodSplatScale: lod === false ? undefined : lod === 'quality' ? 1 : 0.6,
+    lodRenderScale: lod === false || lod === 'quality' ? undefined : 1.2,
+    minSortIntervalMs: lod === false ? 0 : lod === 'quality' ? 32 : 80,
+  };
+}
+
+function getDefaultCaptureTuning(
+  lod: SparkSplatEnvironmentProps['lod']
+): ResolvedSparkSplatCaptureTuning {
+  return {
+    lodSplatScale: lod === false ? undefined : lod === 'quality' ? 1.25 : 1.15,
+    lodRenderScale: lod === false ? undefined : 0.6,
+    minSortIntervalMs: 0,
+    maxWarmupFrames: 4,
+    blankSampleCount: 512,
+    blankAlphaThreshold: 8,
+    blankVisibleRatio: 0.02,
+    blankAverageColor: 3,
+  };
+}
+
+function resolveRenderTuning(
+  defaults: SparkSplatRenderTuning,
+  tuning: SparkSplatRenderTuning | undefined
+): SparkSplatRenderTuning {
+  return {
+    lodSplatScale: tuning?.lodSplatScale ?? defaults.lodSplatScale,
+    lodRenderScale: tuning?.lodRenderScale ?? defaults.lodRenderScale,
+    minSortIntervalMs: tuning?.minSortIntervalMs ?? defaults.minSortIntervalMs,
+  };
+}
+
+function resolveCaptureTuning(
+  lod: SparkSplatEnvironmentProps['lod'],
+  tuning: SparkSplatCaptureTuning | undefined
+): ResolvedSparkSplatCaptureTuning {
+  const defaults = getDefaultCaptureTuning(lod);
+  return {
+    ...resolveRenderTuning(defaults, tuning),
+    maxWarmupFrames: tuning?.maxWarmupFrames ?? defaults.maxWarmupFrames,
+    blankSampleCount: tuning?.blankSampleCount ?? defaults.blankSampleCount,
+    blankAlphaThreshold:
+      tuning?.blankAlphaThreshold ?? defaults.blankAlphaThreshold,
+    blankVisibleRatio: tuning?.blankVisibleRatio ?? defaults.blankVisibleRatio,
+    blankAverageColor: tuning?.blankAverageColor ?? defaults.blankAverageColor,
+  };
+}
+
+function waitForNextAnimationFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
+function isMostlyBlankCapture(
+  pixels: Uint8Array,
+  tuning: ResolvedSparkSplatCaptureTuning
+) {
+  const sampleCount = Math.max(1, Math.floor(tuning.blankSampleCount));
+  const stride = Math.max(4, Math.floor(pixels.length / sampleCount / 4) * 4);
+  let sampled = 0;
+  let visible = 0;
+  let colorTotal = 0;
+
+  for (let i = 0; i < pixels.length; i += stride) {
+    const alpha = pixels[i + 3];
+    const color = pixels[i] + pixels[i + 1] + pixels[i + 2];
+    sampled += 1;
+    if (alpha > tuning.blankAlphaThreshold) visible += 1;
+    colorTotal += color;
+  }
+
+  if (sampled === 0) return true;
+  return (
+    visible / sampled < tuning.blankVisibleRatio ||
+    colorTotal / sampled < tuning.blankAverageColor
+  );
+}
 
 export interface SparkSplatLifecycle {
   status: SparkSplatStatus;
@@ -72,6 +201,10 @@ export interface SparkSplatEnvironmentState {
 export interface SparkSplatEnvironmentProps extends SplatEnvironmentProps {
   /** Enable Spark LoD handling for large splat assets. Default: true. */
   lod?: boolean | 'quality';
+  /** Tune Spark's live viewport renderer. Defaults favor interactive FPS. */
+  renderTuning?: SparkSplatRenderTuning;
+  /** Tune Spark camera-frame capture. Defaults favor sharper snapshots. */
+  captureTuning?: SparkSplatCaptureTuning;
   /**
    * Hide meshes whose names include floor, ground, or plane while the splat is
    * active. This mirrors the common hybrid-rendering setup where MJCF keeps
@@ -230,6 +363,8 @@ export function SparkSplatEnvironment({
   showPlaceholder,
   children,
   lod = true,
+  renderTuning,
+  captureTuning,
   hideGroundMeshes = false,
   onStatusChange,
   onLoad,
@@ -238,6 +373,7 @@ export function SparkSplatEnvironment({
 }: SparkSplatEnvironmentProps) {
   const groupRef = useRef<THREE.Group>(null);
   const sparkRef = useRef<SparkRendererInstance | null>(null);
+  const captureSparkRef = useRef<SparkCaptureRenderer | null>(null);
   const meshRef = useRef<SparkSplatMeshInstance | null>(null);
   const hiddenMeshesRef = useRef<THREE.Mesh[]>([]);
   const onStatusChangeRef = useRef(onStatusChange);
@@ -253,6 +389,29 @@ export function SparkSplatEnvironment({
     format,
     collisionProxy: collisionProxyMetadata,
   });
+  const resolvedRenderTuning = useMemo(
+    () => resolveRenderTuning(getDefaultLiveRenderTuning(lod), renderTuning),
+    [
+      lod,
+      renderTuning?.lodRenderScale,
+      renderTuning?.lodSplatScale,
+      renderTuning?.minSortIntervalMs,
+    ]
+  );
+  const resolvedCaptureTuning = useMemo(
+    () => resolveCaptureTuning(lod, captureTuning),
+    [
+      captureTuning?.blankAlphaThreshold,
+      captureTuning?.blankAverageColor,
+      captureTuning?.blankSampleCount,
+      captureTuning?.blankVisibleRatio,
+      captureTuning?.lodRenderScale,
+      captureTuning?.lodSplatScale,
+      captureTuning?.maxWarmupFrames,
+      captureTuning?.minSortIntervalMs,
+      lod,
+    ]
+  );
 
   useEffect(() => {
     onStatusChangeRef.current = onStatusChange;
@@ -282,6 +441,11 @@ export function SparkSplatEnvironment({
       hiddenMeshesRef.current = [];
     }
 
+    function disposeCaptureSpark() {
+      safelyDisposeSparkResource(captureSparkRef.current?.renderer);
+      captureSparkRef.current = null;
+    }
+
     async function loadSplat() {
       if (!metadata.src) {
         setLifecycleStatus('idle');
@@ -306,7 +470,67 @@ export function SparkSplatEnvironment({
         const spark = new sparkModule.SparkRenderer({
           renderer: gl,
           onDirty: invalidate,
+          ...resolvedRenderTuning,
         });
+        spark.userData[CAMERA_FRAME_CAPTURE_RENDER_USER_DATA_KEY] = async ({
+          scene,
+          camera,
+          width,
+          height,
+        }: CameraFrameCaptureRenderInput): Promise<CameraFrameCaptureRenderResult> => {
+          let captureSpark = captureSparkRef.current;
+          if (
+            !captureSpark ||
+            captureSpark.width !== width ||
+            captureSpark.height !== height
+          ) {
+            disposeCaptureSpark();
+            captureSpark = {
+              renderer: new sparkModule.SparkRenderer({
+                renderer: gl,
+                autoUpdate: false,
+                lodSplatScale: resolvedCaptureTuning.lodSplatScale,
+                lodRenderScale: resolvedCaptureTuning.lodRenderScale,
+                minSortIntervalMs: resolvedCaptureTuning.minSortIntervalMs,
+                target: {
+                  width,
+                  height,
+                },
+              }),
+              width,
+              height,
+            };
+            captureSparkRef.current = captureSpark;
+          }
+
+          const captureRenderer = captureSpark.renderer;
+          const maxWarmupFrames = Math.max(
+            1,
+            Math.floor(resolvedCaptureTuning.maxWarmupFrames)
+          );
+          let pixels: Uint8Array | undefined;
+          for (let attempt = 0; attempt < maxWarmupFrames; attempt += 1) {
+            captureRenderer.renderSize.set(width, height);
+            await captureRenderer.update({ scene, camera });
+            pixels = await captureRenderer.renderReadTarget({
+              scene,
+              camera,
+            });
+            if (
+              captureRenderer.activeSplats > 0 &&
+              !isMostlyBlankCapture(pixels, resolvedCaptureTuning)
+            ) {
+              break;
+            }
+            if (attempt < maxWarmupFrames - 1) {
+              await waitForNextAnimationFrame();
+            }
+          }
+          if (!pixels) {
+            throw new Error('Spark camera frame capture did not produce pixels.');
+          }
+          return { pixels, width, height, flipY: true };
+        };
         const mesh = new sparkModule.SplatMesh({
           url: metadata.src,
           lod,
@@ -368,6 +592,8 @@ export function SparkSplatEnvironment({
         safelyDisposeSparkResource(sparkRef.current);
         sparkRef.current = null;
       }
+
+      disposeCaptureSpark();
     };
   }, [
     gl,
@@ -376,6 +602,17 @@ export function SparkSplatEnvironment({
     lod,
     metadata.format,
     metadata.src,
+    resolvedCaptureTuning.blankAlphaThreshold,
+    resolvedCaptureTuning.blankAverageColor,
+    resolvedCaptureTuning.blankSampleCount,
+    resolvedCaptureTuning.blankVisibleRatio,
+    resolvedCaptureTuning.lodRenderScale,
+    resolvedCaptureTuning.lodSplatScale,
+    resolvedCaptureTuning.maxWarmupFrames,
+    resolvedCaptureTuning.minSortIntervalMs,
+    resolvedRenderTuning.lodRenderScale,
+    resolvedRenderTuning.lodSplatScale,
+    resolvedRenderTuning.minSortIntervalMs,
   ]);
 
   return (
@@ -396,7 +633,10 @@ export function SparkSplatEnvironment({
   );
 }
 
-function safelyDisposeSparkResource(resource: SparkDisposable) {
+function safelyDisposeSparkResource(
+  resource: SparkDisposable | null | undefined
+) {
+  if (!resource) return;
   try {
     silenceSparkWorkerTerminateRejections(resource);
     const result = resource.dispose?.();

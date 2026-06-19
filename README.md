@@ -297,6 +297,16 @@ function Scene() {
 
 `SparkSplatEnvironment` currently renders `.spz` assets. Use the renderer-agnostic
 `SplatEnvironment` for `.ply`/`.splat` metadata or when wiring a different renderer.
+Tune live rendering and snapshots separately with `renderTuning` and
+`captureTuning`:
+
+```tsx
+<SparkSplatEnvironment
+  {...splat.props}
+  renderTuning={{ lodSplatScale: 0.75, minSortIntervalMs: 50 }}
+  captureTuning={{ lodSplatScale: 1.4, lodRenderScale: 0.45, maxWarmupFrames: 6 }}
+/>
+```
 
 ## Write Controllers
 
@@ -850,6 +860,7 @@ Visualization overlays:
 | `showSites` | `boolean?` | `false` | Site markers |
 | `showJoints` | `boolean?` | `false` | Joint axes |
 | `showContacts` | `boolean?` | `false` | Contact force vectors |
+| `showCameras` | `boolean?` | `false` | MuJoCo camera positions, frustums, and forward rays |
 | `showCOM` | `boolean?` | `false` | Center of mass markers |
 | `showInertia` | `boolean?` | `false` | Inertia ellipsoids |
 | `showTendons` | `boolean?` | `false` | Tendon paths |
@@ -857,6 +868,8 @@ Visualization overlays:
 | `siteColor` | `string?` | `"#ff00ff"` | Color for site markers |
 | `contactColor` | `string?` | `"#ff4444"` | Color for contact force arrows |
 | `comColor` | `string?` | `"#ff0000"` | Color for COM markers |
+
+Camera debug overlays use the live MuJoCo `cam_xpos` / `cam_xmat` frame, so the frustum matches mounted camera captures and follows parent body motion.
 
 ### `<TendonRenderer />`
 
@@ -1198,12 +1211,15 @@ function DatasetRecorder() {
 recent recording.
 
 Use `resolveMountedCameraFrameSource()` when dataset feature names need to map
-to named MuJoCo cameras, sites, or bodies before recording. The helper first
-checks exact names and aliases, then falls back to normalized/prefix/suffix
-matches such as `left_wrist` -> `left_wrist_camera_optical_frame`, and
-token-contained imported-model names such as `observation.images.head` ->
-`robot_head_camera`. It returns both the capture selector and the
-mounted-source provenance that should be stored beside the dataset:
+to named MuJoCo cameras, sites, or bodies before recording. The helper honors
+aliases first, then prefers camera matches over sites and bodies, then falls
+back to exact body/site names. This keeps streams such as `wrist` mapped to a
+real `<camera name="wrist_cam">` even when the model also has a body named
+`wrist`. It also handles normalized/prefix/suffix matches such as
+`left_wrist` -> `left_wrist_camera_optical_frame`, and token-contained
+imported-model names such as `observation.images.head` ->
+`robot_head_camera`. It returns both the capture selector and the mounted-source
+provenance that should be stored beside the dataset:
 
 ```tsx
 const resolved = resolveMountedCameraFrameSource("head", {

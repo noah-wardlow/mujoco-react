@@ -24,10 +24,65 @@ export interface CameraFrameCaptureSession {
     height: number;
     source: CameraFrameCaptureSource;
   };
+  captureAsync(options?: CameraFrameCaptureOptions): Promise<{
+    canvas: HTMLCanvasElement;
+    camera: THREE.Camera;
+    width: number;
+    height: number;
+    source: CameraFrameCaptureSource;
+  }>;
   captureDataUrl(options?: CameraFrameCaptureOptions): CameraFrameCaptureResult;
+  captureDataUrlAsync(
+    options?: CameraFrameCaptureOptions
+  ): Promise<CameraFrameCaptureResult>;
   captureBlob(options?: CameraFrameCaptureOptions): Promise<CameraFrameCaptureBlobResult>;
   dispose(): void;
 }
+
+export const CAMERA_FRAME_CAPTURE_RENDER_USER_DATA_KEY =
+  'mujocoReactCameraFrameCaptureRender';
+export const CAPTURE_EXCLUDE_KEY =
+  'mujoco.capture.exclude';
+
+export type CameraFrameCaptureRenderInput = {
+  renderer: THREE.WebGLRenderer;
+  scene: THREE.Scene;
+  camera: THREE.Camera;
+  target: THREE.WebGLRenderTarget;
+  width: number;
+  height: number;
+};
+
+export type CameraFrameCaptureRenderResult = {
+  pixels: Uint8Array;
+  width?: number;
+  height?: number;
+  flipY?: boolean;
+};
+
+type CameraFrameCaptureRender = (
+  input: CameraFrameCaptureRenderInput
+) =>
+  | CameraFrameCaptureRenderResult
+  | null
+  | undefined
+  | Promise<CameraFrameCaptureRenderResult | null | undefined>;
+
+type RendererState = {
+  target: THREE.WebGLRenderTarget | null;
+  xrEnabled: boolean;
+  viewport: THREE.Vector4;
+  scissor: THREE.Vector4;
+  scissorTest: boolean;
+  clearColor: THREE.Color;
+  clearAlpha: number;
+  autoClear: boolean;
+};
+
+type VisibilityState = {
+  object: THREE.Object3D;
+  visible: boolean;
+};
 
 function toVector3(
   value: CameraFrameCaptureVector3 | undefined,
@@ -136,13 +191,55 @@ function readRenderTargetToCanvas(
   pixels: Uint8Array,
   imageData: ImageData,
   width: number,
-  height: number
+  height: number,
+  outputColorSpace: string
 ) {
   renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
 
   const rowBytes = width * 4;
+  const encodeSrgb = outputColorSpace === THREE.SRGBColorSpace;
   for (let y = 0; y < height; y += 1) {
     const sourceStart = (height - y - 1) * rowBytes;
+    const targetStart = y * rowBytes;
+    const row = pixels.subarray(sourceStart, sourceStart + rowBytes);
+    if (!encodeSrgb) {
+      imageData.data.set(row, targetStart);
+      continue;
+    }
+
+    for (let x = 0; x < rowBytes; x += 4) {
+      const pixelOffset = targetStart + x;
+      imageData.data[pixelOffset] = linearByteToSrgbByte(row[x]);
+      imageData.data[pixelOffset + 1] = linearByteToSrgbByte(row[x + 1]);
+      imageData.data[pixelOffset + 2] = linearByteToSrgbByte(row[x + 2]);
+      imageData.data[pixelOffset + 3] = row[x + 3];
+    }
+  }
+  context.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
+function linearByteToSrgbByte(value: number) {
+  const normalized = value / 255;
+  const encoded =
+    normalized <= 0.0031308
+      ? normalized * 12.92
+      : 1.055 * Math.pow(normalized, 1 / 2.4) - 0.055;
+  return Math.min(255, Math.max(0, Math.round(encoded * 255)));
+}
+
+function readPixelsToCanvas(
+  pixels: Uint8Array,
+  context: CanvasRenderingContext2D,
+  imageData: ImageData,
+  width: number,
+  height: number,
+  flipY = true
+) {
+  const rowBytes = width * 4;
+  for (let y = 0; y < height; y += 1) {
+    const sourceY = flipY ? height - y - 1 : y;
+    const sourceStart = sourceY * rowBytes;
     const targetStart = y * rowBytes;
     imageData.data.set(
       pixels.subarray(sourceStart, sourceStart + rowBytes),
@@ -150,7 +247,23 @@ function readRenderTargetToCanvas(
     );
   }
   context.putImageData(imageData, 0, 0);
-  return canvas;
+}
+
+function hideExcludedCaptureObjects(scene: THREE.Scene): VisibilityState[] {
+  const hidden: VisibilityState[] = [];
+  scene.traverse((object) => {
+    if (!object.visible) return;
+    if (!object.userData[CAPTURE_EXCLUDE_KEY]) return;
+    hidden.push({ object, visible: object.visible });
+    object.visible = false;
+  });
+  return hidden;
+}
+
+function restoreObjectVisibility(hidden: VisibilityState[]) {
+  for (const { object, visible } of hidden) {
+    object.visible = visible;
+  }
 }
 
 function getCameraFrameCaptureSource(
@@ -171,6 +284,52 @@ function getCameraFrameCaptureSource(
     return { kind: 'explicit-pose' };
   }
   return { kind: 'fallback-camera' };
+}
+
+function saveRendererState(renderer: THREE.WebGLRenderer): RendererState {
+  const viewport = new THREE.Vector4();
+  const scissor = new THREE.Vector4();
+  const clearColor = new THREE.Color();
+  renderer.getViewport(viewport);
+  renderer.getScissor(scissor);
+  renderer.getClearColor(clearColor);
+  return {
+    target: renderer.getRenderTarget(),
+    xrEnabled: renderer.xr.enabled,
+    viewport,
+    scissor,
+    scissorTest: renderer.getScissorTest(),
+    clearColor,
+    clearAlpha: renderer.getClearAlpha(),
+    autoClear: renderer.autoClear,
+  };
+}
+
+function restoreRendererState(
+  renderer: THREE.WebGLRenderer,
+  state: RendererState
+) {
+  renderer.setRenderTarget(state.target);
+  renderer.xr.enabled = state.xrEnabled;
+  renderer.setViewport(state.viewport);
+  renderer.setScissor(state.scissor);
+  renderer.setScissorTest(state.scissorTest);
+  renderer.setClearColor(state.clearColor, state.clearAlpha);
+  renderer.autoClear = state.autoClear;
+}
+
+function getCaptureRenderer(
+  scene: THREE.Scene
+): CameraFrameCaptureRender | null {
+  const renderers: CameraFrameCaptureRender[] = [];
+  scene.traverse((object) => {
+    if (renderers.length) return;
+    const render = object.userData[
+      CAMERA_FRAME_CAPTURE_RENDER_USER_DATA_KEY
+    ] as CameraFrameCaptureRender | undefined;
+    if (typeof render === 'function') renderers.push(render);
+  });
+  return renderers[0] ?? null;
 }
 
 export function createCameraFrameCaptureSession(
@@ -198,7 +357,7 @@ export function createCameraFrameCaptureSession(
   const pixels = new Uint8Array(width * height * 4);
   const imageData = drawContext.createImageData(width, height);
 
-  function capture(nextOptions: CameraFrameCaptureOptions = {}) {
+  function resolveCaptureOptions(nextOptions: CameraFrameCaptureOptions = {}) {
     const captureOptions = { ...options, ...nextOptions };
     const nextDimensions = getCaptureDimensions(renderer, captureOptions);
     if (
@@ -218,13 +377,20 @@ export function createCameraFrameCaptureSession(
       height
     );
 
-    const previousTarget = renderer.getRenderTarget();
-    const previousXrEnabled = renderer.xr.enabled;
+    return captureOptions;
+  }
+
+  function renderPreparedCapture(captureOptions: CameraFrameCaptureOptions) {
+    const previousState = saveRendererState(renderer);
+    const hidden = hideExcludedCaptureObjects(scene);
 
     scene.updateMatrixWorld(true);
     try {
       renderer.xr.enabled = false;
       renderer.setRenderTarget(target);
+      renderer.setViewport(0, 0, width, height);
+      renderer.setScissor(0, 0, width, height);
+      renderer.setScissorTest(false);
       renderer.clear();
       renderer.render(scene, camera);
       readRenderTargetToCanvas(
@@ -235,7 +401,8 @@ export function createCameraFrameCaptureSession(
         pixels,
         imageData,
         width,
-        height
+        height,
+        renderer.outputColorSpace
       );
       return {
         canvas,
@@ -245,15 +412,69 @@ export function createCameraFrameCaptureSession(
         source: getCameraFrameCaptureSource(captureOptions),
       };
     } finally {
-      renderer.setRenderTarget(previousTarget);
-      renderer.xr.enabled = previousXrEnabled;
+      restoreObjectVisibility(hidden);
+      restoreRendererState(renderer, previousState);
     }
+  }
+
+  function capture(nextOptions: CameraFrameCaptureOptions = {}) {
+    return renderPreparedCapture(resolveCaptureOptions(nextOptions));
+  }
+
+  async function captureAsync(nextOptions: CameraFrameCaptureOptions = {}) {
+    const captureOptions = resolveCaptureOptions(nextOptions);
+    scene.updateMatrixWorld(true);
+    const captureRenderer = getCaptureRenderer(scene);
+    if (captureRenderer) {
+      const previousState = saveRendererState(renderer);
+      const hidden = hideExcludedCaptureObjects(scene);
+      try {
+        renderer.xr.enabled = false;
+        const captureResult = await captureRenderer({
+          renderer,
+          scene,
+          camera,
+          target,
+          width,
+          height,
+        });
+        if (captureResult) {
+          const captureWidth = captureResult.width ?? width;
+          const captureHeight = captureResult.height ?? height;
+          if (captureWidth !== width || captureHeight !== height) {
+            throw new Error(
+              'Camera frame capture renderer returned unexpected dimensions.'
+            );
+          }
+          readPixelsToCanvas(
+            captureResult.pixels,
+            drawContext,
+            imageData,
+            width,
+            height,
+            captureResult.flipY ?? true
+          );
+          return {
+            canvas,
+            camera,
+            width,
+            height,
+            source: getCameraFrameCaptureSource(captureOptions),
+          };
+        }
+      } finally {
+        restoreObjectVisibility(hidden);
+        restoreRendererState(renderer, previousState);
+      }
+    }
+    return renderPreparedCapture(captureOptions);
   }
 
   return {
     width,
     height,
     capture,
+    captureAsync,
     captureDataUrl(nextOptions = {}) {
       const type = nextOptions.type ?? options.type ?? 'image/png';
       const result = capture(nextOptions);
@@ -266,9 +487,21 @@ export function createCameraFrameCaptureSession(
         type,
       };
     },
+    async captureDataUrlAsync(nextOptions = {}) {
+      const type = nextOptions.type ?? options.type ?? 'image/png';
+      const result = await captureAsync(nextOptions);
+      return {
+        ...result,
+        dataUrl: result.canvas.toDataURL(
+          type,
+          nextOptions.quality ?? options.quality
+        ),
+        type,
+      };
+    },
     async captureBlob(nextOptions = {}) {
       const type = nextOptions.type ?? options.type ?? 'image/png';
-      const result = capture(nextOptions);
+      const result = await captureAsync(nextOptions);
       const blob = await new Promise<Blob>((resolve, reject) => {
         result.canvas.toBlob(
           (nextBlob) => {
@@ -313,17 +546,22 @@ export async function captureCameraFrame(
   options: CameraFrameCaptureOptions = {}
 ): Promise<CameraFrameCaptureResult> {
   const type = options.type ?? 'image/png';
-  const result = renderCameraFrameToCanvas(
+  const session = createCameraFrameCaptureSession(
     renderer,
     scene,
     fallbackCamera,
     options
   );
-  return {
-    ...result,
-    dataUrl: result.canvas.toDataURL(type, options.quality),
-    type,
-  };
+  try {
+    const result = await session.captureAsync();
+    return {
+      ...result,
+      dataUrl: result.canvas.toDataURL(type, options.quality),
+      type,
+    };
+  } finally {
+    session.dispose();
+  }
 }
 
 export async function captureCameraFrameBlob(
@@ -332,22 +570,15 @@ export async function captureCameraFrameBlob(
   fallbackCamera: THREE.Camera,
   options: CameraFrameCaptureOptions = {}
 ): Promise<CameraFrameCaptureBlobResult> {
-  const type = options.type ?? 'image/png';
-  const result = renderCameraFrameToCanvas(
+  const session = createCameraFrameCaptureSession(
     renderer,
     scene,
     fallbackCamera,
     options
   );
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    result.canvas.toBlob(
-      (nextBlob) => {
-        if (nextBlob) resolve(nextBlob);
-        else reject(new Error('Camera frame capture did not produce a Blob.'));
-      },
-      type,
-      options.quality
-    );
-  });
-  return { ...result, blob, type };
+  try {
+    return await session.captureBlob();
+  } finally {
+    session.dispose();
+  }
 }

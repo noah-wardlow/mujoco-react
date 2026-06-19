@@ -148,12 +148,12 @@ function vector3FromArray(values: ArrayLike<number>, offset: number): [number, n
   return [values[offset], values[offset + 1], values[offset + 2]];
 }
 
-function quaternionFromArray(values: ArrayLike<number>, offset: number): [number, number, number, number] {
+function quaternionFromMujocoQuat(values: ArrayLike<number>, offset: number): [number, number, number, number] {
   return [
-    values[offset],
     values[offset + 1],
     values[offset + 2],
     values[offset + 3],
+    values[offset],
   ];
 }
 
@@ -993,7 +993,7 @@ export function MujocoSimProvider({
           ? vector3FromArray(model.cam_pos, posOffset)
           : null,
         quaternion: model.cam_quat
-          ? quaternionFromArray(model.cam_quat, quatOffset)
+          ? quaternionFromMujocoQuat(model.cam_quat, quatOffset)
           : null,
       });
     }
@@ -1024,7 +1024,7 @@ export function MujocoSimProvider({
         const quaternion = data.cam_xmat
           ? quaternionFromXmat(data.cam_xmat, cameraId * 9)
           : model.cam_quat
-            ? quaternionFromArray(model.cam_quat, cameraId * 4)
+            ? quaternionFromMujocoQuat(model.cam_quat, cameraId * 4)
             : undefined;
 
         if (!position || !quaternion) {
@@ -1442,7 +1442,7 @@ export function MujocoSimProvider({
           const cameraFrames: Record<string, CameraFrameCaptureResult> = {};
           for (const { key, captureOptions, mountedSource, session } of captureSessions) {
             const resolvedCaptureOptions = resolveCameraCaptureOptions(captureOptions);
-            const cameraFrame = session.captureDataUrl({
+            const cameraFrame = await session.captureDataUrlAsync({
               ...resolvedCaptureOptions,
               source: mountedSource ?? resolvedCaptureOptions.source,
             });

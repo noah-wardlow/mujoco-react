@@ -843,6 +843,7 @@ export interface DebugProps {
   showGeoms?: boolean;
   showSites?: boolean;
   showJoints?: boolean;
+  showCameras?: boolean;
   showContacts?: boolean;
   showCOM?: boolean;
   showInertia?: boolean;

@@ -135,6 +135,21 @@ Spark rendering currently supports `.spz` assets. If a scenario points at `.ply`
 show a clear unsupported-format state. Keep using `SplatEnvironment` for renderer-agnostic metadata
 or when integrating a different splat renderer.
 
+Use `renderTuning` to adjust the live Spark renderer and `captureTuning` to
+adjust offscreen camera-frame capture independently:
+
+```tsx
+<SparkSplatEnvironment
+  {...splat.props}
+  renderTuning={{ lodSplatScale: 0.75, minSortIntervalMs: 50 }}
+  captureTuning={{ lodSplatScale: 1.4, lodRenderScale: 0.45, maxWarmupFrames: 6 }}
+/>
+```
+
+The default live tuning favors interactive frame rate. The default capture
+tuning favors sharper snapshots and retries the first offscreen render if Spark
+has not produced visible splats yet.
+
 Use `useSparkSplatEnvironment` for the Spark path. It builds on
 `useSplatSceneConfig`, adds paired collision proxy XML to the MuJoCo
 `sceneConfig`, and returns lifecycle props for `SparkSplatEnvironment`. For
