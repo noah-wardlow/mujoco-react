@@ -36,6 +36,72 @@
             ]
           },
           {
+            "group": "Components",
+            "pages": [
+              "components/mujoco-provider",
+              "components/mujoco-canvas",
+              "components/mujoco-physics",
+              "components/body",
+              "components/ik-gizmo",
+              "components/drag-interaction",
+              "components/contact-markers",
+              "components/splat-environment",
+              "components/scene-lights",
+              "components/debug",
+              "components/tendon-renderer",
+              "components/flex-renderer",
+              "components/instanced-geom-renderer",
+              "components/contact-listener",
+              "components/trajectory-player"
+            ]
+          },
+          {
+            "group": "Hooks",
+            "pages": [
+              "hooks/use-mujoco",
+              "hooks/use-before-physics-step",
+              "hooks/use-after-physics-step",
+              "hooks/use-ik-controller",
+              "hooks/use-camera-animation",
+              "hooks/use-body-state",
+              "hooks/use-joint-state",
+              "hooks/use-site-position",
+              "hooks/use-sensor",
+              "hooks/use-ctrl",
+              "hooks/use-contacts",
+              "hooks/use-keyboard-teleop",
+              "hooks/use-keyboard-ik-target",
+              "hooks/use-gamepad",
+              "hooks/use-actuators",
+              "hooks/use-policy",
+              "hooks/use-observation",
+              "hooks/use-trajectory-recorder",
+              "hooks/use-trajectory-player",
+              "hooks/use-video-recorder",
+              "hooks/use-frame-capture",
+              "hooks/use-camera-frame-capture",
+              "hooks/use-camera-sequence-recorder",
+              "hooks/use-ctrl-noise",
+              "hooks/use-gravity-compensation",
+              "hooks/use-body-meshes",
+              "hooks/use-selection-highlight",
+              "hooks/use-scene-lights"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "api/simulation-control",
+              "api/state-management",
+              "api/forces",
+              "api/model-introspection",
+              "api/model-mutation",
+              "api/spatial-queries",
+              "api/ik-control",
+              "api/scene-management"
+            ]
+          },
+          {
             "group": "More",
             "pages": [
               "roadmap"
