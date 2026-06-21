@@ -24,6 +24,17 @@ const DEFAULTS: GenericIKOptions = {
     rotWeight: 0.3,
 };
 
+function resolveOptions(opts?: Partial<GenericIKOptions>): GenericIKOptions {
+    return {
+        maxIterations: opts?.maxIterations ?? DEFAULTS.maxIterations,
+        damping: opts?.damping ?? DEFAULTS.damping,
+        tolerance: opts?.tolerance ?? DEFAULTS.tolerance,
+        epsilon: opts?.epsilon ?? DEFAULTS.epsilon,
+        posWeight: opts?.posWeight ?? DEFAULTS.posWeight,
+        rotWeight: opts?.rotWeight ?? DEFAULTS.rotWeight,
+    };
+}
+
 /**
  * Generic Damped Least-Squares IK solver.
  * Uses finite-difference Jacobian via MuJoCo's mj_forward.
@@ -58,7 +69,7 @@ export class GenericIK {
         currentQ: ArrayLike<number>,
         opts?: Partial<GenericIKOptions>
     ): number[] | null {
-        const o = { ...DEFAULTS, ...opts };
+        const o = resolveOptions(opts);
         const n = qposAdr.length;
 
         // Save full qpos so we can restore after solving
