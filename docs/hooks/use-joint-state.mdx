@@ -13,6 +13,16 @@ useJointState(name: string): {
   position: React.RefObject<number | Float64Array>;
   velocity: React.RefObject<number | Float64Array>;
 }
+
+useJointState(name: string, { kind: "scalar" }): {
+  position: React.RefObject<number>;
+  velocity: React.RefObject<number>;
+}
+
+useJointState(name: string, { kind: "array" }): {
+  position: React.RefObject<Float64Array>;
+  velocity: React.RefObject<Float64Array>;
+}
 ```
 
 ## Usage
@@ -21,11 +31,11 @@ useJointState(name: string): {
 import { useJointState } from "mujoco-react";
 
 function JointDisplay() {
-  const { position, velocity } = useJointState("joint1");
-  const textRef = useRef<any>(null);
+  const { position } = useJointState("joint1", { kind: "scalar" });
+  const textRef = useRef<{ text: string } | null>(null);
 
   useFrame(() => {
-    const angle = position.current as number; // Scalar for hinge joints
+    const angle = position.current;
     if (textRef.current) {
       textRef.current.text = `${(angle * 180 / Math.PI).toFixed(1)}°`;
     }
@@ -41,6 +51,8 @@ function JointDisplay() {
 |-------|------|-------------|
 | `position` | `RefObject<number \| Float64Array>` | Joint position(s) from `data.qpos`. Scalar for hinge/slide, `Float64Array` for ball/free. |
 | `velocity` | `RefObject<number \| Float64Array>` | Joint velocity/velocities from `data.qvel`. Scalar for hinge/slide, `Float64Array` for ball/free. |
+
+Pass `{ kind: "scalar" }` for hinge/slide joints when you want numeric refs. Pass `{ kind: "array" }` for ball/free joints when you want typed-array refs. Omit `kind` for generic code that handles both shapes.
 
 ### Array Size by Joint Type
 

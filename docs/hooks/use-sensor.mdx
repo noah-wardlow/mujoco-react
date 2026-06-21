@@ -15,13 +15,13 @@ useSensor(name: Sensors): SensorHandle
 ## Usage
 
 ```tsx
-import { RobotSensors, useSensor } from "mujoco-react";
+import { ModelSensors, useSensor } from "mujoco-react";
 
 function ImuDisplay() {
   const angularVelocity = useSensor(
-    RobotSensors.g1["imu-torso-angular-velocity"]
+    ModelSensors.g1["imu-torso-angular-velocity"]
   );
-  const textRef = useRef<any>(null);
+  const textRef = useRef<{ text: string } | null>(null);
 
   useFrame(() => {
     const v = angularVelocity.read();

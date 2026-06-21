@@ -167,9 +167,9 @@ interface ControlGroupInfo {
 Resolve the same mapping for a site, body, joint selector, or actuator selector.
 
 ```tsx
-import { RobotSites } from "mujoco-react";
+import { ModelSites } from "mujoco-react";
 
-const arm = api.resolveControlGroup({ siteName: RobotSites.franka.tcp });
+const arm = api.resolveControlGroup({ siteName: ModelSites.franka.tcp });
 const named = api.resolveControlGroup({
   joints: ["shoulder", "elbow", "wrist"],
 });

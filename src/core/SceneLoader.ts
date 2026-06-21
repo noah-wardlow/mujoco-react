@@ -849,7 +849,7 @@ function applyInitialPose(mjModel: MujocoModel, mjData: MujocoData, config: Scen
 }
 
 /**
- * Config-driven scene loader — replaces the old RobotLoader + patchSingleRobot approach.
+ * Config-driven scene loader — replaces the old single-model patching approach.
  */
 export async function loadScene(
   mujoco: MujocoModule,

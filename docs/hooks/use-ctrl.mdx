@@ -15,10 +15,10 @@ useCtrl(name: Actuators): CtrlHandle
 ## Usage
 
 ```tsx
-import { RobotActuators, useCtrl } from "mujoco-react";
+import { ModelActuators, useCtrl } from "mujoco-react";
 
 function GripperControl() {
-  const gripper = useCtrl(RobotActuators.franka.gripper);
+  const gripper = useCtrl(ModelActuators.franka.gripper);
 
   return (
     <div>
@@ -33,8 +33,8 @@ function GripperControl() {
 
 ```tsx
 function GripperDisplay() {
-  const gripper = useCtrl(RobotActuators.franka.gripper);
-  const textRef = useRef<any>(null);
+  const gripper = useCtrl(ModelActuators.franka.gripper);
+  const textRef = useRef<{ text: string } | null>(null);
 
   useFrame(() => {
     if (textRef.current) {
@@ -49,11 +49,11 @@ function GripperDisplay() {
 ### Inside useBeforePhysicsStep
 
 ```tsx
-import { RobotActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
+import { ModelActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
 
 function MyController() {
-  const shoulder = useCtrl(RobotActuators.franka.actuator1);
-  const elbow = useCtrl(RobotActuators.franka.actuator2);
+  const shoulder = useCtrl(ModelActuators.franka.actuator1);
+  const elbow = useCtrl(ModelActuators.franka.actuator2);
 
   useBeforePhysicsStep(({ data }) => {
     shoulder.write(Math.sin(data.time));

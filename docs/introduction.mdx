@@ -31,12 +31,12 @@ npm install mujoco-react @react-three/fiber @react-three/drei three
 
 ```tsx
 import {
-  MujocoProvider, MujocoCanvas, RobotSites, useIkController, IkGizmo,
+  MujocoProvider, MujocoCanvas, ModelSites, useIkController, IkGizmo,
 } from "mujoco-react";
 import { OrbitControls } from "@react-three/drei";
 
 function Scene() {
-  const ik = useIkController({ siteName: RobotSites.franka.tcp });
+  const ik = useIkController({ siteName: ModelSites.franka.tcp });
   return (
     <>
       <OrbitControls makeDefault />
@@ -75,14 +75,14 @@ A controller is a React component that calls `useBeforePhysicsStep` to write `da
 
 ```tsx
 import {
-  RobotActuators,
+  ModelActuators,
   useBeforePhysicsStep,
   useCtrl,
 } from "mujoco-react";
 
 function MyController() {
-  const shoulder = useCtrl(RobotActuators.franka.actuator1);
-  const elbow = useCtrl(RobotActuators.franka.actuator2);
+  const shoulder = useCtrl(ModelActuators.franka.actuator1);
+  const elbow = useCtrl(ModelActuators.franka.actuator2);
 
   useBeforePhysicsStep(({ data }) => {
     shoulder.write(Math.sin(data.time));

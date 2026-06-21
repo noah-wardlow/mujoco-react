@@ -9,28 +9,28 @@ Hook that sets up IK control for a MuJoCo site. Pass `null` to disable IK (safe 
 ## Usage
 
 ```tsx
-import { IkGizmo, RobotActuators, RobotJoints, RobotSites, useIkController } from "mujoco-react";
+import { IkGizmo, ModelActuators, ModelJoints, ModelSites, useIkController } from "mujoco-react";
 
 function MyScene({ hasIk }: { hasIk: boolean }) {
   const ik = useIkController(hasIk ? {
-    siteName: RobotSites.franka.tcp,
+    siteName: ModelSites.franka.tcp,
     joints: [
-      RobotJoints.franka.joint1,
-      RobotJoints.franka.joint2,
-      RobotJoints.franka.joint3,
-      RobotJoints.franka.joint4,
-      RobotJoints.franka.joint5,
-      RobotJoints.franka.joint6,
-      RobotJoints.franka.joint7,
+      ModelJoints.franka.joint1,
+      ModelJoints.franka.joint2,
+      ModelJoints.franka.joint3,
+      ModelJoints.franka.joint4,
+      ModelJoints.franka.joint5,
+      ModelJoints.franka.joint6,
+      ModelJoints.franka.joint7,
     ],
     actuators: [
-      RobotActuators.franka.actuator1,
-      RobotActuators.franka.actuator2,
-      RobotActuators.franka.actuator3,
-      RobotActuators.franka.actuator4,
-      RobotActuators.franka.actuator5,
-      RobotActuators.franka.actuator6,
-      RobotActuators.franka.actuator7,
+      ModelActuators.franka.actuator1,
+      ModelActuators.franka.actuator2,
+      ModelActuators.franka.actuator3,
+      ModelActuators.franka.actuator4,
+      ModelActuators.franka.actuator5,
+      ModelActuators.franka.actuator6,
+      ModelActuators.franka.actuator7,
     ],
   } : null);
 
@@ -41,14 +41,14 @@ function MyScene({ hasIk }: { hasIk: boolean }) {
 ### With Custom Solver
 
 ```tsx
-import { RobotSites } from "mujoco-react";
+import { ModelSites } from "mujoco-react";
 import type { IKSolveFn } from "mujoco-react";
 
 const myIK: IKSolveFn = ({ position, currentQ }) => {
   return myAnalyticalSolver(position, currentQ);
 };
 
-const ik = useIkController({ siteName: RobotSites.franka.tcp, ikSolveFn: myIK });
+const ik = useIkController({ siteName: ModelSites.franka.tcp, ikSolveFn: myIK });
 ```
 
 `useIkController` is intentionally open-ended. You can pass `ikSolveFn` for your own IK implementation, wrap the returned `IkContextValue` in your own hook, or build a plugin-style React component that reads/writes the IK target, simulation data, or actuator controls directly. Built-in helpers such as `IkGizmo` and `useKeyboardIkTarget` are optional consumers of the same controller state, not required control paths.
@@ -74,18 +74,18 @@ Pass an `IkConfig` object or `null`:
 By default, `useIkController` infers scalar hinge/slide joints by walking from the site body toward the model root. For nonstandard actuator layouts, pass explicit ordered names or a selector:
 
 ```tsx
-import { RobotActuators, RobotSites } from "mujoco-react";
+import { ModelActuators, ModelSites } from "mujoco-react";
 
 const ik = useIkController({
-  siteName: RobotSites.franka.tcp,
+  siteName: ModelSites.franka.tcp,
   actuators: [
-    RobotActuators.franka.actuator1,
-    RobotActuators.franka.actuator2,
-    RobotActuators.franka.actuator3,
-    RobotActuators.franka.actuator4,
-    RobotActuators.franka.actuator5,
-    RobotActuators.franka.actuator6,
-    RobotActuators.franka.actuator7,
+    ModelActuators.franka.actuator1,
+    ModelActuators.franka.actuator2,
+    ModelActuators.franka.actuator3,
+    ModelActuators.franka.actuator4,
+    ModelActuators.franka.actuator5,
+    ModelActuators.franka.actuator6,
+    ModelActuators.franka.actuator7,
   ],
 });
 ```
@@ -137,11 +137,11 @@ interface IkContextValue {
 A common pattern is disabling IK when keyboard control takes over. Pass the `ik` value to your controller:
 
 ```tsx
-import { IkGizmo, RobotSites, useBeforePhysicsStep, useIkController } from "mujoco-react";
+import { IkGizmo, ModelSites, useBeforePhysicsStep, useIkController } from "mujoco-react";
 import type { IkContextValue } from "mujoco-react";
 
 function MyScene() {
-  const ik = useIkController({ siteName: RobotSites.franka.tcp });
+  const ik = useIkController({ siteName: ModelSites.franka.tcp });
 
   return (
     <>
@@ -174,10 +174,10 @@ The gizmo re-enables IK automatically when dragged.
 ## Example: Waypoint Following
 
 ```tsx
-import { RobotSites, useAfterPhysicsStep, useIkController } from "mujoco-react";
+import { ModelSites, useAfterPhysicsStep, useIkController } from "mujoco-react";
 
 function WaypointFollower({ waypoints }: { waypoints: THREE.Vector3[] }) {
-  const ik = useIkController({ siteName: RobotSites.franka.tcp });
+  const ik = useIkController({ siteName: ModelSites.franka.tcp });
   const [index, setIndex] = useState(0);
 
   useEffect(() => {

@@ -8,23 +8,34 @@
 import { useEffect, useRef } from 'react';
 import { useMujocoContext, useAfterPhysicsStep } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
-import type { Joints, JointStateResult } from '../types';
+import type {
+  ArrayJointStateResult,
+  Joints,
+  JointStateOptions,
+  JointStateResult,
+  ScalarJointStateResult,
+} from '../types';
 
 /**
  * Track a MuJoCo joint's position and velocity by name.
  * Values are updated every physics frame via refs (no re-renders).
  *
- * For hinge/slide joints, position/velocity are scalar (stored as Float64Array of length 1).
+ * For hinge/slide joints, position/velocity are scalar numbers.
  * For ball joints, position is quat (4), velocity is angular vel (3).
  * For free joints, position is pos+quat (7), velocity is lin+ang vel (6).
  */
-export function useJointState(name: Joints): JointStateResult {
+export function useJointState(name: Joints, options: { kind: 'scalar' }): ScalarJointStateResult;
+export function useJointState(name: Joints, options: { kind: 'array' }): ArrayJointStateResult;
+export function useJointState(name: Joints, options?: JointStateOptions): JointStateResult;
+export function useJointState(name: Joints, options: JointStateOptions = {}): JointStateResult {
   const { mjModelRef, mjDataRef, status } = useMujocoContext();
   const jointIdRef = useRef(-1);
   const qposAdrRef = useRef(0);
   const dofAdrRef = useRef(0);
   const qposDimRef = useRef(1);
   const dofDimRef = useRef(1);
+  const kindRef = useRef(options.kind ?? 'auto');
+  kindRef.current = options.kind ?? 'auto';
   const positionRef = useRef<number | Float64Array>(0);
   const velocityRef = useRef<number | Float64Array>(0);
   // Preallocated typed arrays for multi-DOF joints
@@ -45,8 +56,8 @@ export function useJointState(name: Joints): JointStateResult {
         else if (type === 1) { qposDimRef.current = 4; dofDimRef.current = 3; }
         else { qposDimRef.current = 1; dofDimRef.current = 1; }
 
-        // Preallocate buffers for multi-DOF joints
-        if (qposDimRef.current > 1) {
+        // Preallocate buffers when callers request array output, or for multi-DOF joints.
+        if (kindRef.current === 'array' || qposDimRef.current > 1) {
           posBufferRef.current = new Float64Array(qposDimRef.current);
           velBufferRef.current = new Float64Array(dofDimRef.current);
         } else {
@@ -57,13 +68,13 @@ export function useJointState(name: Joints): JointStateResult {
       }
     }
     jointIdRef.current = -1;
-  }, [name, status, mjModelRef]);
+  }, [name, options.kind, status, mjModelRef]);
 
   useAfterPhysicsStep(({ data }) => {
     if (jointIdRef.current < 0) return;
     const qa = qposAdrRef.current;
     const da = dofAdrRef.current;
-    if (qposDimRef.current === 1) {
+    if (kindRef.current === 'scalar' || (kindRef.current === 'auto' && qposDimRef.current === 1)) {
       positionRef.current = data.qpos[qa];
       velocityRef.current = data.qvel[da];
     } else {

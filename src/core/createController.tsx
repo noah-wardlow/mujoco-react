@@ -43,7 +43,7 @@ export type ControllerComponent<TConfig> = React.FC<{
  * const MyController = createController<{ speed: number }>(
  *   { name: 'my-controller', defaultConfig: { speed: 1.0 } },
  *   function MyControllerImpl({ config }) {
- *     const wheel = useCtrl(RobotActuators.mobile.leftWheel);
+ *     const wheel = useCtrl(ModelActuators.mobile.leftWheel);
  *
  *     useBeforePhysicsStep(({ data }) => {
  *       wheel.write(config.speed);
@@ -102,7 +102,7 @@ export function createController<TConfig>(
  *   { name: 'useMyController', defaultConfig: { gain: 1.0 } },
  *   function useMyControllerImpl(config) {
  *     // config is MyConfig | null — hooks must be called unconditionally
- *     const joint = useCtrl(config?.actuator ?? RobotActuators.franka.actuator1);
+ *     const joint = useCtrl(config?.actuator ?? ModelActuators.franka.actuator1);
  *
  *     useBeforePhysicsStep(({ data }) => {
  *       if (!config) return;

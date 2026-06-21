@@ -22,9 +22,12 @@ export interface ReflectorOptions {
 interface ReflectorMesh extends THREE.Mesh {
     type: string;
     material: THREE.MeshPhysicalMaterial;
-    // tslint:disable-next-line:no-any
-    onBeforeRender: (renderer: any, scene: any, camera: any) => void;
+    onBeforeRender: (renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) => void;
 }
+
+type CameraWithViewport = THREE.Camera & {
+    viewport?: THREE.Vector4;
+};
 
 /**
  * Reflector
@@ -199,8 +202,7 @@ export class Reflector extends THREE.Mesh {
             renderer.setRenderTarget(currentRenderTarget);
 
             // Restore viewport
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const viewport = (camera as any).viewport;
+            const viewport = (camera as CameraWithViewport).viewport;
             if (viewport !== undefined) {
                 renderer.state.viewport(viewport);
             }

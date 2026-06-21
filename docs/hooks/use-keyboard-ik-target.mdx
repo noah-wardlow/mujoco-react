@@ -13,10 +13,10 @@ This hook is optional. Applications can still provide their own keyboard hook, c
 ## Usage
 
 ```tsx
-import { IkGizmo, RobotSites, useIkController, useKeyboardIkTarget } from "mujoco-react";
+import { IkGizmo, ModelSites, useIkController, useKeyboardIkTarget } from "mujoco-react";
 
 function Controls() {
-  const ik = useIkController({ siteName: RobotSites.franka.tcp });
+  const ik = useIkController({ siteName: ModelSites.franka.tcp });
 
   useKeyboardIkTarget({
     controller: ik,

@@ -17,7 +17,7 @@ import * as THREE from 'three';
  * ```ts
  * declare module 'mujoco-react' {
  *   interface Register {
- *     robots: {
+ *     models: {
  *       panda: {
  *         actuators: 'joint1' | 'joint2' | 'gripper';
  *         sensors: 'force_sensor' | 'torque_sensor';
@@ -35,45 +35,45 @@ import * as THREE from 'three';
  */
 export interface Register {}
 
-export type RegisteredRobotMap = Register extends { robots: infer T extends Record<string, Record<string, string>> }
+export type RegisteredModelMap = Register extends { models: infer T extends Record<string, Record<string, string>> }
   ? T
   : never;
-export type Robots = [RegisteredRobotMap] extends [never] ? string : Extract<keyof RegisteredRobotMap, string>;
-export type RobotResource<TRobot extends string, TKey extends string> =
-  [RegisteredRobotMap] extends [never]
+export type Models = [RegisteredModelMap] extends [never] ? string : Extract<keyof RegisteredModelMap, string>;
+export type ModelResource<TModel extends string, TKey extends string> =
+  [RegisteredModelMap] extends [never]
     ? string
-    : TRobot extends keyof RegisteredRobotMap
-      ? TKey extends keyof RegisteredRobotMap[TRobot]
-        ? RegisteredRobotMap[TRobot][TKey]
+    : TModel extends keyof RegisteredModelMap
+      ? TKey extends keyof RegisteredModelMap[TModel]
+        ? RegisteredModelMap[TModel][TKey]
         : string
       : never;
-export type RobotActuators<TRobot extends string> = RobotResource<TRobot, 'actuators'>;
-export type RobotSensors<TRobot extends string> = RobotResource<TRobot, 'sensors'>;
-export type RobotBodies<TRobot extends string> = RobotResource<TRobot, 'bodies'>;
-export type RobotJoints<TRobot extends string> = RobotResource<TRobot, 'joints'>;
-export type RobotSites<TRobot extends string> = RobotResource<TRobot, 'sites'>;
-export type RobotGeoms<TRobot extends string> = RobotResource<TRobot, 'geoms'>;
-export type RobotKeyframes<TRobot extends string> = RobotResource<TRobot, 'keyframes'>;
-export type RobotCameras<TRobot extends string> = RobotResource<TRobot, 'cameras'>;
+export type ModelActuators<TModel extends string> = ModelResource<TModel, 'actuators'>;
+export type ModelSensors<TModel extends string> = ModelResource<TModel, 'sensors'>;
+export type ModelBodies<TModel extends string> = ModelResource<TModel, 'bodies'>;
+export type ModelJoints<TModel extends string> = ModelResource<TModel, 'joints'>;
+export type ModelSites<TModel extends string> = ModelResource<TModel, 'sites'>;
+export type ModelGeoms<TModel extends string> = ModelResource<TModel, 'geoms'>;
+export type ModelKeyframes<TModel extends string> = ModelResource<TModel, 'keyframes'>;
+export type ModelCameras<TModel extends string> = ModelResource<TModel, 'cameras'>;
 
 export type RegisterResourceKey = 'actuators' | 'sensors' | 'bodies' | 'joints' | 'sites' | 'geoms' | 'keyframes' | 'cameras';
-export type RobotResourceObject<TRobot extends string, TKey extends RegisterResourceKey> =
-  string extends RobotResource<TRobot, TKey>
+export type ModelResourceObject<TModel extends string, TKey extends RegisterResourceKey> =
+  string extends ModelResource<TModel, TKey>
     ? Record<string, string>
-    : { readonly [K in RobotResource<TRobot, TKey>]: K };
-export type RobotResourceCategory<TKey extends RegisterResourceKey> =
-  string extends Robots
+    : { readonly [K in ModelResource<TModel, TKey>]: K };
+export type ModelResourceCategory<TKey extends RegisterResourceKey> =
+  string extends Models
     ? Record<string, Record<string, string>>
-    : { readonly [TRobot in Robots]: RobotResourceObject<TRobot, TKey> };
-export type RobotResourceRegistry =
-  string extends Robots
+    : { readonly [TModel in Models]: ModelResourceObject<TModel, TKey> };
+export type ModelResourceRegistry =
+  string extends Models
     ? Record<string, Record<RegisterResourceKey, Record<string, string>>>
-    : { readonly [TRobot in Robots]: { readonly [TKey in RegisterResourceKey]: RobotResourceObject<TRobot, TKey> } };
+    : { readonly [TModel in Models]: { readonly [TKey in RegisterResourceKey]: ModelResourceObject<TModel, TKey> } };
 
-type RuntimeRobotResources = Record<string, Record<RegisterResourceKey, Record<string, string>>>;
-type RuntimeRobotResourceRegistration = Readonly<Record<string, Readonly<Record<RegisterResourceKey, Readonly<Record<string, string>>>>>>;
+type RuntimeModelResources = Record<string, Record<RegisterResourceKey, Record<string, string>>>;
+type RuntimeModelResourceRegistration = Readonly<Record<string, Readonly<Record<RegisterResourceKey, Readonly<Record<string, string>>>>>>;
 
-const runtimeRobotResources: RuntimeRobotResources = {};
+const runtimeModelResources: RuntimeModelResources = {};
 const REGISTER_RESOURCE_KEYS: RegisterResourceKey[] = ['actuators', 'sensors', 'bodies', 'joints', 'sites', 'geoms', 'keyframes', 'cameras'];
 
 function createEmptyRuntimeResources(): Record<RegisterResourceKey, Record<string, string>> {
@@ -89,54 +89,54 @@ function createEmptyRuntimeResources(): Record<RegisterResourceKey, Record<strin
   };
 }
 
-export function registerRobotResources(resources: RuntimeRobotResourceRegistration): void {
-  for (const [robot, robotResources] of Object.entries(resources)) {
-    const existing = runtimeRobotResources[robot] ?? createEmptyRuntimeResources();
+export function registerModelResources(resources: RuntimeModelResourceRegistration): void {
+  for (const [model, modelResources] of Object.entries(resources)) {
+    const existing = runtimeModelResources[model] ?? createEmptyRuntimeResources();
     for (const key of REGISTER_RESOURCE_KEYS) {
-      existing[key] = { ...existing[key], ...(robotResources[key] ?? {}) };
+      existing[key] = { ...existing[key], ...(modelResources[key] ?? {}) };
     }
-    runtimeRobotResources[robot] = existing;
+    runtimeModelResources[model] = existing;
   }
 }
 
-function createResourceCategory<TKey extends RegisterResourceKey>(key: TKey): RobotResourceCategory<TKey> {
+function createResourceCategory<TKey extends RegisterResourceKey>(key: TKey): ModelResourceCategory<TKey> {
   return new Proxy({}, {
-    get(_target, robot) {
-      if (typeof robot !== 'string') return undefined;
-      return runtimeRobotResources[robot]?.[key] ?? {};
+    get(_target, model) {
+      if (typeof model !== 'string') return undefined;
+      return runtimeModelResources[model]?.[key] ?? {};
     },
     ownKeys() {
-      return Reflect.ownKeys(runtimeRobotResources);
+      return Reflect.ownKeys(runtimeModelResources);
     },
-    getOwnPropertyDescriptor(_target, robot) {
-      if (typeof robot !== 'string' || !(robot in runtimeRobotResources)) return undefined;
+    getOwnPropertyDescriptor(_target, model) {
+      if (typeof model !== 'string' || !(model in runtimeModelResources)) return undefined;
       return { enumerable: true, configurable: true };
     },
-  }) as RobotResourceCategory<TKey>;
+  }) as ModelResourceCategory<TKey>;
 }
 
-export const RobotResources: RobotResourceRegistry = new Proxy(runtimeRobotResources, {
-  get(target, robot) {
-    if (typeof robot !== 'string') return undefined;
-    return target[robot] ?? createEmptyRuntimeResources();
+export const ModelResources: ModelResourceRegistry = new Proxy(runtimeModelResources, {
+  get(target, model) {
+    if (typeof model !== 'string') return undefined;
+    return target[model] ?? createEmptyRuntimeResources();
   },
   ownKeys(target) {
     return Reflect.ownKeys(target);
   },
-  getOwnPropertyDescriptor(target, robot) {
-    if (typeof robot !== 'string' || !(robot in target)) return undefined;
+  getOwnPropertyDescriptor(target, model) {
+    if (typeof model !== 'string' || !(model in target)) return undefined;
     return { enumerable: true, configurable: true };
   },
-}) as RobotResourceRegistry;
+}) as ModelResourceRegistry;
 
-export const RobotActuators: RobotResourceCategory<'actuators'> = createResourceCategory('actuators');
-export const RobotSensors: RobotResourceCategory<'sensors'> = createResourceCategory('sensors');
-export const RobotBodies: RobotResourceCategory<'bodies'> = createResourceCategory('bodies');
-export const RobotJoints: RobotResourceCategory<'joints'> = createResourceCategory('joints');
-export const RobotSites: RobotResourceCategory<'sites'> = createResourceCategory('sites');
-export const RobotGeoms: RobotResourceCategory<'geoms'> = createResourceCategory('geoms');
-export const RobotKeyframes: RobotResourceCategory<'keyframes'> = createResourceCategory('keyframes');
-export const RobotCameras: RobotResourceCategory<'cameras'> = createResourceCategory('cameras');
+export const ModelActuators: ModelResourceCategory<'actuators'> = createResourceCategory('actuators');
+export const ModelSensors: ModelResourceCategory<'sensors'> = createResourceCategory('sensors');
+export const ModelBodies: ModelResourceCategory<'bodies'> = createResourceCategory('bodies');
+export const ModelJoints: ModelResourceCategory<'joints'> = createResourceCategory('joints');
+export const ModelSites: ModelResourceCategory<'sites'> = createResourceCategory('sites');
+export const ModelGeoms: ModelResourceCategory<'geoms'> = createResourceCategory('geoms');
+export const ModelKeyframes: ModelResourceCategory<'keyframes'> = createResourceCategory('keyframes');
+export const ModelCameras: ModelResourceCategory<'cameras'> = createResourceCategory('cameras');
 
 export type Actuators = Register extends { actuators: infer T extends string } ? T : string;
 export type Sensors = Register extends { sensors: infer T extends string } ? T : string;
@@ -1532,7 +1532,30 @@ export interface BodyStateResult {
   angularVelocity: React.RefObject<THREE.Vector3>;
 }
 
+export type JointStateKind = 'auto' | 'scalar' | 'array';
+
+export interface JointStateOptions {
+  /**
+   * Expected joint value shape.
+   *
+   * - `auto`: scalar joints return numbers, ball/free joints return Float64Array.
+   * - `scalar`: return numeric refs for hinge/slide joints.
+   * - `array`: return Float64Array refs for ball/free joints.
+   */
+  kind?: JointStateKind;
+}
+
 export interface JointStateResult {
   position: React.RefObject<number | Float64Array>;
   velocity: React.RefObject<number | Float64Array>;
+}
+
+export interface ScalarJointStateResult {
+  position: React.RefObject<number>;
+  velocity: React.RefObject<number>;
+}
+
+export interface ArrayJointStateResult {
+  position: React.RefObject<Float64Array>;
+  velocity: React.RefObject<Float64Array>;
 }

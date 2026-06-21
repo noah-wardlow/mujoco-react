@@ -59,10 +59,10 @@ Controllers are React components that call `useBeforePhysicsStep` to write `data
 
 ```tsx
 // This is a complete controller:
-import { RobotActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
+import { ModelActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
 
 function MyController() {
-  const shoulder = useCtrl(RobotActuators.franka.actuator1);
+  const shoulder = useCtrl(ModelActuators.franka.actuator1);
 
   useBeforePhysicsStep(({ data }) => {
     shoulder.write(Math.sin(data.time));
@@ -145,10 +145,10 @@ useFrame(() => {
 Everything inside `<MujocoCanvas>` (or `<MujocoPhysics>`) is a standard R3F child. You mix library components with your own:
 
 ```tsx
-import { IkGizmo, RobotSites, useIkController } from "mujoco-react";
+import { IkGizmo, ModelSites, useIkController } from "mujoco-react";
 
 function Scene() {
-  const ik = useIkController({ siteName: RobotSites.franka.tcp });
+  const ik = useIkController({ siteName: ModelSites.franka.tcp });
 
   return (
     <>
@@ -165,7 +165,7 @@ function Scene() {
       <Grid args={[10, 10]} />
 
       {/* Yours: game logic */}
-      <MyRobotController ik={ik} />
+      <MyController ik={ik} />
       <RewardVisualizer />
     </>
   );

@@ -19,10 +19,10 @@ useBeforePhysicsStep(
 ### Setting Actuator Controls
 
 ```tsx
-import { RobotActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
+import { ModelActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
 
 function ShoulderWave() {
-  const shoulder = useCtrl(RobotActuators.franka.actuator1);
+  const shoulder = useCtrl(ModelActuators.franka.actuator1);
 
   useBeforePhysicsStep(({ data }) => {
     shoulder.write(Math.sin(data.time * 2.0));
@@ -73,7 +73,7 @@ function PDController({ jointIndex, target, kp, kd }) {
 Multiple `useBeforePhysicsStep` hooks compose correctly. Each callback adds to the simulation state rather than overwriting:
 
 ```tsx
-import { RobotActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
+import { ModelActuators, useBeforePhysicsStep, useCtrl } from "mujoco-react";
 
 // Component A: gravity compensation
 useBeforePhysicsStep(({ model, data }) => {
@@ -83,7 +83,7 @@ useBeforePhysicsStep(({ model, data }) => {
 });
 
 // Component B: typed actuator control
-const shoulder = useCtrl(RobotActuators.franka.actuator1);
+const shoulder = useCtrl(ModelActuators.franka.actuator1);
 
 useBeforePhysicsStep(({ data }) => {
   shoulder.write(computeControl(data.time));

@@ -43,7 +43,7 @@ function BodyTracker() {
 ```tsx
 function SpeedDisplay() {
   const { linearVelocity } = useBodyState("ball");
-  const textRef = useRef<any>(null);
+  const textRef = useRef<{ text: string } | null>(null);
 
   useFrame(() => {
     const speed = linearVelocity.current.length();
