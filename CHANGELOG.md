@@ -1,3 +1,17 @@
+# [10.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.6.0...v10.0.0) (2026-06-21)
+
+
+### Features
+
+* stabilize model resource API for 10.0 ([864c002](https://github.com/noah-wardlow/mujoco-react/commit/864c002410b4e648f538efd176c1414b5665b0c6))
+
+
+### BREAKING CHANGES
+
+* Generated resource APIs now use Model-prefixed names and Register.models. Robot-prefixed generated resource exports and registerRobotResources were removed before the 10.0 stable API line. Replace RobotActuators/RobotJoints/RobotSites/etc. with ModelActuators/ModelJoints/ModelSites/etc., and replace registerRobotResources/Register.robots with registerModelResources/Register.models.
+
+Co-Authored-By: OpenAI Codex <noreply@openai.com>
+
 # [9.6.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.5.0...v9.6.0) (2026-06-21)
 
 
