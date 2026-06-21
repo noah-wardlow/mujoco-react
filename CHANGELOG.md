@@ -1,3 +1,10 @@
+## [10.0.1](https://github.com/noah-wardlow/mujoco-react/compare/v10.0.0...v10.0.1) (2026-06-21)
+
+
+### Bug Fixes
+
+* preserve IK solver defaults ([5dfa070](https://github.com/noah-wardlow/mujoco-react/commit/5dfa070469a66f8967cbad0f2e74bb3d2f9ffd32))
+
 # [10.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.6.0...v10.0.0) (2026-06-21)
 
 
