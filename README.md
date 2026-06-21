@@ -4,8 +4,6 @@
 
 # mujoco-react
 
-> **Beta** — This library is under active development. The API may change between minor versions until 10.0.
-
 Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper around the official [@mujoco/mujoco](https://www.npmjs.com/package/@mujoco/mujoco) WASM bindings. Load any MuJoCo model, step physics, render bodies, and write controllers as React components.
 
 [![npm](https://img.shields.io/npm/v/mujoco-react)](https://www.npmjs.com/package/mujoco-react)
@@ -20,7 +18,7 @@ npm install mujoco-react three @react-three/fiber @react-three/drei
 
 ## Vite Plugin and Type-Safe Names
 
-Use the Vite plugin to generate TanStack-style declaration merging for actuator, sensor, body, joint, site, geom, and keyframe names:
+Use the Vite plugin to generate declaration merging for actuator, sensor, body, joint, site, geom, and keyframe names:
 
 ```ts
 // vite.config.ts
