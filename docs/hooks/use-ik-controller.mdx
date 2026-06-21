@@ -51,6 +51,8 @@ const myIK: IKSolveFn = ({ position, currentQ }) => {
 const ik = useIkController({ siteName: RobotSites.franka.tcp, ikSolveFn: myIK });
 ```
 
+`useIkController` is intentionally open-ended. You can pass `ikSolveFn` for your own IK implementation, wrap the returned `IkContextValue` in your own hook, or build a plugin-style React component that reads/writes the IK target, simulation data, or actuator controls directly. Built-in helpers such as `IkGizmo` and `useKeyboardIkTarget` are optional consumers of the same controller state, not required control paths.
+
 ## Config
 
 Pass an `IkConfig` object or `null`:
@@ -63,6 +65,10 @@ Pass an `IkConfig` object or `null`:
 | `numJoints` | `number` | legacy only | Contiguous qpos/ctrl count from older examples |
 | `ikSolveFn` | `IKSolveFn` | built-in DLS | Custom solver function |
 | `damping` | `number` | `0.01` | DLS damping |
+| `posWeight` | `number` | `1.0` | Position error weight for the built-in solver |
+| `rotWeight` | `number` | `0.3` | Orientation error weight for the built-in solver |
+| `tolerance` | `number` | `1e-3` | Solver convergence tolerance |
+| `epsilon` | `number` | `1e-6` | Finite-difference step for Jacobian estimation |
 | `maxIterations` | `number` | `50` | Max solver iterations |
 
 By default, `useIkController` infers scalar hinge/slide joints by walking from the site body toward the model root. For nonstandard actuator layouts, pass explicit ordered names or a selector:
@@ -203,6 +209,7 @@ The default solver uses **Damped Least-Squares** (DLS) with finite-difference Ja
 - **Position weight**: 1.0
 - **Rotation weight**: 0.3
 - **Tolerance**: 1e-3
+- **Finite-difference epsilon**: 1e-6
 - **Method**: Finite-difference Jacobian + pseudoinverse
 
 The solver tracks the best solution across iterations and returns it even if tolerance isn't reached.

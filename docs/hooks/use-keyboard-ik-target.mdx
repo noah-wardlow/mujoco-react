@@ -1,0 +1,74 @@
+---
+title: "useKeyboardIkTarget"
+description: "Move an IK target with keyboard input"
+icon: "keyboard"
+---
+
+Move or rotate an existing `useIkController` target from keyboard input. This hook is robot-agnostic: it edits the IK target, then the normal IK solver writes controls for whichever joints and actuators the controller owns.
+
+Use `useKeyboardTeleop` when keys should write actuator values directly. Use `useKeyboardIkTarget` when keys should behave like a keyboard-driven gizmo.
+
+This hook is optional. Applications can still provide their own keyboard hook, custom IK solver via `ikSolveFn`, or plugin-style controller component that uses `useBeforePhysicsStep`, `useMujoco`, and `IkContextValue` directly.
+
+## Usage
+
+```tsx
+import { IkGizmo, RobotSites, useIkController, useKeyboardIkTarget } from "mujoco-react";
+
+function Controls() {
+  const ik = useIkController({ siteName: RobotSites.franka.tcp });
+
+  useKeyboardIkTarget({
+    controller: ik,
+    translateSpeed: 0.2,
+    rotateSpeed: 0.8,
+    bindings: [
+      { code: "KeyW", action: "y+" },
+      { code: "KeyS", action: "y-" },
+      { code: "KeyA", action: "x-" },
+      { code: "KeyD", action: "x+" },
+      { code: "KeyQ", action: "z+" },
+      { code: "KeyE", action: "z-" },
+      { code: "KeyR", action: "pitch+" },
+      { code: "KeyF", action: "pitch-" },
+      { code: "KeyZ", action: "roll+" },
+      { code: "KeyC", action: "roll-" },
+    ],
+  });
+
+  return ik ? <IkGizmo controller={ik} /> : null;
+}
+```
+
+## Config
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `controller` | `IkContextValue \| null` | **required** | Controller from `useIkController` |
+| `bindings` | `KeyboardIkTargetBinding[]` | **required** | Key code to target action mapping |
+| `enabled` | `boolean` | `true` | Enable or disable all bindings |
+| `translateSpeed` | `number` | `0.25` | Default translation speed in meters/second |
+| `rotateSpeed` | `number` | `1.0` | Default rotation speed in radians/second |
+| `frame` | `"world" \| "target"` | `"world"` | Whether axes are world-relative or target-local |
+| `autoEnableIk` | `boolean` | `true` | Enable IK while bound keys are active |
+| `syncOnStart` | `boolean` | `true` | Snap the target to the current site when keyboard input starts |
+| `preventDefault` | `boolean` | `true` | Prevent browser defaults for bound keys |
+
+## Binding
+
+```ts
+interface KeyboardIkTargetBinding {
+  code: string;
+  action:
+    | "x+" | "x-"
+    | "y+" | "y-"
+    | "z+" | "z-"
+    | "pitch+" | "pitch-"
+    | "yaw+" | "yaw-"
+    | "roll+" | "roll-";
+  translateSpeed?: number;
+  rotateSpeed?: number;
+}
+```
+
+`code` uses `KeyboardEvent.code`, such as `KeyW`, `ArrowUp`, or `Space`.

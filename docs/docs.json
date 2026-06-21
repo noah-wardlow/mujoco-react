@@ -78,6 +78,7 @@
           "hooks/use-ctrl",
           "hooks/use-contacts",
           "hooks/use-keyboard-teleop",
+          "hooks/use-keyboard-ik-target",
           "hooks/use-gamepad",
           "hooks/use-actuators",
           "hooks/use-policy",

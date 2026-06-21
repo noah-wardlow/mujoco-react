@@ -94,7 +94,14 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
         return genericIkRef.current.solve(
           model, data, siteIdRef.current, controlGroup.qposAdr,
           position, quaternion, currentQ,
-          { damping: config.damping, maxIterations: config.maxIterations },
+          {
+            damping: config.damping,
+            epsilon: config.epsilon,
+            maxIterations: config.maxIterations,
+            posWeight: config.posWeight,
+            rotWeight: config.rotWeight,
+            tolerance: config.tolerance,
+          },
         );
       },
       [config, mjModelRef, mjDataRef],

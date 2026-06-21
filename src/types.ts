@@ -516,6 +516,14 @@ export interface IkConfig {
   ikSolveFn?: IKSolveFn;
   /** DLS damping. Default: 0.01. */
   damping?: number;
+  /** Position error weight for the built-in DLS solver. Default: 1. */
+  posWeight?: number;
+  /** Orientation error weight for the built-in DLS solver. Default: 0.3. */
+  rotWeight?: number;
+  /** Solver convergence tolerance. Default: 1e-3. */
+  tolerance?: number;
+  /** Finite-difference step used by the built-in DLS solver. Default: 1e-6. */
+  epsilon?: number;
   /** Max solver iterations. Default: 50. */
   maxIterations?: number;
 }
@@ -862,6 +870,48 @@ export interface IkGizmoProps {
 export interface IkGizmoDragInput {
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;
+}
+
+export type KeyboardIkTargetAction =
+  | 'x+'
+  | 'x-'
+  | 'y+'
+  | 'y-'
+  | 'z+'
+  | 'z-'
+  | 'pitch+'
+  | 'pitch-'
+  | 'yaw+'
+  | 'yaw-'
+  | 'roll+'
+  | 'roll-';
+
+export interface KeyboardIkTargetBinding {
+  /** KeyboardEvent.code, e.g. `KeyW`, `ArrowUp`, `Space`. */
+  code: string;
+  action: KeyboardIkTargetAction;
+  /** Override translation speed in meters/second for this binding. */
+  translateSpeed?: number;
+  /** Override rotation speed in radians/second for this binding. */
+  rotateSpeed?: number;
+}
+
+export interface KeyboardIkTargetConfig {
+  controller: IkContextValue | null;
+  bindings: KeyboardIkTargetBinding[];
+  enabled?: boolean;
+  /** Default translation speed in meters/second. Default: 0.25. */
+  translateSpeed?: number;
+  /** Default rotation speed in radians/second. Default: 1.0. */
+  rotateSpeed?: number;
+  /** Apply translation and rotation axes in world or current target space. Default: `world`. */
+  frame?: 'world' | 'target';
+  /** Enable IK while keys are active. Default: true. */
+  autoEnableIk?: boolean;
+  /** Sync target to current site when keyboard control starts. Default: true. */
+  syncOnStart?: boolean;
+  /** Prevent browser default behavior for bound keys. Default: true. */
+  preventDefault?: boolean;
 }
 
 export interface DragInteractionProps {

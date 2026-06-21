@@ -91,6 +91,7 @@ export { useBodyState } from './hooks/useBodyState';
 export { useCtrl } from './hooks/useCtrl';
 export { useContacts, useContactEvents } from './hooks/useContacts';
 export { useKeyboardTeleop } from './hooks/useKeyboardTeleop';
+export { useKeyboardIkTarget } from './hooks/useKeyboardIkTarget';
 export { usePolicy } from './hooks/usePolicy';
 export { useObservation } from './hooks/useObservation';
 export { useTrajectoryPlayer } from './hooks/useTrajectoryPlayer';
@@ -211,6 +212,9 @@ export type {
   // Keyboard teleop
   KeyBinding,
   KeyboardTeleopConfig,
+  KeyboardIkTargetAction,
+  KeyboardIkTargetBinding,
+  KeyboardIkTargetConfig,
   // Policy
   PolicyConfig,
   PolicyVector,
