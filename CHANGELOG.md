@@ -1,3 +1,10 @@
+# [9.6.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.5.0...v9.6.0) (2026-06-21)
+
+
+### Features
+
+* add keyboard IK target controls ([7aac8f4](https://github.com/noah-wardlow/mujoco-react/commit/7aac8f47600d418cc6b142c900b19aaafc5350f6))
+
 # [9.5.0](https://github.com/noah-wardlow/mujoco-react/compare/v9.4.0...v9.5.0) (2026-06-19)
 
 
