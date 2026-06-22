@@ -1,3 +1,10 @@
+## [10.2.1](https://github.com/noah-wardlow/mujoco-react/compare/v10.2.0...v10.2.1) (2026-06-22)
+
+
+### Bug Fixes
+
+* expose policy queue depth and capture mirroring ([75f0cdf](https://github.com/noah-wardlow/mujoco-react/commit/75f0cdf95ff9b59562acac710759c7d9f30ffa3f))
+
 # [10.2.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.1.0...v10.2.0) (2026-06-22)
 
 
