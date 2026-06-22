@@ -41,6 +41,8 @@ export interface CameraFrameCaptureSession {
 
 export const CAMERA_FRAME_CAPTURE_RENDER_USER_DATA_KEY =
   'mujocoReactCameraFrameCaptureRender';
+export const CAMERA_FRAME_CAPTURE_PRE_RENDER_USER_DATA_KEY =
+  'mujocoReactCameraFrameCapturePreRender';
 export const CAPTURE_EXCLUDE_KEY =
   'mujoco.capture.exclude';
 
@@ -83,6 +85,8 @@ type VisibilityState = {
   object: THREE.Object3D;
   visible: boolean;
 };
+
+type CameraFrameCapturePreRender = () => void;
 
 function toVector3(
   value: CameraFrameCaptureVector3 | undefined,
@@ -260,6 +264,39 @@ function hideExcludedCaptureObjects(scene: THREE.Scene): VisibilityState[] {
   return hidden;
 }
 
+function hideCaptureGeomGroups(
+  scene: THREE.Scene,
+  options: CameraFrameCaptureOptions
+): VisibilityState[] {
+  const hidden: VisibilityState[] = [];
+  const hiddenGroups = options.hiddenGeomGroups
+    ? new Set(options.hiddenGeomGroups)
+    : null;
+  const visibleGroups = options.visibleGeomGroups
+    ? new Set(options.visibleGeomGroups)
+    : null;
+  const hiddenNames = options.hiddenGeomNames
+    ? new Set(options.hiddenGeomNames)
+    : null;
+  if (!hiddenGroups && !visibleGroups && !hiddenNames) return hidden;
+
+  scene.traverse((object) => {
+    if (!object.visible) return;
+    const geomGroup = object.userData.geomGroup;
+    const geomName = object.userData.geomName;
+    if (typeof geomGroup !== 'number' && typeof geomName !== 'string') return;
+    if (
+      hiddenNames?.has(geomName) ||
+      hiddenGroups?.has(geomGroup) ||
+      (typeof geomGroup === 'number' && visibleGroups && !visibleGroups.has(geomGroup))
+    ) {
+      hidden.push({ object, visible: object.visible });
+      object.visible = false;
+    }
+  });
+  return hidden;
+}
+
 function restoreObjectVisibility(hidden: VisibilityState[]) {
   for (const { object, visible } of hidden) {
     object.visible = visible;
@@ -332,6 +369,17 @@ function getCaptureRenderer(
   return renderers[0] ?? null;
 }
 
+function runCapturePreRenderHooks(scene: THREE.Scene) {
+  const callbacks: CameraFrameCapturePreRender[] = [];
+  scene.traverse((object) => {
+    const callback = object.userData[
+      CAMERA_FRAME_CAPTURE_PRE_RENDER_USER_DATA_KEY
+    ] as CameraFrameCapturePreRender | undefined;
+    if (typeof callback === 'function') callbacks.push(callback);
+  });
+  for (const callback of callbacks) callback();
+}
+
 export function createCameraFrameCaptureSession(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,
@@ -382,8 +430,12 @@ export function createCameraFrameCaptureSession(
 
   function renderPreparedCapture(captureOptions: CameraFrameCaptureOptions) {
     const previousState = saveRendererState(renderer);
-    const hidden = hideExcludedCaptureObjects(scene);
+    const hidden = [
+      ...hideExcludedCaptureObjects(scene),
+      ...hideCaptureGeomGroups(scene, captureOptions),
+    ];
 
+    runCapturePreRenderHooks(scene);
     scene.updateMatrixWorld(true);
     try {
       renderer.xr.enabled = false;
@@ -391,6 +443,14 @@ export function createCameraFrameCaptureSession(
       renderer.setViewport(0, 0, width, height);
       renderer.setScissor(0, 0, width, height);
       renderer.setScissorTest(false);
+      if (captureOptions.background !== undefined) {
+        renderer.setClearColor(
+          new THREE.Color(captureOptions.background),
+          captureOptions.backgroundAlpha ?? previousState.clearAlpha
+        );
+      } else if (captureOptions.backgroundAlpha !== undefined) {
+        renderer.setClearColor(previousState.clearColor, captureOptions.backgroundAlpha);
+      }
       renderer.clear();
       renderer.render(scene, camera);
       readRenderTargetToCanvas(
@@ -423,13 +483,25 @@ export function createCameraFrameCaptureSession(
 
   async function captureAsync(nextOptions: CameraFrameCaptureOptions = {}) {
     const captureOptions = resolveCaptureOptions(nextOptions);
+    runCapturePreRenderHooks(scene);
     scene.updateMatrixWorld(true);
     const captureRenderer = getCaptureRenderer(scene);
     if (captureRenderer) {
       const previousState = saveRendererState(renderer);
-      const hidden = hideExcludedCaptureObjects(scene);
+      const hidden = [
+        ...hideExcludedCaptureObjects(scene),
+        ...hideCaptureGeomGroups(scene, captureOptions),
+      ];
       try {
         renderer.xr.enabled = false;
+        if (captureOptions.background !== undefined) {
+          renderer.setClearColor(
+            new THREE.Color(captureOptions.background),
+            captureOptions.backgroundAlpha ?? previousState.clearAlpha
+          );
+        } else if (captureOptions.backgroundAlpha !== undefined) {
+          renderer.setClearColor(previousState.clearColor, captureOptions.backgroundAlpha);
+        }
         const captureResult = await captureRenderer({
           renderer,
           scene,

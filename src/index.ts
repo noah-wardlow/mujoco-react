@@ -88,12 +88,30 @@ export { useGravityCompensation } from './hooks/useGravityCompensation';
 export { useSensor, useSensors } from './hooks/useSensor';
 export { useJointState } from './hooks/useJointState';
 export { useBodyState } from './hooks/useBodyState';
+export { useBodyPose, useGeomPose, useSitePose } from './hooks/usePose';
+export type { PoseReadout, PoseResourceKind } from './hooks/usePose';
 export { useCtrl } from './hooks/useCtrl';
+export { useControlWriter } from './hooks/useControlWriter';
+export type {
+  ControlWriterConflict,
+  ControlWriterHandle,
+  ControlWriterOptions,
+  ControlWriterWriteOptions,
+} from './hooks/useControlWriter';
 export { useContacts, useContactEvents } from './hooks/useContacts';
+export { useContactHistory } from './hooks/useContactHistory';
+export type {
+  ContactHistoryEntry,
+  ContactHistoryHandle,
+  ContactHistoryOptions,
+} from './hooks/useContactHistory';
 export { useKeyboardTeleop } from './hooks/useKeyboardTeleop';
 export { useKeyboardIkTarget } from './hooks/useKeyboardIkTarget';
 export { usePolicy } from './hooks/usePolicy';
+export { useRemotePolicy } from './hooks/useRemotePolicy';
 export { useObservation } from './hooks/useObservation';
+export { useNamedObservation } from './hooks/useNamedObservation';
+export type { NamedObservationHandle } from './hooks/useNamedObservation';
 export { useTrajectoryPlayer } from './hooks/useTrajectoryPlayer';
 export { useTrajectoryRecorder } from './hooks/useTrajectoryRecorder';
 export { useGamepad } from './hooks/useGamepad';
@@ -104,6 +122,14 @@ export {
   useFrameCapture,
 } from './hooks/useFrameCapture';
 export { useCameraFrameCapture } from './hooks/useCameraFrameCapture';
+export {
+  usePolicyCameraFrames,
+  usePolicyCameraFramesFromMountedStreams,
+} from './hooks/usePolicyCameraFrames';
+export type {
+  MountedPolicyCameraFrameCaptureAPI,
+  MountedPolicyCameraFrameCaptureOptions,
+} from './hooks/usePolicyCameraFrames';
 export { useCameraSequenceRecorder } from './hooks/useCameraSequenceRecorder';
 export { useMountedCameraSequenceRecorder } from './hooks/useMountedCameraSequenceRecorder';
 export type {
@@ -114,12 +140,53 @@ export type {
   MountedCameraSequenceRecordResult,
 } from './hooks/useMountedCameraSequenceRecorder';
 export {
+  CAMERA_FRAME_CAPTURE_RENDER_USER_DATA_KEY,
+  CAMERA_FRAME_CAPTURE_PRE_RENDER_USER_DATA_KEY,
   CAPTURE_EXCLUDE_KEY,
   captureCameraFrame,
   captureCameraFrameBlob,
   createCameraFrameCaptureSession,
   renderCameraFrameToCanvas,
 } from './rendering/cameraFrameCapture';
+export {
+  capturePolicyCameraFrames,
+  capturePolicyCameraFramesFromMountedStreams,
+  createPolicyCameraFrameCapturePlan,
+  createPolicyCameraFrameCapturePlanFromApi,
+} from './policyCameraFrames';
+export {
+  applyPolicyActionToControls,
+  clampPolicyActionValue,
+} from './policyControls';
+export {
+  bodyPositionField,
+  createNamedObservationBuilder,
+  ctrlField,
+  geomPositionField,
+  qposField,
+  qvelField,
+  readNamedObservation,
+  sitePositionField,
+} from './policyObservation';
+export type {
+  CreatePolicyCameraFrameCapturePlanOptions,
+  PolicyCameraFrameCapturePlan,
+  PolicyCameraFrameCaptureTarget,
+  PolicyCameraFramePlanTarget,
+  PolicyCameraFrameStreamOptions,
+} from './policyCameraFrames';
+export type {
+  ApplyPolicyActionToControlsOptions,
+  ApplyPolicyActionToControlsResult,
+} from './policyControls';
+export type {
+  NamedObservationField,
+  NamedObservationInput,
+  NamedObservationLayoutItem,
+  NamedObservationMissing,
+  NamedObservationOptions,
+  NamedObservationResult,
+} from './policyObservation';
 export {
   createMountedCameraFrameSequenceManifest,
   createMountedCameraFrameSequenceReadiness,
@@ -216,11 +283,25 @@ export type {
   KeyboardIkTargetBinding,
   KeyboardIkTargetConfig,
   // Policy
+  PolicyAPI,
   PolicyConfig,
   PolicyVector,
+  PolicyActionChunk,
+  PolicyInferenceOutput,
   PolicyObservationInput,
   PolicyInferenceInput,
+  PolicyInferenceResult,
   PolicyActionInput,
+  RemotePolicyAPI,
+  RemotePolicyConfig,
+  RemotePolicyRequestInput,
+  RemotePolicyRequestInfo,
+  RemotePolicyResponseInfo,
+  RemotePolicyStatus,
+  PolicyCameraFrameCaptureAPI,
+  PolicyCameraFrameCaptureOptions,
+  PolicyCameraFrameCaptureResult,
+  PolicyCameraFrameStream,
   // Observations
   ObservationConfig,
   ObservationHandle,

@@ -266,7 +266,17 @@ export interface MujocoModel {
   geom_friction: Float64Array;
 
   // Material
+  mat_texid: Int32Array;
+  mat_texrepeat: Float32Array;
+  mat_texuniform: Uint8Array;
   mat_rgba: Float32Array;
+
+  // Texture
+  tex_adr: Int32Array;
+  tex_data: Uint8Array;
+  tex_height: Int32Array;
+  tex_nchannel: Int32Array;
+  tex_width: Int32Array;
 
   // Mesh
   mesh_vertadr: Int32Array;
@@ -434,6 +444,8 @@ export interface MujocoModule {
 
 export interface SceneObject {
   name: string;
+  /** MuJoCo geom name. Defaults to `${name}_geom` for generated objects. */
+  geomName?: string;
   type: 'box' | 'sphere' | 'cylinder';
   size: [number, number, number];
   position: [number, number, number];
@@ -787,17 +799,141 @@ export interface PolicyInferenceInput extends PolicyObservationInput {
   observation: PolicyVector;
 }
 
+export type PolicyActionChunk = readonly PolicyVector[];
+export type PolicyInferenceOutput = PolicyVector | PolicyActionChunk;
+export type PolicyInferenceResult = PolicyInferenceOutput | Promise<PolicyInferenceOutput>;
+
 export interface PolicyActionInput extends PolicyInferenceInput {
   action: PolicyVector;
+}
+
+export interface PolicyAPI {
+  readonly isRunning: boolean;
+  start: () => void;
+  stop: () => void;
+  clearQueue: () => void;
+  reset: () => void;
+  readonly inFlight: boolean;
+  readonly queuedActions: number;
+  readonly lastObservation: PolicyVector | null;
+  readonly lastAction: PolicyVector | null;
+  readonly lastError: unknown;
 }
 
 export interface PolicyConfig {
   frequency: number;
   enabled?: boolean;
+  /** Start async inference while this many queued actions remain. Defaults to 0. */
+  prefetchThreshold?: number;
+  /**
+   * How async action chunks update the queue.
+   * - append preserves legacy FIFO behavior.
+   * - replace is useful for receding-horizon policies where a fresh chunk should supersede stale queued actions.
+   */
+  queueStrategy?: 'append' | 'replace';
+  /**
+   * Clear queued actions and ignore in-flight async results when `stop()` is called.
+   * Defaults to false so callers can choose pause/resume behavior explicitly.
+   */
+  clearQueueOnStop?: boolean;
   onObservation: (input: PolicyObservationInput) => PolicyVector;
   /** Run policy inference. Omit to pass observations directly to `onAction` for custom inline controllers. */
-  infer?: (input: PolicyInferenceInput) => PolicyVector;
+  infer?: (input: PolicyInferenceInput) => PolicyInferenceResult;
   onAction: (input: PolicyActionInput) => void;
+  /** Called when async inference rejects. */
+  onError?: (error: unknown) => void;
+}
+
+export interface RemotePolicyRequestInput extends PolicyInferenceInput {
+  /** True for the first request after hook construction or `reset()`. */
+  reset: boolean;
+  /** Zero-based request index since construction or `reset()`. */
+  requestIndex: number;
+  /** Aborts when the request is no longer needed, e.g. after pause/reset. */
+  signal: AbortSignal;
+}
+
+export interface RemotePolicyRequestInfo extends RemotePolicyRequestInput {
+  body: unknown;
+  requestStartedAt: number;
+}
+
+export interface RemotePolicyResponseInfo extends RemotePolicyRequestInfo {
+  response: Response;
+  responseBody: unknown;
+  responseFinishedAt: number;
+  requestMs: number;
+}
+
+export type RemotePolicyStatus = 'idle' | 'requesting' | 'ready' | 'error' | 'aborted';
+
+export interface RemotePolicyConfig extends Omit<PolicyConfig, 'infer'> {
+  endpoint: string | URL;
+  method?: string;
+  headers?: HeadersInit;
+  credentials?: RequestCredentials;
+  /** Additional external cancellation signal for remote inference requests. */
+  signal?: AbortSignal;
+  /**
+   * Abort the active HTTP request when `stop()` or `reset()` is called.
+   * Defaults to true so paused policies stop consuming server work.
+   */
+  abortOnStop?: boolean;
+  fetcher?: typeof fetch;
+  requestInit?: Omit<RequestInit, 'body' | 'headers' | 'method' | 'credentials' | 'signal'>;
+  buildRequest?: (input: RemotePolicyRequestInput) => unknown | Promise<unknown>;
+  readResponse?: (response: Response) => unknown | Promise<unknown>;
+  parseResponse?: (
+    responseBody: unknown,
+    info: RemotePolicyResponseInfo
+  ) => PolicyInferenceResult;
+  onRequest?: (info: RemotePolicyRequestInfo) => void;
+  onResponse?: (info: RemotePolicyResponseInfo) => void;
+}
+
+export interface RemotePolicyAPI extends PolicyAPI {
+  abort: (reason?: unknown) => void;
+  readonly remoteStatus: RemotePolicyStatus;
+  readonly requestCount: number;
+  readonly responseCount: number;
+  readonly lastRequestBody: unknown;
+  readonly lastResponseBody: unknown;
+  readonly lastHttpStatus: number | null;
+  readonly lastRequestMs: number | null;
+}
+
+export interface PolicyCameraFrameStream extends CameraFrameCaptureOptions {
+  /** Image key used in policy payloads, e.g. `image`, `front`, or `wrist_cam`. */
+  key: string;
+  /** Additional payload keys that should receive the same data URL. */
+  aliases?: readonly string[];
+}
+
+export interface PolicyCameraFrameCaptureOptions {
+  streams: readonly PolicyCameraFrameStream[];
+  /**
+   * Include `observation.images.${key}` for every captured stream.
+   * Defaults to true because LeRobot-style policies usually use these names.
+   */
+  includeObservationImageAliases?: boolean;
+}
+
+export interface PolicyCameraFrameCaptureResult {
+  frames: Record<string, CameraFrameCaptureResult>;
+  images: Record<string, string>;
+  /** Human-readable source summary for UI/debug telemetry. */
+  sourceSummary: string;
+  capturedAt: number;
+}
+
+export interface PolicyCameraFrameCaptureAPI {
+  status: FrameCaptureStatus;
+  error: Error | null;
+  isCapturing: boolean;
+  capture: (
+    options?: Partial<PolicyCameraFrameCaptureOptions>
+  ) => Promise<PolicyCameraFrameCaptureResult>;
+  reset: () => void;
 }
 
 // ---- Observation Builder ----
@@ -1343,6 +1479,10 @@ export interface CameraFrameCaptureOptions {
   lookAt?: CameraFrameCaptureVector3;
   quaternion?: CameraFrameCaptureQuaternion;
   up?: CameraFrameCaptureVector3;
+  /** Local-space offset applied after resolving a mounted MuJoCo camera/site/body pose. */
+  positionOffset?: CameraFrameCaptureVector3;
+  /** Local-space rotation applied after resolving a mounted MuJoCo camera/site/body pose. Array values use Three.js order: [x, y, z, w]. */
+  quaternionOffset?: CameraFrameCaptureQuaternion;
   width?: number;
   height?: number;
   type?: string;
@@ -1352,6 +1492,16 @@ export interface CameraFrameCaptureOptions {
   far?: number;
   /** Provenance for the camera pose used by the capture. Usually set by the MuJoCo provider. */
   source?: CameraFrameCaptureSource;
+  /** Hide rendered Three objects whose MuJoCo geom group is in this list. */
+  hiddenGeomGroups?: readonly number[];
+  /** When provided, only rendered Three objects whose MuJoCo geom group is in this list are visible. */
+  visibleGeomGroups?: readonly number[];
+  /** Hide rendered Three objects whose MuJoCo geom name is in this list. */
+  hiddenGeomNames?: readonly string[];
+  /** Optional clear color for this capture only. Defaults to the renderer's current clear color. */
+  background?: THREE.ColorRepresentation;
+  /** Optional clear alpha for this capture only. Defaults to the renderer's current clear alpha. */
+  backgroundAlpha?: number;
 }
 
 export type CameraFrameCaptureSource =

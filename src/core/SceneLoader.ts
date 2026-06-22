@@ -482,8 +482,14 @@ export function createContiguousControlGroup(mjModel: MujocoModel, count: number
  */
 function sceneObjectToXml(obj: SceneObject): string {
   const joint = obj.freejoint ? '<freejoint/>' : '';
+  const geomName = obj.geomName ?? `${obj.name}_geom`;
   const pos = obj.position.map((v) => v.toFixed(3)).join(' ');
-  const size = obj.size.map((v) => v.toFixed(3)).join(' ');
+  const sizeValues = obj.type === 'sphere'
+    ? obj.size.slice(0, 1)
+    : obj.type === 'cylinder'
+      ? obj.size.slice(0, 2)
+      : obj.size;
+  const size = sizeValues.map((v) => v.toFixed(3)).join(' ');
   const rgba = obj.rgba.join(' ');
   const mass = obj.mass ? ` mass="${obj.mass}"` : '';
   const friction = obj.friction ? ` friction="${obj.friction}"` : '';
@@ -492,7 +498,7 @@ function sceneObjectToXml(obj: SceneObject): string {
   const condim = obj.condim ? ` condim="${obj.condim}"` : '';
   const group = obj.group !== undefined ? ` group="${obj.group}"` : '';
   // Always set contype/conaffinity=1 so objects collide regardless of model defaults
-  return `<body name="${obj.name}" pos="${pos}">${joint}<geom type="${obj.type}" size="${size}" rgba="${rgba}" contype="1" conaffinity="1"${mass}${friction}${solref}${solimp}${condim}${group}/></body>`;
+  return `<body name="${obj.name}" pos="${pos}">${joint}<geom name="${geomName}" type="${obj.type}" size="${size}" rgba="${rgba}" contype="1" conaffinity="1"${mass}${friction}${solref}${solimp}${condim}${group}/></body>`;
 }
 
 /** Create virtual directory structure for a file path. */

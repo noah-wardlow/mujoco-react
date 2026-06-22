@@ -16,6 +16,7 @@ const config: SceneConfig = {
   sceneFile: "scene.xml",
   sceneObjects: [{
     name: "cube",
+    geomName: "cube_geom",
     type: "box",
     size: [0.025, 0.025, 0.025],
     position: [0.4, 0, 0.025],
@@ -29,6 +30,10 @@ const config: SceneConfig = {
   }],
 };
 ```
+
+`geomName` is optional and defaults to `${name}_geom` for generated
+`SceneObject` entries. Set it explicitly when you need stable contact telemetry
+or camera-capture filters such as `hiddenGeomNames`.
 
 ## What Each Parameter Does
 

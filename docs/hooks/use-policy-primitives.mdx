@@ -1,0 +1,89 @@
+---
+title: "Policy Primitives"
+description: "Composable hooks for real policy rollouts"
+icon: "route"
+---
+
+These primitives help policy apps avoid raw MuJoCo array plumbing while keeping
+controllers explicit and composable.
+
+## Control Ownership
+
+Use `useControlWriter` when a controller, policy, replay, or teleop path writes
+to `data.ctrl`. It cooperatively claims a control group and refuses to write
+when another owner has already claimed the same actuators.
+
+```tsx
+import { useBeforePhysicsStep, useControlWriter } from "mujoco-react";
+
+function PolicyControls({ action }: { action: number[] }) {
+  const writer = useControlWriter({
+    owner: "policy",
+    selector: { actuators: ["shoulder_pan", "shoulder_lift"] },
+  });
+
+  useBeforePhysicsStep(() => {
+    writer.write(action);
+  });
+
+  return null;
+}
+```
+
+For real policy evaluation, make policy, IK, keyboard teleop, replay, and debug
+state mutation mutually exclusive. Use `force: true` only for deliberate
+low-level overrides.
+
+## Named Poses
+
+Use pose hooks for HUDs, diagnostics, and verifier logic:
+
+```tsx
+const cube = useBodyPose("cube");
+const gripper = useSitePose("gripper");
+const contactGeom = useGeomPose("left_finger_pad");
+
+cube.position.current.toArray();
+gripper.quaternion.current.toArray();
+contactGeom.found.current;
+```
+
+The hooks update refs after physics steps and do not trigger React re-renders.
+
+## Contact History
+
+`useContactHistory` records a bounded contact log with body and geom names:
+
+```tsx
+const history = useContactHistory({
+  bodyNames: ["cube", "gripper"],
+  maxLength: 1000,
+});
+
+const graspContacts = history.countPair("cube", "gripper");
+history.clear();
+```
+
+This is useful for browser verifiers that need evidence of physical contact,
+not just visual movement.
+
+## Named Observations
+
+Named observation builders make policy vector order and units visible:
+
+```tsx
+const observation = useNamedObservation({
+  fields: [
+    qposField("shoulder_pan", 0, "radians"),
+    qposField("shoulder_lift", 1, "radians"),
+    bodyPositionField("cube", "meters"),
+    sitePositionField("gripper", "meters"),
+  ],
+  missing: "throw",
+});
+
+const { values, layout } = observation.read();
+```
+
+`layout` records each field name, vector start, size, and units. Use it in
+telemetry and tests so model/input mismatches are visible.

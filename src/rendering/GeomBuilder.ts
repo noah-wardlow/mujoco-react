@@ -6,7 +6,7 @@
 
 import * as THREE from 'three';
 import { CapsuleGeometry } from './CapsuleGeometry';
-import { Reflector } from './Reflector';
+import { getName } from '../core/SceneLoader';
 import { MujocoModel, MujocoModule } from '../types';
 
 /**
@@ -19,9 +19,62 @@ import { MujocoModel, MujocoModule } from '../types';
  */
 export class GeomBuilder {
     private mujoco: MujocoModule; 
+    private textureCache = new Map<number, THREE.Texture>();
 
     constructor(mujoco: MujocoModule) {
         this.mujoco = mujoco;
+    }
+
+    private getMaterialTexture(mjModel: MujocoModel, matId: number): THREE.Texture | null {
+        if (matId < 0 || !mjModel.mat_texid || !mjModel.tex_data) return null;
+
+        const materialCount = Math.max(1, Math.floor(mjModel.mat_rgba.length / 4));
+        const textureRoles = Math.max(1, Math.floor(mjModel.mat_texid.length / materialCount));
+        let texId = -1;
+        for (let role = 0; role < textureRoles; role += 1) {
+            const candidate = mjModel.mat_texid[matId * textureRoles + role];
+            if (candidate >= 0) {
+                texId = candidate;
+                break;
+            }
+        }
+        if (texId < 0) return null;
+
+        const cached = this.textureCache.get(texId);
+        if (cached) return cached;
+
+        const width = Number(mjModel.tex_width[texId]);
+        const height = Number(mjModel.tex_height[texId]);
+        const channels = Number(mjModel.tex_nchannel[texId]);
+        const offset = Number(mjModel.tex_adr[texId]);
+        if (width <= 0 || height <= 0 || channels <= 0 || offset < 0) return null;
+
+        const source = mjModel.tex_data.subarray(offset, offset + width * height * channels);
+        const rgba = new Uint8Array(width * height * 4);
+        for (let i = 0, j = 0; i < width * height; i += 1, j += channels) {
+            const r = source[j] ?? 255;
+            const g = channels > 1 ? source[j + 1] : r;
+            const b = channels > 2 ? source[j + 2] : r;
+            const a = channels > 3 ? source[j + 3] : 255;
+            const out = i * 4;
+            rgba[out] = r;
+            rgba[out + 1] = g;
+            rgba[out + 2] = b;
+            rgba[out + 3] = a;
+        }
+
+        const texture = new THREE.DataTexture(rgba, width, height, THREE.RGBAFormat);
+        texture.colorSpace = THREE.LinearSRGBColorSpace;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.flipY = true;
+        const repeatOffset = matId * 2;
+        const repeatS = mjModel.mat_texrepeat?.[repeatOffset] ?? 1;
+        const repeatT = mjModel.mat_texrepeat?.[repeatOffset + 1] ?? 1;
+        texture.repeat.set(repeatS || 1, repeatT || 1);
+        texture.needsUpdate = true;
+        this.textureCache.set(texId, texture);
+        return texture;
     }
 
     /**
@@ -43,6 +96,7 @@ export class GeomBuilder {
         // Sometimes color is on the geom itself, sometimes it uses a shared material definition.
         const matId = mjModel.geom_matid[g];
         const color = new THREE.Color(0xffffff);
+        const map = this.getMaterialTexture(mjModel, matId);
         let opacity = 1.0;
 
         if (matId >= 0) {
@@ -65,8 +119,7 @@ export class GeomBuilder {
         const getVal = (v: unknown) => (v as { value: number })?.value ?? v;
 
         if (type === getVal(MG.mjGEOM_PLANE)) {
-            // Planes are infinite in MuJoCo, but we need a finite mesh for Three.js. 
-            // Fallback reduced to 5m to match grid as requested.
+            // Planes are infinite in MuJoCo, but Three needs finite UVs for textured captures.
             geo = new THREE.PlaneGeometry(size[0] * 2 || 5, size[1] * 2 || 5);
         } else if (type === getVal(MG.mjGEOM_SPHERE)) {
             geo = new THREE.SphereGeometry(size[0], 24, 24);
@@ -100,28 +153,22 @@ export class GeomBuilder {
 
         // 5. Construct the final Mesh
         if (geo) {
-            let mesh;
-            // Special handling for the floor plane to make it shiny
-            if (type === getVal(MG.mjGEOM_PLANE)) {
-                mesh = new Reflector(geo, {
-                    clipBias: 0.003,
-                    textureWidth: 1024, textureHeight: 1024,
-                    color,
-                    mixStrength: 0.25
-                });
-            } else {
-                // Standard physical material for everything else
-                mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-                    color,
-                    transparent: opacity < 1,
-                    opacity,
-                    roughness: 0.6,
-                    metalness: 0.2
-                }));
-                // Enable shadows
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
+            const isPlane = type === getVal(MG.mjGEOM_PLANE);
+            const materialMap = isPlane && map ? map.clone() : map;
+            if (isPlane && materialMap) {
+                materialMap.repeat.multiplyScalar(2.5);
+                materialMap.needsUpdate = true;
             }
+            const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+                color,
+                map: materialMap,
+                transparent: opacity < 1,
+                opacity,
+                roughness: 0.6,
+                metalness: 0
+            }));
+            mesh.castShadow = type !== getVal(MG.mjGEOM_PLANE);
+            mesh.receiveShadow = true;
 
             // Apply the local position offset and rotation specified in the MJCF XML
             mesh.position.set(pos[0], pos[1], pos[2]);
@@ -131,6 +178,8 @@ export class GeomBuilder {
             // Tag the mesh with its MuJoCo body and geom IDs for interaction (picking/dragging)
             mesh.userData.bodyID = mjModel.geom_bodyid[g];
             mesh.userData.geomID = g;
+            mesh.userData.geomGroup = mjModel.geom_group[g];
+            mesh.userData.geomName = getName(mjModel, mjModel.name_geomadr[g]);
 
             return mesh;
         }

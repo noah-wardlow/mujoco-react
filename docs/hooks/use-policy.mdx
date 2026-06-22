@@ -1,10 +1,17 @@
 ---
 title: "usePolicy"
-description: "Framework-agnostic RL policy decimation loop"
+description: "Framework-agnostic policy loop for local, remote, and chunked inference"
 icon: "brain"
 ---
 
-Run a policy inference loop at a fixed frequency (decimation), independent of the physics or render rate. Designed for deploying RL policies trained in frameworks like Isaac Gym, Brax, or MuJoCo MPC.
+Run a policy inference loop at a fixed frequency, independent of the physics or
+render rate. `usePolicy` works with synchronous browser models, remote HTTP
+policies, and receding-horizon policies that return chunks of future actions.
+
+The hook only schedules policy inference and applies the returned actions. It
+does not run IK, blend actions, or synthesize task logic. If a policy is trained
+for a scene, the scene, observation vector, camera streams, units, and action
+order must match that policy.
 
 ## Signature
 
@@ -12,27 +19,44 @@ Run a policy inference loop at a fixed frequency (decimation), independent of th
 usePolicy(config: {
   frequency: number;
   enabled?: boolean;
+  prefetchThreshold?: number;
+  queueStrategy?: "append" | "replace";
+  clearQueueOnStop?: boolean;
   onObservation: (input: { model: MujocoModel; data: MujocoData }) => PolicyVector;
-  infer?: (input: { observation: PolicyVector; model: MujocoModel; data: MujocoData }) => PolicyVector;
+  infer?: (input: {
+    observation: PolicyVector;
+    model: MujocoModel;
+    data: MujocoData;
+  }) => PolicyVector | readonly PolicyVector[] | Promise<PolicyVector | readonly PolicyVector[]>;
   onAction: (input: {
     action: PolicyVector;
     observation: PolicyVector;
     model: MujocoModel;
     data: MujocoData;
   }) => void;
+  onError?: (error: unknown) => void;
 }): {
   start: () => void;
   stop: () => void;
+  clearQueue: () => void;
+  reset: () => void;
   isRunning: boolean;
+  inFlight: boolean;
+  queuedActions: number;
   lastObservation: PolicyVector | null;
   lastAction: PolicyVector | null;
+  lastError: unknown;
 }
 ```
 
 ## Usage
 
 ```tsx
-import { buildObservation, usePolicy } from "mujoco-react";
+import {
+  applyPolicyActionToControls,
+  buildObservation,
+  usePolicy,
+} from "mujoco-react";
 
 function PolicyRunner({ model: nnModel }) {
   const policy = usePolicy({
@@ -49,9 +73,7 @@ function PolicyRunner({ model: nnModel }) {
     infer: ({ observation }) => nnModel.predict(observation),
 
     onAction: ({ action, model, data }) => {
-      for (let i = 0; i < model.nu; i++) {
-        data.ctrl[i] = action[i];
-      }
+      applyPolicyActionToControls(model, data, action);
     },
   });
 
@@ -70,9 +92,13 @@ function PolicyRunner({ model: nnModel }) {
 |-------|------|-------------|
 | `frequency` | `number` | Policy inference rate in Hz |
 | `enabled` | `boolean` | Start enabled or disabled |
+| `prefetchThreshold` | `number` | Start async inference while this many queued actions remain |
+| `queueStrategy` | `"append" \| "replace"` | Append chunks or replace stale queued actions |
+| `clearQueueOnStop` | `boolean` | Clear queued actions and ignore in-flight async results when `stop()` is called |
 | `onObservation` | `({ model, data }) => PolicyVector` | Build observation vector from simulation state |
-| `infer` | `({ observation, model, data }) => PolicyVector` | Optional policy inference step |
+| `infer` | `(...) => PolicyInferenceResult` | Optional policy inference step. May return one action, an action chunk, or a promise of either |
 | `onAction` | `({ action, observation, model, data }) => void` | Write actions to `data.ctrl` |
+| `onError` | `(error) => void` | Called when async inference rejects |
 
 ## Return Value
 
@@ -80,23 +106,140 @@ function PolicyRunner({ model: nnModel }) {
 |-------|------|-------------|
 | `start` | `() => void` | Start the policy loop |
 | `stop` | `() => void` | Stop the policy loop |
+| `clearQueue` | `() => void` | Drop queued future actions and ignore pending async inference results |
+| `reset` | `() => void` | Clear the queue, pending async results, last action, last observation, and timing state |
 | `isRunning` | `boolean` | Whether the policy is currently active |
+| `inFlight` | `boolean` | Whether an async inference call is currently pending |
+| `queuedActions` | `number` | Number of queued future actions |
 | `lastObservation` | `Float32Array \| Float64Array \| number[] \| null` | Most recent observation vector |
 | `lastAction` | `Float32Array \| Float64Array \| number[] \| null` | Most recent action vector |
+| `lastError` | `unknown` | Most recent async inference error |
 
 ## How It Works
 
 1. The hook registers a `useBeforePhysicsStep` callback
 2. Each physics step, it checks if enough time has elapsed since the last inference (based on `frequency`)
-3. If so, it calls `onObservation` to build the observation vector
-4. Then calls `infer` if provided; otherwise it uses the observation as the action
-5. Then calls `onAction` to apply actions
-6. Between inference steps, the previous actions continue to be applied (zero-order hold)
+3. If a queued action exists, it applies that action with `onAction`
+4. If inference is needed, it calls `onObservation` to build the observation vector
+5. Then it calls `infer` if provided; otherwise it uses the observation as the action
+6. If `infer` returns a chunk, the first action is applied immediately when possible and the rest are queued
+7. If `infer` returns a promise, future actions are queued when the promise resolves
+
+For receding-horizon policies, use `queueStrategy: "replace"` so fresh chunks
+supersede stale queued actions. Use `prefetchThreshold` to request the next
+chunk before the queue is empty.
+
+For long open-loop chunks, use `queueStrategy: "append"` so prefetching does not
+discard the tail of the current plan. When pausing a remote policy or changing
+policy inputs, call `reset()` or set `clearQueueOnStop: true`; pending async
+responses are ignored after a reset so stale server results cannot resume later.
+
+## Example: Remote Chunked Policy
+
+```tsx
+import { applyPolicyActionToControls, useRemotePolicy } from "mujoco-react";
+
+function RemotePolicyRunner() {
+  const policy = useRemotePolicy({
+    endpoint: "http://127.0.0.1:8774/infer",
+    frequency: 50,
+    enabled: false,
+    queueStrategy: "replace",
+    prefetchThreshold: 8,
+
+    onObservation: ({ data }) => {
+      return Array.from(data.qpos.slice(0, 6));
+    },
+
+    buildRequest: ({ observation, data, reset, signal }) => {
+      signal.throwIfAborted();
+      return {
+        state: Array.from(observation),
+        time: data.time,
+        reset,
+      };
+    },
+
+    onAction: ({ action, model, data }) => {
+      applyPolicyActionToControls(model, data, action);
+    },
+
+    onError: (error) => {
+      console.error("Policy inference failed", error);
+    },
+  });
+
+  return (
+    <button onClick={() => policy.isRunning ? policy.stop() : policy.start()}>
+      {policy.isRunning ? "Pause" : "Run"}
+    </button>
+  );
+}
+```
+
+`useRemotePolicy` is a convenience wrapper around `usePolicy`: it posts JSON to
+`endpoint`, accepts responses shaped like `{ action: number[] }` or
+`{ actions: number[][] }`, and exposes request metadata such as
+`remoteStatus`, `requestCount`, `responseCount`, `lastHttpStatus`, and
+`lastRequestMs`. It aborts the active HTTP request on `stop()` and `reset()` by
+default; call `policy.abort()` to cancel explicitly, or set `abortOnStop: false`
+to let a request finish in the background. Use `parseResponse` when a server
+returns a custom schema.
+
+For browser-to-Python inference, an HTTP endpoint that returns chunks is usually
+enough. WebSockets or SSE are useful when the policy server needs a continuous
+bidirectional stream, but they add lifecycle complexity that chunked HTTP avoids.
+
+## Example: Visual Policy Captures
+
+Pair `usePolicy` with `usePolicyCameraFramesFromMountedStreams` when the policy
+expects images and your camera streams should resolve from the loaded MuJoCo
+model:
+
+```tsx
+const policyCameras = usePolicyCameraFramesFromMountedStreams({
+  cameraKeys: ["front", "wrist"],
+  aliases: {
+    front: [{ cameraName: "realsense_d435i" }],
+    wrist: [{ cameraName: "wrist_cam" }],
+  },
+  defaults: {
+    width: 640,
+    height: 480,
+    type: "image/jpeg",
+    quality: 0.82,
+  },
+  requireAll: true,
+});
+
+const policy = useRemotePolicy({
+  endpoint: "/infer",
+  frequency: 30,
+  onObservation: ({ model, data }) => buildJointObservation(model, data),
+  buildRequest: async ({ observation, reset, signal }) => {
+    signal.throwIfAborted();
+    const frames = await policyCameras.capture();
+    signal.throwIfAborted();
+    return {
+      state: Array.from(observation),
+      reset,
+      images: frames.images,
+    };
+  },
+  onAction: ({ action, model, data }) => {
+    applyPolicyActionToControls(model, data, action);
+  },
+});
+```
+
+Use `capturePolicyCameraFramesFromMountedStreams(api, options)` instead when
+the capture happens outside React.
 
 ## Example: TensorFlow.js Policy
 
 ```tsx
 import * as tf from "@tensorflow/tfjs";
+import { applyPolicyActionToControls } from "mujoco-react";
 
 function TFPolicy() {
   const modelRef = useRef<tf.LayersModel | null>(null);
@@ -123,7 +266,7 @@ function TFPolicy() {
       return Array.from(values);
     },
     onAction: ({ action, model, data }) => {
-      for (let i = 0; i < Math.min(model.nu, action.length); i++) data.ctrl[i] = action[i];
+      applyPolicyActionToControls(model, data, action);
     },
   });
 
@@ -133,6 +276,11 @@ function TFPolicy() {
 
 ## Notes
 
-- Disable IK when running a policy: `api.setIkEnabled(false)`
+- Disable IK or any other controller that writes the same controls while a policy is running.
 - The policy runs inside `useBeforePhysicsStep`, so it executes at physics rate but only does inference at `frequency` Hz
-- Observation building and action application happen synchronously — keep them fast
+- `onObservation` and `onAction` run in the physics callback; keep them fast.
+- Remote inference belongs in `infer`, which may return a promise.
+- Match policy units explicitly. For example, do not send degrees to a policy trained on radians.
+- Use `applyPolicyActionToControls` for the common case of writing an action
+  vector to `data.ctrl`; it clamps to `model.actuator_ctrlrange` and skips
+  non-finite entries by default.

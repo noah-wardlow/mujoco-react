@@ -188,6 +188,56 @@ function omitResolvedCameraSelectors(
   return rest;
 }
 
+function vector3FromCaptureValue(value: NonNullable<CameraFrameCaptureOptions['positionOffset']>) {
+  return value instanceof THREE.Vector3
+    ? value.clone()
+    : new THREE.Vector3(value[0], value[1], value[2]);
+}
+
+function quaternionFromCaptureValue(value: NonNullable<CameraFrameCaptureOptions['quaternionOffset']>) {
+  return value instanceof THREE.Quaternion
+    ? value.clone()
+    : new THREE.Quaternion(value[0], value[1], value[2], value[3]);
+}
+
+function applyMountedCameraPoseOffsets(
+  options: CameraFrameCaptureOptions,
+  position: [number, number, number],
+  quaternion: [number, number, number, number]
+) {
+  const resolvedPosition = new THREE.Vector3(position[0], position[1], position[2]);
+  const resolvedQuaternion = new THREE.Quaternion(
+    quaternion[0],
+    quaternion[1],
+    quaternion[2],
+    quaternion[3]
+  );
+
+  if (options.positionOffset) {
+    resolvedPosition.add(
+      vector3FromCaptureValue(options.positionOffset).applyQuaternion(resolvedQuaternion)
+    );
+  }
+
+  if (options.quaternionOffset) {
+    resolvedQuaternion.multiply(quaternionFromCaptureValue(options.quaternionOffset)).normalize();
+  }
+
+  return {
+    position: [
+      resolvedPosition.x,
+      resolvedPosition.y,
+      resolvedPosition.z,
+    ] as [number, number, number],
+    quaternion: [
+      resolvedQuaternion.x,
+      resolvedQuaternion.y,
+      resolvedQuaternion.z,
+      resolvedQuaternion.w,
+    ] as [number, number, number, number],
+  };
+}
+
 function countMountedCameraSelectors(options: CameraFrameCaptureOptions) {
   return Number(Boolean(options.cameraName)) +
     Number(Boolean(options.siteName)) +
@@ -1033,10 +1083,11 @@ export function MujocoSimProvider({
           );
         }
 
+        const pose = applyMountedCameraPoseOffsets(options, position, quaternion);
+
         return {
           ...baseOptions,
-          position,
-          quaternion,
+          ...pose,
           fov: options.fov ?? model.cam_fovy?.[cameraId],
           source: { kind: 'mujoco-camera', cameraName: options.cameraName },
         };
@@ -1048,10 +1099,15 @@ export function MujocoSimProvider({
           throw new Error(`MuJoCo site "${options.siteName}" was not found.`);
         }
 
+        const pose = applyMountedCameraPoseOffsets(
+          options,
+          vector3FromArray(data.site_xpos, siteId * 3),
+          quaternionFromXmat(data.site_xmat, siteId * 9)
+        );
+
         return {
           ...baseOptions,
-          position: vector3FromArray(data.site_xpos, siteId * 3),
-          quaternion: quaternionFromXmat(data.site_xmat, siteId * 9),
+          ...pose,
           source: { kind: 'mujoco-site', siteName: options.siteName },
         };
       }
@@ -1067,10 +1123,15 @@ export function MujocoSimProvider({
           );
         }
 
+        const pose = applyMountedCameraPoseOffsets(
+          options,
+          vector3FromArray(data.xpos, bodyId * 3),
+          quaternionFromXmat(data.xmat, bodyId * 9)
+        );
+
         return {
           ...baseOptions,
-          position: vector3FromArray(data.xpos, bodyId * 3),
-          quaternion: quaternionFromXmat(data.xmat, bodyId * 9),
+          ...pose,
           source: { kind: 'mujoco-body', bodyName: options.bodyName },
         };
       }

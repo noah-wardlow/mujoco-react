@@ -23,6 +23,8 @@ useCameraFrameCapture(options?: {
   lookAt?: THREE.Vector3 | readonly [number, number, number]
   quaternion?: THREE.Quaternion | readonly [number, number, number, number]
   up?: THREE.Vector3 | readonly [number, number, number]
+  positionOffset?: THREE.Vector3 | readonly [number, number, number]
+  quaternionOffset?: THREE.Quaternion | readonly [number, number, number, number]
   width?: number
   height?: number
   type?: string
@@ -92,11 +94,104 @@ const blob = await apiRef.current?.captureCameraFrameBlob({
 });
 ```
 
+## Policy Image Payloads
+
+Use `usePolicyCameraFramesFromMountedStreams` or
+`capturePolicyCameraFramesFromMountedStreams` when a policy expects image keys
+such as `observation.images.front` and `observation.images.wrist`.
+The helper resolves dataset stream names to mounted MuJoCo cameras, sites, or
+bodies, captures each stream, and returns both raw frames and payload-ready
+data URLs.
+
+```tsx
+const policyCameras = usePolicyCameraFramesFromMountedStreams({
+  cameraKeys: ["front", "wrist"],
+  aliases: {
+    front: [{ cameraName: "realsense_d435i" }],
+    wrist: [{ cameraName: "wrist_cam" }],
+  },
+  defaults: {
+    width: 640,
+    height: 480,
+    type: "image/jpeg",
+    quality: 0.82,
+  },
+  streamOptions: {
+    front: {
+      aliases: ["realsense"],
+      hiddenGeomGroups: [3, 4],
+      background: "#d8ddd8",
+    },
+    wrist: {
+      quaternionOffset: [1, 0, 0, 0],
+    },
+  },
+  requireAll: true,
+});
+
+const result = await policyCameras.capture();
+
+await fetch("/infer", {
+  method: "POST",
+  body: JSON.stringify({
+    state,
+    images: result.images,
+  }),
+});
+```
+
+Use the non-hook helper when policy execution happens outside React:
+
+```ts
+const result = await capturePolicyCameraFramesFromMountedStreams(api, {
+  cameraKeys: ["front", "wrist"],
+  aliases: {
+    front: [{ cameraName: "realsense_d435i" }],
+    wrist: [{ cameraName: "wrist_cam" }],
+  },
+  requireAll: true,
+});
+```
+
+Explicit Three camera poses are also valid policy streams. They do not move the
+user's orbit camera:
+
+```tsx
+const result = await capturePolicyCameraFramesFromMountedStreams(api, {
+  cameraKeys: ["front", "wrist"],
+  aliases: {
+    wrist: [{ cameraName: "wrist_cam" }],
+  },
+  streamOptions: {
+    front: {
+      position: [1.1, -0.3, 1.3],
+      lookAt: [0.45, -0.3, 0.8],
+      up: [0, 0, 1],
+      fov: 48.5,
+    },
+  },
+});
+```
+
+Policy stream keys stay stable even when they resolve through aliases. In the
+example above, `result.frames.wrist`, `result.images.wrist`, and
+`result.images["observation.images.wrist"]` are populated even though the
+mounted MuJoCo camera is named `wrist_cam`.
+
 ## Notes
 
 - Use `cameraName` for MuJoCo `<camera>` elements, or `siteName` / `bodyName`
   for robot-mounted camera frames.
+- Use `positionOffset` and `quaternionOffset` to calibrate a mounted camera
+  pose without editing MJCF. Offsets are applied in the mounted camera/site/body
+  local frame. Quaternion arrays use Three.js order `[x, y, z, w]`; convert
+  MuJoCo `[w, x, y, z]` quaternions before passing them.
 - Use `position` + `lookAt` only for synthetic fixed debug cameras.
 - Use `quaternion` when replaying a recorded camera pose.
 - Use `camera` to clone an existing `THREE.Camera`.
 - The returned canvas is generated from an offscreen render target.
+- Use `hiddenGeomGroups`, `visibleGeomGroups`, or `hiddenGeomNames` to match a
+  dataset renderer without changing the interactive scene.
+- Advanced renderers can attach a function to
+  `CAMERA_FRAME_CAPTURE_RENDER_USER_DATA_KEY` in scene object `userData` to
+  provide custom Three pixels for capture.

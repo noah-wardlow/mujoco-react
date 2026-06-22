@@ -5,9 +5,10 @@
 
 import { useFrame } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { GeomBuilder } from '../rendering/GeomBuilder';
+import { CAMERA_FRAME_CAPTURE_PRE_RENDER_USER_DATA_KEY } from '../rendering/cameraFrameCapture';
 import { MujocoModel } from '../types';
 import { getName } from '../core/SceneLoader';
 import { useMujocoContext } from '../core/MujocoSimProvider';
@@ -74,8 +75,7 @@ export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
     bodyRefs.current = refs;
   }, [status, geomBuilder, mjModelRef]);
 
-  // Sync body positions from mjData every frame
-  useFrame(() => {
+  const syncBodiesToData = useCallback(() => {
     const data = mjDataRef.current;
     if (!data) return;
     const bodies = bodyRefs.current;
@@ -121,12 +121,19 @@ export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
         );
       }
     }
-  });
+  }, [interpolateRef, interpolationStateRef, mjDataRef]);
+
+  // Sync body positions from mjData every frame
+  useFrame(syncBodiesToData);
 
   return (
     <group
       {...props}
       ref={groupRef}
+      userData={{
+        ...props.userData,
+        [CAMERA_FRAME_CAPTURE_PRE_RENDER_USER_DATA_KEY]: syncBodiesToData,
+      }}
       onDoubleClick={(e) => {
         if (typeof props.onDoubleClick === 'function') props.onDoubleClick(e);
         e.stopPropagation();
