@@ -149,6 +149,10 @@ export {
   renderCameraFrameToCanvas,
 } from './rendering/cameraFrameCapture';
 export {
+  imagePointToNdc,
+  projectImagePointTo3D,
+} from './rendering/imageProjection';
+export {
   capturePolicyCameraFrames,
   capturePolicyCameraFramesFromMountedStreams,
   createPolicyCameraFrameCapturePlan,
@@ -269,6 +273,9 @@ export type {
   ContactInfo,
   // Raycast
   RayHit,
+  ImagePointCoordinateSpace,
+  ImagePointProjectionOptions,
+  ImagePointProjectionResult,
   // Model options
   ModelOptions,
   // Trajectory

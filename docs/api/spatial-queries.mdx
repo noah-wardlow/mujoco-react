@@ -82,6 +82,48 @@ if (hit) {
 
 **Returns:** `{ point: THREE.Vector3, bodyId: number, geomId: number } | null`
 
+## projectImagePointTo3D(options)
+
+Project detector/image coordinates back into the rendered MuJoCo scene. Prefer
+this method for perception models because it makes the coordinate convention and
+camera source explicit.
+
+```tsx
+const hit = api.projectImagePointTo3D({
+  cameraName: "overhead",
+  x: 512,
+  y: 418,
+  coordinateSpace: "normalized-1000",
+  width: 640,
+  height: 480,
+  hiddenGeomGroups: [3],
+});
+
+if (hit) {
+  console.log(hit.bodyId, hit.geomId, hit.point.toArray());
+}
+```
+
+<ParamField body="x" type="number" required>
+  X coordinate in the selected coordinate space.
+</ParamField>
+
+<ParamField body="y" type="number" required>
+  Y coordinate in the selected coordinate space.
+</ParamField>
+
+<ParamField body="coordinateSpace" type="'normalized' | 'normalized-1000' | 'pixel' | 'ndc'" default="normalized">
+  Coordinate convention for the detector result.
+</ParamField>
+
+<ParamField body="cameraName | siteName | bodyName | position/lookAt" type="CameraFrameCaptureOptions">
+  Camera source. Uses the same fields as `captureCameraFrame`.
+</ParamField>
+
+**Returns:** `ImagePointProjectionResult | null`
+
+See [Perception Projection](/guides/perception-projection) for examples.
+
 ## getCanvasSnapshot(width?, height?, mimeType?)
 
 Capture the current canvas as a base64-encoded image.

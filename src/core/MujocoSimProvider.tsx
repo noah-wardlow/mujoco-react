@@ -31,6 +31,8 @@ import {
   ControlGroupSelector,
   ContactInfo,
   GeomInfo,
+  ImagePointProjectionOptions,
+  ImagePointProjectionResult,
   JointInfo,
   LoadFromFilesOptions,
   LocalMujocoFile,
@@ -61,6 +63,7 @@ import {
   getCameraFrameCaptureSourceTarget,
   isMountedCameraFrameCaptureSource,
 } from '../rendering/cameraFrameSource';
+import { projectImagePointTo3D as projectImagePointTo3DFromScene } from '../rendering/imageProjection';
 import {
   loadScene,
   createSceneConfigFromFiles,
@@ -1590,6 +1593,31 @@ export function MujocoSimProvider({
     [camera, gl]
   );
 
+  const projectImagePointTo3D = useCallback(
+    (options: ImagePointProjectionOptions): ImagePointProjectionResult | null => {
+      const {
+        x,
+        y,
+        coordinateSpace,
+        imageWidth,
+        imageHeight,
+        maxDistance,
+        ...captureOptions
+      } = options;
+      const resolvedCaptureOptions = resolveCameraCaptureOptions(captureOptions);
+      return projectImagePointTo3DFromScene(gl, scene, camera, {
+        ...resolvedCaptureOptions,
+        x,
+        y,
+        coordinateSpace,
+        imageWidth,
+        imageHeight,
+        maxDistance,
+      });
+    },
+    [camera, gl, resolveCameraCaptureOptions, scene]
+  );
+
   // --- Domain randomization ---
 
   const setBodyMass = useCallback((name: string, mass: number): void => {
@@ -1676,6 +1704,7 @@ export function MujocoSimProvider({
       captureCameraFrameBlob: captureCameraFrameBlobApi,
       recordCameraSequence: recordCameraSequenceApi,
       project2DTo3D,
+      projectImagePointTo3D,
       setBodyMass,
       setGeomFriction,
       setGeomSize,
@@ -1696,6 +1725,7 @@ export function MujocoSimProvider({
       captureCameraFrameApi, captureCameraFrameBlobApi,
       recordCameraSequenceApi,
       project2DTo3D,
+      projectImagePointTo3D,
       setBodyMass, setGeomFriction, setGeomSize,
     ]
   );

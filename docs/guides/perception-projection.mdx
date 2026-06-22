@@ -1,0 +1,81 @@
+---
+title: "Perception Projection"
+description: "Project detector image coordinates back into MuJoCo world geometry"
+icon: "scan-search"
+---
+
+`mujoco-react` already loads remote MJCF/XML models through `SceneConfig.src`
+and follows referenced assets. Use this guide when a perception model returns
+2D image coordinates and you need the corresponding MuJoCo body, geom, and
+world point.
+
+## Project A Detector Point
+
+`api.projectImagePointTo3D` uses the same camera options as
+`api.captureCameraFrame`, so the image you send to a model and the coordinate
+projection can share one camera definition.
+
+```tsx
+const camera = {
+  cameraName: "overhead_camera",
+  width: 640,
+  height: 480,
+  hiddenGeomGroups: [3],
+};
+
+const frame = await api.captureCameraFrame(camera);
+
+const hit = api.projectImagePointTo3D({
+  ...camera,
+  x: 512,
+  y: 418,
+  coordinateSpace: "normalized-1000",
+});
+
+if (hit) {
+  console.log(hit.bodyId, hit.geomId, hit.point.toArray());
+}
+```
+
+## Coordinate Spaces
+
+Use an explicit coordinate space instead of guessing detector conventions:
+
+| `coordinateSpace` | Meaning |
+| --- | --- |
+| `"normalized"` | `0..1` image coordinates with top-left origin |
+| `"normalized-1000"` | `0..1000` detector coordinates with top-left origin |
+| `"pixel"` | Pixel coordinates with top-left origin |
+| `"ndc"` | Three.js normalized device coordinates, `-1..1` |
+
+For pixel coordinates, pass `imageWidth` and `imageHeight` when they differ
+from the capture size.
+
+```tsx
+api.projectImagePointTo3D({
+  siteName: "wrist_camera",
+  x: 320,
+  y: 240,
+  coordinateSpace: "pixel",
+  imageWidth: 640,
+  imageHeight: 480,
+});
+```
+
+## Standalone Utility
+
+For custom renderers, use the standalone helper.
+
+```tsx
+import { projectImagePointTo3D } from "mujoco-react";
+
+const hit = projectImagePointTo3D(renderer, scene, camera, {
+  x: 0.5,
+  y: 0.5,
+  coordinateSpace: "normalized",
+});
+```
+
+Projection respects capture exclusion metadata plus `hiddenGeomGroups`,
+`visibleGeomGroups`, and `hiddenGeomNames`, matching the common perception
+capture path.

@@ -747,6 +747,42 @@ export interface RayHit {
   distance: number;
 }
 
+export type ImagePointCoordinateSpace =
+  | 'normalized'
+  | 'normalized-1000'
+  | 'pixel'
+  | 'ndc';
+
+export interface ImagePointProjectionOptions extends CameraFrameCaptureOptions {
+  /** X coordinate in the selected coordinate space. Defaults to normalized 0..1. */
+  x: number;
+  /** Y coordinate in the selected coordinate space. Defaults to normalized 0..1 with origin at top-left. */
+  y: number;
+  /**
+   * Coordinate convention for x/y:
+   * - normalized: 0..1 image coordinates, top-left origin
+   * - normalized-1000: 0..1000 detector coordinates, top-left origin
+   * - pixel: pixel coordinates, top-left origin
+   * - ndc: Three.js normalized device coordinates, -1..1
+   */
+  coordinateSpace?: ImagePointCoordinateSpace;
+  /** Image width for pixel coordinates. Falls back to `width` or renderer canvas width. */
+  imageWidth?: number;
+  /** Image height for pixel coordinates. Falls back to `height` or renderer canvas height. */
+  imageHeight?: number;
+  /** Ignore hits farther than this distance from the camera ray origin. */
+  maxDistance?: number;
+}
+
+export interface ImagePointProjectionResult extends RayHit {
+  /** NDC coordinates used for raycasting. */
+  ndc: [number, number];
+  /** Image dimensions used when interpreting pixel coordinates. */
+  imageSize: [number, number];
+  /** Camera pose provenance, matching camera-frame capture results. */
+  source: CameraFrameCaptureSource;
+}
+
 // ---- Model Options (spec 5.3) ----
 
 export interface ModelOptions {
@@ -1404,6 +1440,7 @@ export interface MujocoSimAPI {
     cameraPos: THREE.Vector3,
     lookAt: THREE.Vector3
   ): { point: THREE.Vector3; bodyId: number; geomId: number } | null;
+  projectImagePointTo3D(options: ImagePointProjectionOptions): ImagePointProjectionResult | null;
 
   // Domain randomization (spec 10.3)
   setBodyMass(name: Bodies, mass: number): void;
