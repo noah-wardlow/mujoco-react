@@ -1,3 +1,10 @@
+# [10.2.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.1.0...v10.2.0) (2026-06-22)
+
+
+### Features
+
+* add image point projection API ([e195347](https://github.com/noah-wardlow/mujoco-react/commit/e195347fc43e34493977f0eb82e4a61cb1e7af19))
+
 # [10.1.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.0.1...v10.1.0) (2026-06-22)
 
 
