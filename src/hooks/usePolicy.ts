@@ -111,7 +111,10 @@ export function usePolicy(config: PolicyConfig): PolicyAPI {
 
       // Build observation
       const observation = cfg.onObservation({ model, data });
-      const result = cfg.infer ? cfg.infer({ observation, model, data }) : observation;
+      const queuedActions = actionQueueRef.current.length;
+      const result = cfg.infer
+        ? cfg.infer({ observation, model, data, queuedActions })
+        : observation;
 
       if (isPromiseLike(result)) {
         const epoch = epochRef.current;

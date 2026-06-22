@@ -163,7 +163,7 @@ export function useRemotePolicy(config: RemotePolicyConfig): RemotePolicyAPI {
 
   const policy = usePolicy({
     ...config,
-    infer: async ({ observation, model, data }) => {
+    infer: async ({ observation, model, data, queuedActions }) => {
       const cfg = configRef.current;
       abortController(abortControllerRef.current, createAbortError('Remote policy request was superseded.'));
       const controller = new AbortController();
@@ -175,6 +175,7 @@ export function useRemotePolicy(config: RemotePolicyConfig): RemotePolicyAPI {
         observation,
         model,
         data,
+        queuedActions,
         reset: requestIndex === 0,
         requestIndex,
         signal,

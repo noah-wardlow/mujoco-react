@@ -833,6 +833,8 @@ export interface PolicyObservationInput {
 
 export interface PolicyInferenceInput extends PolicyObservationInput {
   observation: PolicyVector;
+  /** Number of actions still queued locally when inference is requested. */
+  queuedActions?: number;
 }
 
 export type PolicyActionChunk = readonly PolicyVector[];
@@ -1539,6 +1541,8 @@ export interface CameraFrameCaptureOptions {
   background?: THREE.ColorRepresentation;
   /** Optional clear alpha for this capture only. Defaults to the renderer's current clear alpha. */
   backgroundAlpha?: number;
+  /** Mirror the captured image horizontally after rendering. Useful when matching policy datasets with mirrored camera frames. */
+  flipX?: boolean;
 }
 
 export type CameraFrameCaptureSource =

@@ -27,6 +27,7 @@ usePolicy(config: {
     observation: PolicyVector;
     model: MujocoModel;
     data: MujocoData;
+    queuedActions?: number;
   }) => PolicyVector | readonly PolicyVector[] | Promise<PolicyVector | readonly PolicyVector[]>;
   onAction: (input: {
     action: PolicyVector;
@@ -128,6 +129,10 @@ function PolicyRunner({ model: nnModel }) {
 For receding-horizon policies, use `queueStrategy: "replace"` so fresh chunks
 supersede stale queued actions. Use `prefetchThreshold` to request the next
 chunk before the queue is empty.
+
+`infer` receives `queuedActions`, the number of future actions still buffered
+when the request starts. Remote policy adapters can pass this to the server so
+it can tune horizon length, skip work, or report queue telemetry.
 
 For long open-loop chunks, use `queueStrategy: "append"` so prefetching does not
 discard the tail of the current plan. When pausing a remote policy or changing

@@ -32,6 +32,7 @@ useCameraFrameCapture(options?: {
   fov?: number
   near?: number
   far?: number
+  flipX?: boolean
 }): {
   status: "idle" | "capturing" | "captured" | "error"
   error: Error | null
@@ -192,6 +193,8 @@ mounted MuJoCo camera is named `wrist_cam`.
 - The returned canvas is generated from an offscreen render target.
 - Use `hiddenGeomGroups`, `visibleGeomGroups`, or `hiddenGeomNames` to match a
   dataset renderer without changing the interactive scene.
+- Use `flipX` to mirror captured frames horizontally when matching a policy
+  dataset or camera convention that stores mirrored images.
 - Advanced renderers can attach a function to
   `CAMERA_FRAME_CAPTURE_RENDER_USER_DATA_KEY` in scene object `userData` to
   provide custom Three pixels for capture.

@@ -60,6 +60,7 @@ export type CameraFrameCaptureRenderResult = {
   width?: number;
   height?: number;
   flipY?: boolean;
+  flipX?: boolean;
 };
 
 type CameraFrameCaptureRender = (
@@ -196,7 +197,8 @@ function readRenderTargetToCanvas(
   imageData: ImageData,
   width: number,
   height: number,
-  outputColorSpace: string
+  outputColorSpace: string,
+  flipX = false
 ) {
   renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
 
@@ -206,17 +208,25 @@ function readRenderTargetToCanvas(
     const sourceStart = (height - y - 1) * rowBytes;
     const targetStart = y * rowBytes;
     const row = pixels.subarray(sourceStart, sourceStart + rowBytes);
-    if (!encodeSrgb) {
+    if (!encodeSrgb && !flipX) {
       imageData.data.set(row, targetStart);
       continue;
     }
 
-    for (let x = 0; x < rowBytes; x += 4) {
-      const pixelOffset = targetStart + x;
-      imageData.data[pixelOffset] = linearByteToSrgbByte(row[x]);
-      imageData.data[pixelOffset + 1] = linearByteToSrgbByte(row[x + 1]);
-      imageData.data[pixelOffset + 2] = linearByteToSrgbByte(row[x + 2]);
-      imageData.data[pixelOffset + 3] = row[x + 3];
+    for (let x = 0; x < width; x += 1) {
+      const sourceX = flipX ? width - x - 1 : x;
+      const sourceOffset = sourceX * 4;
+      const targetOffset = targetStart + x * 4;
+      imageData.data[targetOffset] = encodeSrgb
+        ? linearByteToSrgbByte(row[sourceOffset])
+        : row[sourceOffset];
+      imageData.data[targetOffset + 1] = encodeSrgb
+        ? linearByteToSrgbByte(row[sourceOffset + 1])
+        : row[sourceOffset + 1];
+      imageData.data[targetOffset + 2] = encodeSrgb
+        ? linearByteToSrgbByte(row[sourceOffset + 2])
+        : row[sourceOffset + 2];
+      imageData.data[targetOffset + 3] = row[sourceOffset + 3];
     }
   }
   context.putImageData(imageData, 0, 0);
@@ -238,17 +248,30 @@ function readPixelsToCanvas(
   imageData: ImageData,
   width: number,
   height: number,
-  flipY = true
+  flipY = true,
+  flipX = false
 ) {
   const rowBytes = width * 4;
   for (let y = 0; y < height; y += 1) {
     const sourceY = flipY ? height - y - 1 : y;
     const sourceStart = sourceY * rowBytes;
     const targetStart = y * rowBytes;
-    imageData.data.set(
-      pixels.subarray(sourceStart, sourceStart + rowBytes),
-      targetStart
-    );
+    if (!flipX) {
+      imageData.data.set(
+        pixels.subarray(sourceStart, sourceStart + rowBytes),
+        targetStart
+      );
+      continue;
+    }
+    for (let x = 0; x < width; x += 1) {
+      const sourceX = width - x - 1;
+      const sourceOffset = sourceStart + sourceX * 4;
+      const targetOffset = targetStart + x * 4;
+      imageData.data[targetOffset] = pixels[sourceOffset];
+      imageData.data[targetOffset + 1] = pixels[sourceOffset + 1];
+      imageData.data[targetOffset + 2] = pixels[sourceOffset + 2];
+      imageData.data[targetOffset + 3] = pixels[sourceOffset + 3];
+    }
   }
   context.putImageData(imageData, 0, 0);
 }
@@ -462,7 +485,8 @@ export function createCameraFrameCaptureSession(
         imageData,
         width,
         height,
-        renderer.outputColorSpace
+        renderer.outputColorSpace,
+        captureOptions.flipX ?? false
       );
       return {
         canvas,
@@ -524,7 +548,8 @@ export function createCameraFrameCaptureSession(
             imageData,
             width,
             height,
-            captureResult.flipY ?? true
+            captureResult.flipY ?? true,
+            captureResult.flipX ?? captureOptions.flipX ?? false
           );
           return {
             canvas,
