@@ -1,3 +1,10 @@
+# [10.1.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.0.1...v10.1.0) (2026-06-22)
+
+
+### Features
+
+* add policy primitives and camera capture controls ([88d0e30](https://github.com/noah-wardlow/mujoco-react/commit/88d0e305a0df9390f9b08c04a161360ffc353c22))
+
 ## [10.0.1](https://github.com/noah-wardlow/mujoco-react/compare/v10.0.0...v10.0.1) (2026-06-21)
 
 
