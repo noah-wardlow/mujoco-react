@@ -5,9 +5,12 @@
 
 
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CapsuleGeometry } from './CapsuleGeometry';
 import { getName } from '../core/SceneLoader';
-import { MujocoModel, MujocoModule } from '../types';
+import { MujocoModel, MujocoModule, MujocoRenderOptions } from '../types';
+
+const DEFAULT_MESH_NORMAL_SMOOTHING_TOLERANCE = 1e-4;
 
 /**
  * GeomBuilder
@@ -20,9 +23,18 @@ import { MujocoModel, MujocoModule } from '../types';
 export class GeomBuilder {
     private mujoco: MujocoModule; 
     private textureCache = new Map<number, THREE.Texture>();
+    private renderOptions?: MujocoRenderOptions;
 
-    constructor(mujoco: MujocoModule) {
+    constructor(mujoco: MujocoModule, renderOptions?: MujocoRenderOptions) {
         this.mujoco = mujoco;
+        this.renderOptions = renderOptions;
+    }
+
+    private getMeshNormalSmoothingTolerance(): number | null {
+        const smoothing = this.renderOptions?.meshNormalSmoothing;
+        if (!smoothing) return null;
+        if (smoothing === true) return DEFAULT_MESH_NORMAL_SMOOTHING_TOLERANCE;
+        return smoothing.tolerance ?? DEFAULT_MESH_NORMAL_SMOOTHING_TOLERANCE;
     }
 
     private getMaterialTexture(mjModel: MujocoModel, matId: number): THREE.Texture | null {
@@ -148,6 +160,10 @@ export class GeomBuilder {
             geo.setAttribute('position', new THREE.Float32BufferAttribute(mjModel.mesh_vert.subarray(vAdr * 3, (vAdr + vNum) * 3), 3));
             // 'index' = faces (triangles connecting vertices)
             geo.setIndex(Array.from(mjModel.mesh_face.subarray(fAdr * 3, (fAdr + fNum) * 3)));
+            const smoothingTolerance = this.getMeshNormalSmoothingTolerance();
+            if (smoothingTolerance !== null) {
+                geo = mergeVertices(geo, smoothingTolerance);
+            }
             geo.computeVertexNormals(); // Auto-calculate smooth lighting normals
         }
 

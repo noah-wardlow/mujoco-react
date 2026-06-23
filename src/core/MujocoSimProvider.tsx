@@ -37,6 +37,7 @@ import {
   LoadFromFilesOptions,
   LocalMujocoFile,
   ModelOptions,
+  MujocoRenderOptions,
   MujocoSimAPI,
   PhysicsStepCallback,
   RayHit,
@@ -241,6 +242,143 @@ function applyMountedCameraPoseOffsets(
   };
 }
 
+function resolveMujocoCameraCompatibilityOptions(
+  options: CameraFrameCaptureOptions
+) {
+  const compatibility = options.mujocoCameraCompatibility;
+  if (!compatibility) return null;
+  if (compatibility === true) {
+    return {
+      useResolution: true,
+      useIntrinsics: true,
+      useClipping: true,
+      preserveAspect: true,
+      preferResolution: false,
+    };
+  }
+  return {
+    useResolution: compatibility.useResolution ?? true,
+    useIntrinsics: compatibility.useIntrinsics ?? true,
+    useClipping: compatibility.useClipping ?? true,
+    preserveAspect: compatibility.preserveAspect ?? true,
+    preferResolution: compatibility.preferResolution ?? false,
+  };
+}
+
+function mujocoVisualClip(model: MujocoModel) {
+  const map = (model as unknown as {
+    vis?: { map?: { znear?: number; zfar?: number } };
+  }).vis?.map;
+  const near = typeof map?.znear === 'number' && map.znear > 0
+    ? map.znear
+    : undefined;
+  const far = typeof map?.zfar === 'number' && map.zfar > 0
+    ? map.zfar
+    : undefined;
+  return { near, far };
+}
+
+function mujocoCameraResolution(
+  model: MujocoModel,
+  cameraId: number
+): { width?: number; height?: number } {
+  const resolution = model.cam_resolution;
+  if (!resolution) return {};
+  const width = Number(resolution[cameraId * 2]);
+  const height = Number(resolution[cameraId * 2 + 1]);
+  return {
+    width: Number.isFinite(width) && width > 0 ? width : undefined,
+    height: Number.isFinite(height) && height > 0 ? height : undefined,
+  };
+}
+
+function mujocoCameraProjectionMatrix(
+  model: MujocoModel,
+  cameraId: number,
+  width: number | undefined,
+  height: number | undefined,
+  near: number | undefined,
+  far: number | undefined
+): THREE.Matrix4 | undefined {
+  const intrinsic = model.cam_intrinsic;
+  const sensorSize = model.cam_sensorsize;
+  if (!intrinsic || !sensorSize || !width || !height) return undefined;
+
+  const intrinsicOffset = cameraId * 4;
+  const sensorOffset = cameraId * 2;
+  const focalX = Number(intrinsic[intrinsicOffset]);
+  const focalY = Number(intrinsic[intrinsicOffset + 1]);
+  const principalX = Number(intrinsic[intrinsicOffset + 2]);
+  const principalY = Number(intrinsic[intrinsicOffset + 3]);
+  const sensorWidth = Number(sensorSize[sensorOffset]);
+  const sensorHeight = Number(sensorSize[sensorOffset + 1]);
+  if (
+    !Number.isFinite(focalX) ||
+    !Number.isFinite(focalY) ||
+    !Number.isFinite(principalX) ||
+    !Number.isFinite(principalY) ||
+    !Number.isFinite(sensorWidth) ||
+    !Number.isFinite(sensorHeight) ||
+    focalX <= 0 ||
+    focalY <= 0 ||
+    sensorWidth <= 0 ||
+    sensorHeight <= 0
+  ) {
+    return undefined;
+  }
+
+  const fx = focalX / sensorWidth * width;
+  const fy = focalY / sensorHeight * height;
+  const cx = width * (0.5 + principalX / sensorWidth);
+  const cy = height * (0.5 + principalY / sensorHeight);
+  const znear = near ?? 0.01;
+  const zfar = far ?? 100;
+
+  return new THREE.Matrix4().set(
+    2 * fx / width, 0, 1 - 2 * cx / width, 0,
+    0, 2 * fy / height, 2 * cy / height - 1, 0,
+    0, 0, -(zfar + znear) / (zfar - znear), -2 * zfar * znear / (zfar - znear),
+    0, 0, -1, 0
+  );
+}
+
+function resolveMujocoCameraCaptureDimensions(
+  requested: CameraFrameCaptureOptions,
+  cameraResolution: { width?: number; height?: number },
+  compatibility: NonNullable<ReturnType<typeof resolveMujocoCameraCompatibilityOptions>>
+) {
+  if (!compatibility.useResolution) {
+    return {
+      width: requested.width,
+      height: requested.height,
+    };
+  }
+
+  if (compatibility.preferResolution) {
+    return {
+      width: cameraResolution.width ?? requested.width,
+      height: cameraResolution.height ?? requested.height,
+    };
+  }
+
+  let width = requested.width ?? cameraResolution.width;
+  let height = requested.height ?? cameraResolution.height;
+
+  if (
+    compatibility.preserveAspect &&
+    cameraResolution.width &&
+    cameraResolution.height
+  ) {
+    if (requested.width !== undefined && requested.height === undefined) {
+      height = requested.width * cameraResolution.height / cameraResolution.width;
+    } else if (requested.height !== undefined && requested.width === undefined) {
+      width = requested.height * cameraResolution.width / cameraResolution.height;
+    }
+  }
+
+  return { width, height };
+}
+
 function countMountedCameraSelectors(options: CameraFrameCaptureOptions) {
   return Number(Boolean(options.cameraName)) +
     Number(Boolean(options.siteName)) +
@@ -406,6 +544,7 @@ interface MujocoSimProviderProps {
   paused?: boolean;
   speed?: number;
   interpolate?: boolean;
+  renderOptions?: MujocoRenderOptions;
   children: React.ReactNode;
 }
 
@@ -423,6 +562,7 @@ export function MujocoSimProvider({
   paused,
   speed,
   interpolate,
+  renderOptions,
   children,
 }: MujocoSimProviderProps) {
   const { gl, camera, scene } = useThree();
@@ -462,14 +602,12 @@ export function MujocoSimProvider({
   const hiddenBodiesRef = useRef(new Set<string>());
   const bodyReloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { configRef.current = config; }, [config]);
-  useEffect(() => { mujocoRef.current = mujoco; }, [mujoco]);
-
-  // Sync declarative props to refs
-  useEffect(() => { pausedRef.current = paused ?? false; }, [paused]);
-  useEffect(() => { speedRef.current = speed ?? 1; }, [speed]);
-  useEffect(() => { substepsRef.current = substeps ?? 1; }, [substeps]);
-  useEffect(() => { interpolateRef.current = interpolate ?? false; }, [interpolate]);
+  configRef.current = config;
+  mujocoRef.current = mujoco;
+  pausedRef.current = paused ?? false;
+  speedRef.current = speed ?? 1;
+  substepsRef.current = substeps ?? 1;
+  interpolateRef.current = interpolate ?? false;
 
   // Sync gravity prop
   useEffect(() => {
@@ -1037,11 +1175,33 @@ export function MujocoSimProvider({
     for (let i = 0; i < ncam; i += 1) {
       const posOffset = i * 3;
       const quatOffset = i * 4;
+      const intrinsicOffset = i * 4;
+      const resolutionOffset = i * 2;
       result.push({
         id: i,
         name: getName(model, nameAddresses[i]),
         bodyId: model.cam_bodyid?.[i] ?? -1,
         fov: model.cam_fovy?.[i] ?? null,
+        resolution: model.cam_resolution
+          ? [
+            model.cam_resolution[resolutionOffset],
+            model.cam_resolution[resolutionOffset + 1],
+          ]
+          : null,
+        sensorSize: model.cam_sensorsize
+          ? [
+            model.cam_sensorsize[resolutionOffset],
+            model.cam_sensorsize[resolutionOffset + 1],
+          ]
+          : null,
+        intrinsic: model.cam_intrinsic
+          ? [
+            model.cam_intrinsic[intrinsicOffset],
+            model.cam_intrinsic[intrinsicOffset + 1],
+            model.cam_intrinsic[intrinsicOffset + 2],
+            model.cam_intrinsic[intrinsicOffset + 3],
+          ]
+          : null,
         position: model.cam_pos
           ? vector3FromArray(model.cam_pos, posOffset)
           : null,
@@ -1087,11 +1247,31 @@ export function MujocoSimProvider({
         }
 
         const pose = applyMountedCameraPoseOffsets(options, position, quaternion);
+        const compatibility = resolveMujocoCameraCompatibilityOptions(options);
+        const cameraResolution = compatibility?.useResolution
+          ? mujocoCameraResolution(model, cameraId)
+          : { width: undefined, height: undefined };
+        const clip = compatibility?.useClipping
+          ? mujocoVisualClip(model)
+          : { near: undefined, far: undefined };
+        const { width, height } = compatibility
+          ? resolveMujocoCameraCaptureDimensions(options, cameraResolution, compatibility)
+          : { width: options.width, height: options.height };
+        const near = options.near ?? clip.near;
+        const far = options.far ?? clip.far;
+        const projectionMatrix = compatibility?.useIntrinsics
+          ? mujocoCameraProjectionMatrix(model, cameraId, width, height, near, far)
+          : undefined;
 
         return {
           ...baseOptions,
+          width,
+          height,
           ...pose,
           fov: options.fov ?? model.cam_fovy?.[cameraId],
+          near,
+          far,
+          projectionMatrix: options.projectionMatrix ?? projectionMatrix,
           source: { kind: 'mujoco-camera', cameraName: options.cameraName },
         };
       }
@@ -1759,7 +1939,7 @@ export function MujocoSimProvider({
 
   return (
     <MujocoSimContext.Provider value={contextValue}>
-      <SceneRenderer />
+      <SceneRenderer renderOptions={renderOptions} />
       {children}
     </MujocoSimContext.Provider>
   );

@@ -381,6 +381,10 @@ export function SparkSplatEnvironment({
   const onErrorRef = useRef(onError);
   const [status, setStatus] = useState<SparkSplatStatus>('idle');
   const { gl, invalidate } = useThree();
+  onStatusChangeRef.current = onStatusChange;
+  onLoadRef.current = onLoad;
+  onErrorRef.current = onError;
+
   const metadata = useSplatEnvironment({
     environment,
     scenario,
@@ -412,18 +416,6 @@ export function SparkSplatEnvironment({
       lod,
     ]
   );
-
-  useEffect(() => {
-    onStatusChangeRef.current = onStatusChange;
-  }, [onStatusChange]);
-
-  useEffect(() => {
-    onLoadRef.current = onLoad;
-  }, [onLoad]);
-
-  useEffect(() => {
-    onErrorRef.current = onError;
-  }, [onError]);
 
   useEffect(() => {
     let disposed = false;

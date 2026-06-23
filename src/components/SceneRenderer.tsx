@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { GeomBuilder } from '../rendering/GeomBuilder';
 import { CAMERA_FRAME_CAPTURE_PRE_RENDER_USER_DATA_KEY } from '../rendering/cameraFrameCapture';
-import { MujocoModel } from '../types';
+import { MujocoModel, MujocoRenderOptions } from '../types';
 import { getName } from '../core/SceneLoader';
 import { useMujocoContext } from '../core/MujocoSimProvider';
 
@@ -17,7 +17,18 @@ import { useMujocoContext } from '../core/MujocoSimProvider';
  * SceneRenderer — creates and syncs MuJoCo body meshes every frame.
  * Accepts standard R3F group props (position, rotation, scale, visible, etc.).
  */
-export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
+export interface SceneRendererProps extends Omit<ThreeElements['group'], 'ref'> {
+  renderOptions?: MujocoRenderOptions;
+}
+
+function getRenderOptionsKey(renderOptions: MujocoRenderOptions | undefined) {
+  const smoothing = renderOptions?.meshNormalSmoothing;
+  if (!smoothing) return 'default';
+  if (smoothing === true) return 'meshNormalSmoothing:true';
+  return `meshNormalSmoothing:${smoothing.tolerance ?? 'default'}`;
+}
+
+export function SceneRenderer({ renderOptions, ...props }: SceneRendererProps) {
   const {
     mjModelRef,
     mjDataRef,
@@ -31,11 +42,13 @@ export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
   const groupRef = useRef<THREE.Group>(null);
   const bodyRefs = useRef<(THREE.Group | null)[]>([]);
   const prevModelRef = useRef<MujocoModel | null>(null);
+  const prevRenderOptionsKeyRef = useRef<string | null>(null);
+  const renderOptionsKey = getRenderOptionsKey(renderOptions);
 
   const geomBuilder = useMemo(() => {
     if (status !== 'ready') return null;
-    return new GeomBuilder(mujocoRef.current);
-  }, [status, mujocoRef]);
+    return new GeomBuilder(mujocoRef.current, renderOptions);
+  }, [status, mujocoRef, renderOptionsKey]);
 
   // Build body groups when model loads
   useEffect(() => {
@@ -45,8 +58,14 @@ export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
     if (!model || !group) return;
 
     // Skip if model hasn't changed
-    if (prevModelRef.current === model) return;
+    if (
+      prevModelRef.current === model &&
+      prevRenderOptionsKeyRef.current === renderOptionsKey
+    ) {
+      return;
+    }
     prevModelRef.current = model;
+    prevRenderOptionsKeyRef.current = renderOptionsKey;
 
     // Clear previous bodies
     while (group.children.length > 0) {
@@ -73,7 +92,7 @@ export function SceneRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
       refs.push(bodyGroup);
     }
     bodyRefs.current = refs;
-  }, [status, geomBuilder, mjModelRef]);
+  }, [status, geomBuilder, mjModelRef, renderOptionsKey]);
 
   const syncBodiesToData = useCallback(() => {
     const data = mjDataRef.current;

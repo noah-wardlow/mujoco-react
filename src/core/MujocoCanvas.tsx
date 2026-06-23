@@ -4,7 +4,7 @@
  */
 
 import { Canvas } from '@react-three/fiber';
-import { forwardRef, useEffect } from 'react';
+import { forwardRef, useEffect, useRef } from 'react';
 import { useMujocoWasm } from './MujocoProvider';
 import { MujocoSimProvider } from './MujocoSimProvider';
 import { MujocoCanvasProps, MujocoSimAPI } from '../types';
@@ -31,6 +31,7 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
       paused,
       speed,
       interpolate,
+      renderOptions,
       loadingFallback,
       children,
       ...canvasProps
@@ -38,12 +39,14 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
     ref
   ) {
     const { mujoco, status: wasmStatus, error: wasmError } = useMujocoWasm();
+    const onErrorRef = useRef(onError);
+    onErrorRef.current = onError;
 
     useEffect(() => {
-      if (wasmStatus === 'error' && onError) {
-        onError(new Error(wasmError ?? 'WASM load failed'));
+      if (wasmStatus === 'error') {
+        onErrorRef.current?.(new Error(wasmError ?? 'WASM load failed'));
       }
-    }, [wasmStatus, wasmError, onError]);
+    }, [wasmStatus, wasmError]);
 
     if (wasmStatus === 'loading' || !mujoco) {
       return loadingFallback ? (
@@ -71,6 +74,7 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
           paused={paused}
           speed={speed}
           interpolate={interpolate}
+          renderOptions={renderOptions}
         >
           {children}
         </MujocoSimProvider>

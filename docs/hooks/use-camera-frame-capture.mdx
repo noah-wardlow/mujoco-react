@@ -32,6 +32,21 @@ useCameraFrameCapture(options?: {
   fov?: number
   near?: number
   far?: number
+  projectionMatrix?: THREE.Matrix4 | readonly number[]
+  mujocoCameraCompatibility?: boolean | {
+    useResolution?: boolean
+    useIntrinsics?: boolean
+    useClipping?: boolean
+    preserveAspect?: boolean
+    preferResolution?: boolean
+  }
+  hiddenGeomGroups?: readonly number[]
+  visibleGeomGroups?: readonly number[]
+  hiddenGeomNames?: readonly string[]
+  background?: THREE.ColorRepresentation
+  backgroundAlpha?: number
+  visualOverrides?: CameraFrameVisualOverrides
+  renderIsolation?: boolean | CameraFrameRenderIsolationOptions
   flipX?: boolean
 }): {
   status: "idle" | "capturing" | "captured" | "error"
@@ -83,6 +98,7 @@ const frame = await apiRef.current?.captureCameraFrame({
   width: 1024,
   height: 1024,
   cameraName: "head_camera",
+  mujocoCameraCompatibility: true,
 });
 if (frame?.source.kind !== "mujoco-camera") {
   throw new Error("Expected a mounted MuJoCo camera frame.");
@@ -94,6 +110,20 @@ const blob = await apiRef.current?.captureCameraFrameBlob({
   siteName: "wrist_camera_rgb_optical_frame",
 });
 ```
+
+`mujocoCameraCompatibility` is only applied to named MuJoCo `<camera>` captures.
+It derives width/height from MJCF `resolution`, uses MJCF `fovy`, copies visual
+clip planes when available, and installs an asymmetric projection matrix from
+`cam_intrinsic` and `cam_sensorsize` when those arrays are exposed by the WASM
+model. Leave it off for synthetic `position` + `lookAt` probes where you are
+manually matching a dataset view.
+
+Use `projectionMatrix` when you already have calibrated camera intrinsics. Use
+`visualOverrides` to temporarily override scene background, environment, fog,
+shadow maps, tone mapping, or output color space for one capture. Use
+`renderIsolation` when policy or training images should be rendered with an
+independent offscreen `WebGLRenderer` instead of inheriting viewer renderer
+state.
 
 ## Policy Image Payloads
 
@@ -193,6 +223,8 @@ mounted MuJoCo camera is named `wrist_cam`.
 - The returned canvas is generated from an offscreen render target.
 - Use `hiddenGeomGroups`, `visibleGeomGroups`, or `hiddenGeomNames` to match a
   dataset renderer without changing the interactive scene.
+- Use `visualOverrides` and `renderIsolation` for canonical policy/training
+  captures that should not inherit the interactive viewer's visual effects.
 - Use `flipX` to mirror captured frames horizontally when matching a policy
   dataset or camera convention that stores mirrored images.
 - Advanced renderers can attach a function to

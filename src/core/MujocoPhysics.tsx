@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { forwardRef, useEffect } from 'react';
+import { forwardRef, useEffect, useRef } from 'react';
 import { useMujocoWasm } from './MujocoProvider';
 import { MujocoSimProvider } from './MujocoSimProvider';
 import type {
@@ -62,12 +62,14 @@ export interface MujocoPhysicsProps {
 export const MujocoPhysics = forwardRef<MujocoSimAPI, MujocoPhysicsProps>(
   function MujocoPhysics({ onError, children, ...props }, ref) {
     const { mujoco, status: wasmStatus, error: wasmError } = useMujocoWasm();
+    const onErrorRef = useRef(onError);
+    onErrorRef.current = onError;
 
     useEffect(() => {
-      if (wasmStatus === 'error' && onError) {
-        onError(new Error(wasmError ?? 'WASM load failed'));
+      if (wasmStatus === 'error') {
+        onErrorRef.current?.(new Error(wasmError ?? 'WASM load failed'));
       }
-    }, [wasmStatus, wasmError, onError]);
+    }, [wasmStatus, wasmError]);
 
     if (wasmStatus === 'error' || wasmStatus === 'loading' || !mujoco) {
       return null;

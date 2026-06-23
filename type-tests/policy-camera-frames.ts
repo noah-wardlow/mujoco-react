@@ -14,9 +14,13 @@ const plan: PolicyCameraFrameCapturePlan = createPolicyCameraFrameCapturePlan({
   },
   defaults: {
     width: 640,
-    height: 480,
     type: 'image/jpeg',
     fov: 48.5,
+    mujocoCameraCompatibility: {
+      useResolution: true,
+      useIntrinsics: true,
+      preserveAspect: true,
+    },
   },
   streamOptions: {
     front: {
@@ -43,6 +47,9 @@ async function captureFromApi() {
         name: 'front_camera',
         bodyId: 0,
         fov: 48.5,
+        resolution: null,
+        sensorSize: null,
+        intrinsic: null,
         position: [0, 0, 0],
         quaternion: [1, 0, 0, 0],
       },
@@ -51,6 +58,9 @@ async function captureFromApi() {
         name: 'wrist_camera',
         bodyId: 1,
         fov: 48.5,
+        resolution: null,
+        sensorSize: null,
+        intrinsic: null,
         position: [0, 0, 0],
         quaternion: [1, 0, 0, 0],
       },

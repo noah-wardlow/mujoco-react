@@ -328,6 +328,9 @@ export interface MujocoModel {
   cam_pos?: Float64Array;
   cam_quat?: Float64Array;
   cam_fovy?: Float64Array;
+  cam_intrinsic?: Float64Array;
+  cam_resolution?: Int32Array;
+  cam_sensorsize?: Float64Array;
 
   // Tendon
   ten_wrapadr: Int32Array;
@@ -723,6 +726,9 @@ export interface CameraInfo {
   name: string;
   bodyId: number;
   fov: number | null;
+  resolution: [number, number] | null;
+  sensorSize: [number, number] | null;
+  intrinsic: [number, number, number, number] | null;
   position: [number, number, number] | null;
   quaternion: [number, number, number, number] | null;
 }
@@ -1505,6 +1511,51 @@ export type CameraFrameCaptureQuaternion =
   | THREE.Quaternion
   | readonly [number, number, number, number];
 
+export interface CameraFrameVisualOverrides {
+  /**
+   * Override `scene.background` for this capture only.
+   * Use `null` or `false` to render without the viewer scene background.
+   */
+  sceneBackground?: THREE.Scene['background'] | THREE.ColorRepresentation | null | false;
+  /**
+   * Override `scene.environment` for this capture only.
+   * Use `null` or `false` to remove viewer environment lighting/maps.
+   */
+  sceneEnvironment?: THREE.Scene['environment'] | null | false;
+  /**
+   * Override `scene.fog` for this capture only.
+   * Use `null` or `false` to remove viewer fog.
+   */
+  sceneFog?: THREE.Scene['fog'] | null | false;
+  /** Override `renderer.shadowMap.enabled` while capturing. */
+  shadows?: boolean;
+  /** Override renderer tone mapping while capturing. */
+  toneMapping?: THREE.WebGLRenderer['toneMapping'];
+  /** Override renderer output color space while capturing. */
+  outputColorSpace?: THREE.WebGLRenderer['outputColorSpace'];
+}
+
+export interface CameraFrameRenderIsolationOptions {
+  /**
+   * Use an independent offscreen WebGLRenderer for this capture.
+   *
+   * This prevents viewer renderer settings such as antialiasing, shadow-map
+   * configuration, tone mapping, and environment setup from leaking into
+   * policy/training images. Leave unset for the historical shared-renderer path.
+   */
+  enabled?: boolean;
+  /** Offscreen renderer antialiasing. Defaults to false for deterministic policy captures. */
+  antialias?: boolean;
+  /** Offscreen renderer alpha buffer. Defaults to false, matching Three.js WebGLRenderer. */
+  alpha?: boolean;
+  /** Offscreen renderer preserveDrawingBuffer flag. Defaults to false. */
+  preserveDrawingBuffer?: boolean;
+  /** Offscreen renderer power preference. Defaults to the browser's renderer default. */
+  powerPreference?: WebGLPowerPreference;
+  /** Reuse an offscreen renderer for matching capture dimensions/options. Defaults to true. */
+  cache?: boolean;
+}
+
 export interface CameraFrameCaptureOptions {
   /** Existing Three camera to clone before applying pose overrides. */
   camera?: THREE.Camera;
@@ -1529,8 +1580,36 @@ export interface CameraFrameCaptureOptions {
   fov?: number;
   near?: number;
   far?: number;
+  /**
+   * Explicit projection matrix for offscreen capture. This is useful when a
+   * MuJoCo camera has calibrated intrinsics that cannot be represented by a
+   * symmetric Three.js PerspectiveCamera fov alone.
+   */
+  projectionMatrix?: THREE.Matrix4 | readonly number[];
   /** Provenance for the camera pose used by the capture. Usually set by the MuJoCo provider. */
   source?: CameraFrameCaptureSource;
+  /**
+   * When resolving a named MuJoCo camera, derive Three capture settings from
+   * MuJoCo camera metadata where available: cam_resolution, cam_fovy,
+   * cam_intrinsic/cam_sensorsize, and visual map near/far clipping.
+   */
+  mujocoCameraCompatibility?: boolean | {
+    useResolution?: boolean;
+    useIntrinsics?: boolean;
+    useClipping?: boolean;
+    /**
+     * When a MuJoCo camera has `resolution` metadata and the caller supplies
+     * only width or only height, derive the missing dimension from the MuJoCo
+     * camera aspect ratio.
+     */
+    preserveAspect?: boolean;
+    /**
+     * Prefer the MuJoCo camera's configured resolution over width/height
+     * provided by the caller. Leave false when a policy wants fixed-size
+     * payloads while still preserving the camera aspect ratio.
+     */
+    preferResolution?: boolean;
+  };
   /** Hide rendered Three objects whose MuJoCo geom group is in this list. */
   hiddenGeomGroups?: readonly number[];
   /** When provided, only rendered Three objects whose MuJoCo geom group is in this list are visible. */
@@ -1541,6 +1620,15 @@ export interface CameraFrameCaptureOptions {
   background?: THREE.ColorRepresentation;
   /** Optional clear alpha for this capture only. Defaults to the renderer's current clear alpha. */
   backgroundAlpha?: number;
+  /** Temporary scene/renderer visual overrides applied only for this offscreen capture. */
+  visualOverrides?: CameraFrameVisualOverrides;
+  /**
+   * Render this capture with a separate offscreen WebGLRenderer.
+   *
+   * This is useful for policy or training captures that should remain canonical
+   * while the interactive viewer uses richer visual effects.
+   */
+  renderIsolation?: boolean | CameraFrameRenderIsolationOptions;
   /** Mirror the captured image horizontally after rendering. Useful when matching policy datasets with mirrored camera frames. */
   flipX?: boolean;
 }
@@ -1658,6 +1746,21 @@ export interface CameraFrameSequenceRecorderAPI {
   reset: () => void;
 }
 
+export type MujocoMeshNormalSmoothing =
+  | boolean
+  | {
+    /** Vertex merge tolerance used before recomputing mesh normals. Defaults to `1e-4`. */
+    tolerance?: number;
+  };
+
+export interface MujocoRenderOptions {
+  /**
+   * Smooth mesh normals by welding duplicate vertices before recomputing normals.
+   * Useful for faceted STL visuals; keep off for exact policy-render parity.
+   */
+  meshNormalSmoothing?: MujocoMeshNormalSmoothing;
+}
+
 // ---- Canvas Props ----
 
 export type MujocoCanvasProps = Omit<CanvasProps, 'onError'> & {
@@ -1675,6 +1778,7 @@ export type MujocoCanvasProps = Omit<CanvasProps, 'onError'> & {
   paused?: boolean;
   speed?: number;
   interpolate?: boolean;
+  renderOptions?: MujocoRenderOptions;
 };
 
 // ---- Hook Return Types ----

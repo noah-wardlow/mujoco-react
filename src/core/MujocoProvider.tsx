@@ -96,6 +96,8 @@ export function MujocoProvider({
   const [error, setError] = useState<string | null>(null);
   const moduleRef = useRef<MujocoModule | null>(null);
   const isMounted = useRef(true);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   useEffect(() => {
     isMounted.current = true;
@@ -105,7 +107,7 @@ export function MujocoProvider({
       const err = new Error('MujocoProvider wasmVariant="threaded" requires a threadedLoader from @mujoco/mujoco/mt');
       setError(err.message);
       setStatus('error');
-      onError?.(err);
+      onErrorRef.current?.(err);
       return;
     }
     let selectedWasmUrl = wasmUrl ?? defaultMujocoWasmUrl;
@@ -115,7 +117,7 @@ export function MujocoProvider({
         const err = new Error('MujocoProvider wasmVariant="threaded" requires mtWasmUrl from @mujoco/mujoco/mt/mujoco.wasm?url');
         setError(err.message);
         setStatus('error');
-        onError?.(err);
+        onErrorRef.current?.(err);
         return;
       }
       selectedWasmUrl = mtWasmUrl;
@@ -152,14 +154,14 @@ export function MujocoProvider({
           const msg = err.message || 'Failed to init spatial simulation';
           setError(msg);
           setStatus('error');
-          onError?.(new Error(msg));
+          onErrorRef.current?.(new Error(msg));
         }
       });
 
     return () => {
       isMounted.current = false;
     };
-  }, [wasmUrl, mtWasmUrl, threadedLoader, wasmVariant, timeout, onError]);
+  }, [wasmUrl, mtWasmUrl, threadedLoader, wasmVariant, timeout]);
 
   return (
     <MujocoContext.Provider

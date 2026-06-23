@@ -748,6 +748,7 @@ Thin wrapper around R3F `<Canvas>`. Accepts all R3F Canvas props plus:
 | `substeps` | `number` | mj_step calls per frame |
 | `paused` | `boolean` | Declarative pause |
 | `speed` | `number` | Simulation speed multiplier |
+| `renderOptions` | `MujocoRenderOptions` | Optional render-time geometry settings such as `meshNormalSmoothing` |
 
 ### `<MujocoPhysics>`
 
@@ -1112,6 +1113,26 @@ needs an offscreen camera render at a stable resolution without moving the
 user's interactive viewport. Pass `cameraName`, `siteName`, or `bodyName` to
 record true MuJoCo-mounted camera frames; the returned image includes
 `source.kind` so dataset pipelines can reject fallback or synthetic fixed poses.
+For named MuJoCo cameras, set `mujocoCameraCompatibility` when you want the
+Three.js offscreen camera to inherit the MJCF camera's `resolution`, `fovy`,
+near/far clipping, and calibrated intrinsics when the WASM model exposes
+`cam_intrinsic` plus `cam_sensorsize`:
+
+```tsx
+const frame = await apiRef.current?.captureCameraFrame({
+  cameraName: "front_camera",
+  width: 640,
+  type: "image/jpeg",
+  mujocoCameraCompatibility: true,
+});
+```
+
+This is still rendered by Three.js. It is useful for browser policy payloads and
+dataset debugging until you have native MuJoCo framebuffer bindings available.
+For canonical policy/training captures, use `visualOverrides` to temporarily
+override scene background, environment, fog, shadow maps, tone mapping, or color
+space, and `renderIsolation` to render with an independent offscreen
+`WebGLRenderer` instead of inheriting viewer renderer state.
 
 Use `recordCameraSequence()` / `useCameraSequenceRecorder()` to step policy
 rollouts and capture synchronized per-camera frames from one or more MuJoCo

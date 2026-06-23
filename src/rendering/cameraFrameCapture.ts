@@ -80,6 +80,15 @@ type RendererState = {
   clearColor: THREE.Color;
   clearAlpha: number;
   autoClear: boolean;
+  shadowMapEnabled: boolean;
+  toneMapping: THREE.WebGLRenderer['toneMapping'];
+  outputColorSpace: THREE.WebGLRenderer['outputColorSpace'];
+};
+
+type SceneVisualState = {
+  background: THREE.Scene['background'];
+  environment: THREE.Scene['environment'];
+  fog: THREE.Scene['fog'];
 };
 
 type VisibilityState = {
@@ -88,6 +97,107 @@ type VisibilityState = {
 };
 
 type CameraFrameCapturePreRender = () => void;
+
+const isolatedRendererCache = new WeakMap<
+  THREE.WebGLRenderer,
+  Map<string, THREE.WebGLRenderer>
+>();
+
+function shouldUseRenderIsolation(
+  options: CameraFrameCaptureOptions
+): boolean {
+  return options.renderIsolation === true || (
+    typeof options.renderIsolation === 'object' &&
+    options.renderIsolation.enabled !== false
+  );
+}
+
+function getRenderIsolationOptions(
+  options: CameraFrameCaptureOptions
+) {
+  return typeof options.renderIsolation === 'object'
+    ? options.renderIsolation
+    : {};
+}
+
+function getRenderIsolationCacheKey(
+  width: number,
+  height: number,
+  options: CameraFrameCaptureOptions
+) {
+  const isolation = getRenderIsolationOptions(options);
+  return JSON.stringify({
+    width,
+    height,
+    antialias: isolation.antialias ?? false,
+    alpha: isolation.alpha ?? false,
+    preserveDrawingBuffer: isolation.preserveDrawingBuffer ?? false,
+    powerPreference: isolation.powerPreference ?? null,
+  });
+}
+
+function createIsolatedRenderer(
+  sourceRenderer: THREE.WebGLRenderer,
+  width: number,
+  height: number,
+  options: CameraFrameCaptureOptions
+): { renderer: THREE.WebGLRenderer; cached: boolean } | null {
+  if (!shouldUseRenderIsolation(options)) return null;
+
+  const isolation = getRenderIsolationOptions(options);
+  if (isolation.cache !== false) {
+    const cacheKey = getRenderIsolationCacheKey(width, height, options);
+    let rendererCache = isolatedRendererCache.get(sourceRenderer);
+    if (!rendererCache) {
+      rendererCache = new Map();
+      isolatedRendererCache.set(sourceRenderer, rendererCache);
+    }
+    const cachedRenderer = rendererCache.get(cacheKey);
+    if (cachedRenderer) {
+      cachedRenderer.outputColorSpace = sourceRenderer.outputColorSpace;
+      cachedRenderer.toneMapping = sourceRenderer.toneMapping;
+      cachedRenderer.shadowMap.enabled = false;
+      return { renderer: cachedRenderer, cached: true };
+    }
+    const createdRenderer = createUncachedIsolatedRenderer(
+      sourceRenderer,
+      width,
+      height,
+      options
+    );
+    rendererCache.set(cacheKey, createdRenderer);
+    return { renderer: createdRenderer, cached: true };
+  }
+
+  return {
+    renderer: createUncachedIsolatedRenderer(sourceRenderer, width, height, options),
+    cached: false,
+  };
+}
+
+function createUncachedIsolatedRenderer(
+  sourceRenderer: THREE.WebGLRenderer,
+  width: number,
+  height: number,
+  options: CameraFrameCaptureOptions
+) {
+  const isolation = getRenderIsolationOptions(options);
+  const canvas = document.createElement('canvas');
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: isolation.antialias ?? false,
+    alpha: isolation.alpha ?? false,
+    preserveDrawingBuffer: isolation.preserveDrawingBuffer ?? false,
+    powerPreference: isolation.powerPreference,
+  });
+
+  renderer.setPixelRatio(1);
+  renderer.setSize(width, height, false);
+  renderer.outputColorSpace = sourceRenderer.outputColorSpace;
+  renderer.toneMapping = sourceRenderer.toneMapping;
+  renderer.shadowMap.enabled = false;
+  return renderer;
+}
 
 function toVector3(
   value: CameraFrameCaptureVector3 | undefined,
@@ -127,6 +237,19 @@ function applyCameraPose(
   camera.updateMatrixWorld();
 }
 
+function applyProjectionMatrix(
+  camera: THREE.Camera,
+  projectionMatrix: CameraFrameCaptureOptions['projectionMatrix'] | undefined
+) {
+  if (!projectionMatrix) return;
+  if (projectionMatrix instanceof THREE.Matrix4) {
+    camera.projectionMatrix.copy(projectionMatrix);
+  } else {
+    camera.projectionMatrix.fromArray(projectionMatrix);
+  }
+  camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+}
+
 function createCaptureCamera(
   options: CameraFrameCaptureOptions,
   fallbackCamera: THREE.Camera,
@@ -146,6 +269,7 @@ function createCaptureCamera(
     camera.far = options.far ?? camera.far;
     camera.updateProjectionMatrix();
   }
+  applyProjectionMatrix(camera, options.projectionMatrix);
 
   applyCameraPose(camera, options, fallbackCamera);
   return camera;
@@ -184,6 +308,7 @@ function prepareCaptureCamera(
     camera.far = options.far ?? camera.far;
     camera.updateProjectionMatrix();
   }
+  applyProjectionMatrix(camera, options.projectionMatrix);
 
   applyCameraPose(camera, options, fallbackCamera);
 }
@@ -362,6 +487,9 @@ function saveRendererState(renderer: THREE.WebGLRenderer): RendererState {
     clearColor,
     clearAlpha: renderer.getClearAlpha(),
     autoClear: renderer.autoClear,
+    shadowMapEnabled: renderer.shadowMap.enabled,
+    toneMapping: renderer.toneMapping,
+    outputColorSpace: renderer.outputColorSpace,
   };
 }
 
@@ -376,6 +504,64 @@ function restoreRendererState(
   renderer.setScissorTest(state.scissorTest);
   renderer.setClearColor(state.clearColor, state.clearAlpha);
   renderer.autoClear = state.autoClear;
+  renderer.shadowMap.enabled = state.shadowMapEnabled;
+  renderer.toneMapping = state.toneMapping;
+  renderer.outputColorSpace = state.outputColorSpace;
+}
+
+function saveSceneVisualState(scene: THREE.Scene): SceneVisualState {
+  return {
+    background: scene.background,
+    environment: scene.environment,
+    fog: scene.fog,
+  };
+}
+
+function restoreSceneVisualState(scene: THREE.Scene, state: SceneVisualState) {
+  scene.background = state.background;
+  scene.environment = state.environment;
+  scene.fog = state.fog;
+}
+
+function hasOwn<T extends object>(object: T, key: keyof T) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function applyCaptureVisualOverrides(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  options: CameraFrameCaptureOptions
+): SceneVisualState | null {
+  const overrides = options.visualOverrides;
+  if (!overrides) return null;
+
+  const previousSceneState = saveSceneVisualState(scene);
+  if (hasOwn(overrides, 'sceneBackground')) {
+    const background = overrides.sceneBackground;
+    scene.background = background === false ? null : (
+      typeof background === 'string' || typeof background === 'number'
+        ? new THREE.Color(background)
+        : background ?? null
+    );
+  }
+  if (hasOwn(overrides, 'sceneEnvironment')) {
+    const environment = overrides.sceneEnvironment;
+    scene.environment = environment === false ? null : environment ?? null;
+  }
+  if (hasOwn(overrides, 'sceneFog')) {
+    const fog = overrides.sceneFog;
+    scene.fog = fog === false ? null : fog ?? null;
+  }
+  if (overrides.shadows !== undefined) {
+    renderer.shadowMap.enabled = overrides.shadows;
+  }
+  if (overrides.toneMapping !== undefined) {
+    renderer.toneMapping = overrides.toneMapping;
+  }
+  if (overrides.outputColorSpace !== undefined) {
+    renderer.outputColorSpace = overrides.outputColorSpace;
+  }
+  return previousSceneState;
 }
 
 function getCaptureRenderer(
@@ -410,6 +596,8 @@ export function createCameraFrameCaptureSession(
   options: CameraFrameCaptureOptions = {}
 ): CameraFrameCaptureSession {
   const { width, height } = getCaptureDimensions(renderer, options);
+  const isolatedRenderer = createIsolatedRenderer(renderer, width, height, options);
+  const sessionRenderer = isolatedRenderer?.renderer ?? renderer;
   const camera = createCaptureCamera(options, fallbackCamera, width, height);
   const target = new THREE.WebGLRenderTarget(width, height, {
     format: THREE.RGBAFormat,
@@ -430,6 +618,13 @@ export function createCameraFrameCaptureSession(
 
   function resolveCaptureOptions(nextOptions: CameraFrameCaptureOptions = {}) {
     const captureOptions = { ...options, ...nextOptions };
+    if (
+      shouldUseRenderIsolation(captureOptions) !== shouldUseRenderIsolation(options)
+    ) {
+      throw new Error(
+        'Camera frame capture sessions require stable renderIsolation settings.'
+      );
+    }
     const nextDimensions = getCaptureDimensions(renderer, captureOptions);
     if (
       nextDimensions.width !== width ||
@@ -452,7 +647,12 @@ export function createCameraFrameCaptureSession(
   }
 
   function renderPreparedCapture(captureOptions: CameraFrameCaptureOptions) {
-    const previousState = saveRendererState(renderer);
+    const previousState = saveRendererState(sessionRenderer);
+    const previousSceneState = applyCaptureVisualOverrides(
+      sessionRenderer,
+      scene,
+      captureOptions
+    );
     const hidden = [
       ...hideExcludedCaptureObjects(scene),
       ...hideCaptureGeomGroups(scene, captureOptions),
@@ -461,23 +661,23 @@ export function createCameraFrameCaptureSession(
     runCapturePreRenderHooks(scene);
     scene.updateMatrixWorld(true);
     try {
-      renderer.xr.enabled = false;
-      renderer.setRenderTarget(target);
-      renderer.setViewport(0, 0, width, height);
-      renderer.setScissor(0, 0, width, height);
-      renderer.setScissorTest(false);
+      sessionRenderer.xr.enabled = false;
+      sessionRenderer.setRenderTarget(target);
+      sessionRenderer.setViewport(0, 0, width, height);
+      sessionRenderer.setScissor(0, 0, width, height);
+      sessionRenderer.setScissorTest(false);
       if (captureOptions.background !== undefined) {
-        renderer.setClearColor(
+        sessionRenderer.setClearColor(
           new THREE.Color(captureOptions.background),
           captureOptions.backgroundAlpha ?? previousState.clearAlpha
         );
       } else if (captureOptions.backgroundAlpha !== undefined) {
-        renderer.setClearColor(previousState.clearColor, captureOptions.backgroundAlpha);
+        sessionRenderer.setClearColor(previousState.clearColor, captureOptions.backgroundAlpha);
       }
-      renderer.clear();
-      renderer.render(scene, camera);
+      sessionRenderer.clear();
+      sessionRenderer.render(scene, camera);
       readRenderTargetToCanvas(
-        renderer,
+        sessionRenderer,
         target,
         canvas,
         drawContext,
@@ -485,7 +685,7 @@ export function createCameraFrameCaptureSession(
         imageData,
         width,
         height,
-        renderer.outputColorSpace,
+        sessionRenderer.outputColorSpace,
         captureOptions.flipX ?? false
       );
       return {
@@ -497,7 +697,8 @@ export function createCameraFrameCaptureSession(
       };
     } finally {
       restoreObjectVisibility(hidden);
-      restoreRendererState(renderer, previousState);
+      if (previousSceneState) restoreSceneVisualState(scene, previousSceneState);
+      restoreRendererState(sessionRenderer, previousState);
     }
   }
 
@@ -511,23 +712,28 @@ export function createCameraFrameCaptureSession(
     scene.updateMatrixWorld(true);
     const captureRenderer = getCaptureRenderer(scene);
     if (captureRenderer) {
-      const previousState = saveRendererState(renderer);
+      const previousState = saveRendererState(sessionRenderer);
+      const previousSceneState = applyCaptureVisualOverrides(
+        sessionRenderer,
+        scene,
+        captureOptions
+      );
       const hidden = [
         ...hideExcludedCaptureObjects(scene),
         ...hideCaptureGeomGroups(scene, captureOptions),
       ];
       try {
-        renderer.xr.enabled = false;
+        sessionRenderer.xr.enabled = false;
         if (captureOptions.background !== undefined) {
-          renderer.setClearColor(
+          sessionRenderer.setClearColor(
             new THREE.Color(captureOptions.background),
             captureOptions.backgroundAlpha ?? previousState.clearAlpha
           );
         } else if (captureOptions.backgroundAlpha !== undefined) {
-          renderer.setClearColor(previousState.clearColor, captureOptions.backgroundAlpha);
+          sessionRenderer.setClearColor(previousState.clearColor, captureOptions.backgroundAlpha);
         }
         const captureResult = await captureRenderer({
-          renderer,
+          renderer: sessionRenderer,
           scene,
           camera,
           target,
@@ -561,7 +767,8 @@ export function createCameraFrameCaptureSession(
         }
       } finally {
         restoreObjectVisibility(hidden);
-        restoreRendererState(renderer, previousState);
+        if (previousSceneState) restoreSceneVisualState(scene, previousSceneState);
+        restoreRendererState(sessionRenderer, previousState);
       }
     }
     return renderPreparedCapture(captureOptions);
@@ -613,6 +820,9 @@ export function createCameraFrameCaptureSession(
     },
     dispose() {
       target.dispose();
+      if (isolatedRenderer && !isolatedRenderer.cached) {
+        isolatedRenderer.renderer.dispose();
+      }
     },
   };
 }

@@ -89,6 +89,13 @@ function App() {
   Smooth rendered body poses between fixed physics steps. Useful for high-refresh displays.
 </ParamField>
 
+<ParamField body="renderOptions" type="MujocoRenderOptions">
+  Optional render-time settings for generated MuJoCo geometry. Set
+  `renderOptions={{ meshNormalSmoothing: true }}` to weld duplicate mesh
+  vertices before recomputing normals, which smooths faceted STL visuals. Leave
+  it unset when you need exact policy-render parity.
+</ParamField>
+
 ### R3F Canvas Props
 
 All standard `@react-three/fiber` Canvas props are passed through:
