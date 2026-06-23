@@ -1,3 +1,10 @@
+# [10.3.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.2.1...v10.3.0) (2026-06-23)
+
+
+### Features
+
+* add policy camera render options ([af6e9eb](https://github.com/noah-wardlow/mujoco-react/commit/af6e9eb8e9a49cb7db6e80afa767f77f990bdc99))
+
 ## [10.2.1](https://github.com/noah-wardlow/mujoco-react/compare/v10.2.0...v10.2.1) (2026-06-22)
 
 
