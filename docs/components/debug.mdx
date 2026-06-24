@@ -36,6 +36,10 @@ Renders debug overlays for MuJoCo simulation elements — geom wireframes, site 
   Show MuJoCo camera positions, frustums, labels, and forward rays from the live `cam_xpos` / `cam_xmat` frame.
 </ParamField>
 
+<ParamField body="virtualCameras" type="DebugVirtualCamera[]" default="[]">
+  Show explicit virtual camera poses that are not declared as MJCF cameras, such as fixed policy/offscreen render viewpoints created from `position`, `lookAt`, `up`, `fov`, `width`, and `height`.
+</ParamField>
+
 <ParamField body="showCOM" type="boolean" default="false">
   Show center of mass markers for each body.
 </ParamField>
@@ -69,6 +73,7 @@ Renders debug overlays for MuJoCo simulation elements — geom wireframes, site 
 - **Static geometry** (geoms, sites, joints) is created once when the model loads
 - **Positions** are updated every frame using preallocated temp vectors to minimize GC pressure
 - **Camera frustums** are derived from MuJoCo camera state and are excluded from mounted camera captures
+- **Explicit virtual camera frustums** from `virtualCameras` are also excluded from camera captures, so visual debugging does not contaminate policy images
 - **Contact arrows** use a pre-created pool of 50 `ArrowHelper` objects — they are shown/hidden and repositioned each frame rather than created and disposed
 
 ## Example: Debug Panel Toggle
@@ -86,6 +91,17 @@ function App() {
         showJoints={debug.joints}
         showContacts={debug.contacts}
         showCameras={debug.cameras}
+        virtualCameras={[
+          {
+            name: "policy front",
+            position: [0.72, 0, 1.08],
+            lookAt: [0.4, 0, 0.43],
+            up: [0, 0, 1],
+            fov: 50,
+            width: 640,
+            height: 480,
+          },
+        ]}
       />
     </MujocoCanvas>
   );

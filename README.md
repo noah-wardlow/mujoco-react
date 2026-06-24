@@ -860,6 +860,7 @@ Visualization overlays:
 | `showJoints` | `boolean?` | `false` | Joint axes |
 | `showContacts` | `boolean?` | `false` | Contact force vectors |
 | `showCameras` | `boolean?` | `false` | MuJoCo camera positions, frustums, and forward rays |
+| `virtualCameras` | `DebugVirtualCamera[]?` | `[]` | Explicit virtual policy/offscreen render camera poses to draw alongside MuJoCo cameras |
 | `showCOM` | `boolean?` | `false` | Center of mass markers |
 | `showInertia` | `boolean?` | `false` | Inertia ellipsoids |
 | `showTendons` | `boolean?` | `false` | Tendon paths |
@@ -868,7 +869,7 @@ Visualization overlays:
 | `contactColor` | `string?` | `"#ff4444"` | Color for contact force arrows |
 | `comColor` | `string?` | `"#ff0000"` | Color for COM markers |
 
-Camera debug overlays use the live MuJoCo `cam_xpos` / `cam_xmat` frame, so the frustum matches mounted camera captures and follows parent body motion.
+Camera debug overlays use the live MuJoCo `cam_xpos` / `cam_xmat` frame, so the frustum matches mounted camera captures and follows parent body motion. Use `virtualCameras` for synthetic fixed policy/offscreen render viewpoints that are not declared as MJCF `<camera>` elements. Debug camera overlays are excluded from camera captures.
 
 ### `<TendonRenderer />`
 

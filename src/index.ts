@@ -320,6 +320,7 @@ export type {
   IkGizmoProps,
   IkGizmoDragInput,
   DragInteractionProps,
+  DebugVirtualCamera,
   DebugProps,
   SceneLightsProps,
   ScenarioLightingPreset,

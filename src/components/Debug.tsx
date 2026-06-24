@@ -13,7 +13,7 @@ import { useMujocoContext } from '../core/MujocoSimProvider';
 import { getName } from '../core/SceneLoader';
 import { CAPTURE_EXCLUDE_KEY } from '../rendering/cameraFrameCapture';
 import { getContact, withContacts } from '../types';
-import type { DebugProps } from '../types';
+import type { CameraFrameCaptureVector3, DebugProps, DebugVirtualCamera } from '../types';
 
 const JOINT_COLORS: Record<number, number> = {
   0: 0xff0000, // free - red
@@ -41,6 +41,170 @@ type CameraDebugObject = THREE.Group & {
   };
 };
 
+function toVector3(
+  value: CameraFrameCaptureVector3 | undefined,
+  fallback: THREE.Vector3
+) {
+  if (!value) return fallback.clone();
+  return value instanceof THREE.Vector3
+    ? value.clone()
+    : new THREE.Vector3(value[0], value[1], value[2]);
+}
+
+function createCameraLabel(text: string, color: THREE.ColorRepresentation) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = new THREE.Color(color).getStyle();
+  ctx.font = 'bold 32px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 128, 42);
+  const texture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: texture,
+      depthTest: false,
+      transparent: true,
+    })
+  );
+  sprite.position.set(0, 0.014, 0.01);
+  sprite.scale.set(0.05, 0.012, 1);
+  sprite.renderOrder = 999;
+  return sprite;
+}
+
+function createVirtualCameraDebugObject(
+  camera: DebugVirtualCamera,
+  index: number
+) {
+  const color = camera.color ?? '#ff3d71';
+  const aimColor = camera.aimColor ?? '#38bdf8';
+  const markerScale = camera.markerScale ?? 1;
+  const cameraPosition = toVector3(camera.position, new THREE.Vector3());
+  const configuredUp = toVector3(camera.up, new THREE.Vector3(0, 0, 1)).normalize();
+  const cameraQuaternion = new THREE.Quaternion();
+  const forward = new THREE.Vector3();
+
+  if (camera.quaternion) {
+    if (camera.quaternion instanceof THREE.Quaternion) {
+      cameraQuaternion.copy(camera.quaternion);
+    } else {
+      cameraQuaternion.set(
+        camera.quaternion[0],
+        camera.quaternion[1],
+        camera.quaternion[2],
+        camera.quaternion[3]
+      );
+    }
+    forward.set(0, 0, -1).applyQuaternion(cameraQuaternion).normalize();
+  } else {
+    const target = toVector3(
+      camera.lookAt,
+      cameraPosition.clone().add(new THREE.Vector3(0, 0, -1))
+    );
+    forward.copy(target).sub(cameraPosition);
+    if (forward.lengthSq() < 1e-8) forward.set(0, 0, -1);
+    forward.normalize();
+    cameraQuaternion.setFromRotationMatrix(
+      new THREE.Matrix4().lookAt(cameraPosition, target, configuredUp)
+    );
+  }
+
+  const target = camera.lookAt
+    ? toVector3(camera.lookAt, cameraPosition.clone().add(forward))
+    : cameraPosition.clone().addScaledVector(forward, 0.4);
+  const distanceToTarget = Math.max(target.distanceTo(cameraPosition), 0.001);
+  const depth = camera.frustumDepth ?? Math.min(Math.max(distanceToTarget * 0.42, 0.16), 0.45);
+  const fov = camera.fov ?? 50;
+  const aspect = (camera.width ?? 640) / (camera.height ?? 480);
+
+  const right = forward.clone().cross(configuredUp);
+  if (right.lengthSq() < 1e-8) right.set(1, 0, 0);
+  right.normalize();
+  const orthogonalUp = right.clone().cross(forward).normalize();
+  const frustumHeight = 2 * Math.tan(THREE.MathUtils.degToRad(fov) / 2) * depth;
+  const frustumWidth = frustumHeight * aspect;
+  const center = cameraPosition.clone().addScaledVector(forward, depth);
+  const halfRight = right.clone().multiplyScalar(frustumWidth / 2);
+  const halfUp = orthogonalUp.clone().multiplyScalar(frustumHeight / 2);
+
+  const topLeft = center.clone().sub(halfRight).add(halfUp);
+  const topRight = center.clone().add(halfRight).add(halfUp);
+  const bottomRight = center.clone().add(halfRight).sub(halfUp);
+  const bottomLeft = center.clone().sub(halfRight).sub(halfUp);
+  const frustumPoints = [
+    cameraPosition, topLeft,
+    cameraPosition, topRight,
+    cameraPosition, bottomRight,
+    cameraPosition, bottomLeft,
+    topLeft, topRight,
+    topRight, bottomRight,
+    bottomRight, bottomLeft,
+    bottomLeft, topLeft,
+  ];
+
+  const group = new THREE.Group();
+  group.name = camera.name ?? `virtual-camera-${index}`;
+  group.renderOrder = 999;
+  group.frustumCulled = false;
+
+  const frustum = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(frustumPoints),
+    new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.9,
+      depthTest: false,
+    })
+  );
+  frustum.renderOrder = 999;
+  frustum.frustumCulled = false;
+  group.add(frustum);
+
+  const aim = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints([cameraPosition, target]),
+    new THREE.LineBasicMaterial({
+      color: aimColor,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+    })
+  );
+  aim.renderOrder = 999;
+  aim.frustumCulled = false;
+  group.add(aim);
+
+  const markerGroup = new THREE.Group();
+  markerGroup.position.copy(cameraPosition);
+  markerGroup.quaternion.copy(cameraQuaternion);
+  markerGroup.renderOrder = 999;
+  markerGroup.frustumCulled = false;
+  markerGroup.add(new THREE.Mesh(
+    new THREE.BoxGeometry(0.045 * markerScale, 0.028 * markerScale, 0.022 * markerScale),
+    new THREE.MeshBasicMaterial({ color, depthTest: false })
+  ));
+  const lens = new THREE.Mesh(
+    new THREE.BoxGeometry(0.025 * markerScale, 0.018 * markerScale, 0.014 * markerScale),
+    new THREE.MeshBasicMaterial({ color: aimColor, depthTest: false })
+  );
+  lens.position.set(0, 0, -0.021 * markerScale);
+  markerGroup.add(lens);
+  if (camera.name) markerGroup.add(createCameraLabel(camera.name, color));
+  group.add(markerGroup);
+
+  const targetMarker = new THREE.Mesh(
+    new THREE.SphereGeometry(0.018 * markerScale, 16, 10),
+    new THREE.MeshBasicMaterial({ color: aimColor, depthTest: false })
+  );
+  targetMarker.position.copy(target);
+  targetMarker.renderOrder = 999;
+  targetMarker.frustumCulled = false;
+  group.add(targetMarker);
+
+  return group;
+}
+
 /**
  * Declarative debug visualization component.
  * Renders wireframe geoms, site markers, joint axes, contact forces, COM markers, etc.
@@ -50,6 +214,7 @@ export function Debug({
   showSites = false,
   showJoints = false,
   showCameras = false,
+  virtualCameras = [],
   showContacts = false,
   showCOM = false,
   showInertia = false,
@@ -69,6 +234,7 @@ export function Debug({
     const sites: THREE.Object3D[] = [];
     const joints: THREE.Object3D[] = [];
     const cameras: CameraDebugObject[] = [];
+    const virtualCameraObjects: THREE.Object3D[] = [];
     const comMarkers: THREE.Object3D[] = [];
 
     // Wireframe geoms
@@ -270,6 +436,10 @@ export function Debug({
       }
     }
 
+    for (let i = 0; i < virtualCameras.length; i += 1) {
+      virtualCameraObjects.push(createVirtualCameraDebugObject(virtualCameras[i], i));
+    }
+
     // COM markers
     if (showCOM) {
       for (let i = 1; i < model.nbody; i++) {
@@ -281,8 +451,8 @@ export function Debug({
       }
     }
 
-    return { geoms, sites, joints, cameras, comMarkers };
-  }, [status, mjModelRef, showGeoms, showSites, showJoints, showCameras, showCOM]);
+    return { geoms, sites, joints, cameras, virtualCameraObjects, comMarkers };
+  }, [status, mjModelRef, showGeoms, showSites, showJoints, showCameras, virtualCameras, showCOM]);
 
   // Add/remove debug objects from scene
   useEffect(() => {
@@ -294,6 +464,7 @@ export function Debug({
       ...debugGeometry.sites,
       ...debugGeometry.joints,
       ...debugGeometry.cameras,
+      ...debugGeometry.virtualCameraObjects,
       ...debugGeometry.comMarkers,
     ];
     for (const obj of allObjects) group.add(obj);

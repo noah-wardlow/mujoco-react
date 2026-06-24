@@ -1027,11 +1027,28 @@ export interface ObservationHandle {
 
 // ---- Debug Component (spec 6.1) ----
 
+export interface DebugVirtualCamera {
+  name?: string;
+  position?: CameraFrameCaptureVector3;
+  lookAt?: CameraFrameCaptureVector3;
+  up?: CameraFrameCaptureVector3;
+  quaternion?: THREE.Quaternion | readonly [number, number, number, number];
+  fov?: number;
+  width?: number;
+  height?: number;
+  frustumDepth?: number;
+  markerScale?: number;
+  color?: THREE.ColorRepresentation;
+  aimColor?: THREE.ColorRepresentation;
+}
+
 export interface DebugProps {
   showGeoms?: boolean;
   showSites?: boolean;
   showJoints?: boolean;
   showCameras?: boolean;
+  /** Additional explicit virtual camera poses to visualize alongside MuJoCo XML cameras. */
+  virtualCameras?: readonly DebugVirtualCamera[];
   showContacts?: boolean;
   showCOM?: boolean;
   showInertia?: boolean;
