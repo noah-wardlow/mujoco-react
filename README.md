@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/mj2.gif" alt="mujoco-react demo" width="100%" />
+  <img width="941" height="598" alt="Screenshot 2026-06-24 at 5 44 13 PM" src="https://github.com/user-attachments/assets/09999f02-c093-473e-aaee-519fe2e4cdd4" />
 </p>
 
 # mujoco-react
