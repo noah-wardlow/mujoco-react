@@ -1,3 +1,10 @@
+# [10.4.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.3.0...v10.4.0) (2026-06-24)
+
+
+### Features
+
+* add virtual camera debug overlays ([bfe7dff](https://github.com/noah-wardlow/mujoco-react/commit/bfe7dffbe40d444d41e9608d53ff64362175d31d))
+
 # [10.3.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.2.1...v10.3.0) (2026-06-23)
 
 
