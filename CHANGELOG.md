@@ -1,3 +1,10 @@
+# [10.5.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.4.0...v10.5.0) (2026-06-26)
+
+
+### Features
+
+* live camera streams, policy image tensors, and typed control groups ([ff236a4](https://github.com/noah-wardlow/mujoco-react/commit/ff236a4478212a33bcabb860e842298a5027fcbc))
+
 # [10.4.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.3.0...v10.4.0) (2026-06-24)
 
 
