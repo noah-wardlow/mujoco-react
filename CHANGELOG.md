@@ -1,3 +1,15 @@
+# [10.6.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.5.0...v10.6.0) (2026-06-26)
+
+
+### Bug Fixes
+
+* stop IK solver diverging on unreachable targets ([5a944ef](https://github.com/noah-wardlow/mujoco-react/commit/5a944ef8f36c3bfafdf0730345744606224e8dfb))
+
+
+### Features
+
+* accept tuples and plain objects for IK target pose ([656ddfe](https://github.com/noah-wardlow/mujoco-react/commit/656ddfeba4f241e05771aa0d32393160ea50a248))
+
 # [10.5.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.4.0...v10.5.0) (2026-06-26)
 
 
