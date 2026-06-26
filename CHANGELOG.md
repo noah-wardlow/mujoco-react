@@ -1,3 +1,10 @@
+# [10.7.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.6.0...v10.7.0) (2026-06-26)
+
+
+### Features
+
+* improve named control ergonomics ([4c3facd](https://github.com/noah-wardlow/mujoco-react/commit/4c3facda90667fcb697122a958ee48899879e428))
+
 # [10.6.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.5.0...v10.6.0) (2026-06-26)
 
 
