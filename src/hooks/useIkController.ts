@@ -97,6 +97,9 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
           {
             damping: config.damping,
             epsilon: config.epsilon,
+            jointLimits: config.jointLimits ?? controlGroup.joints.map((joint) => (
+              joint.limited ? joint.range : joint.ctrlRange
+            )),
             maxIterations: config.maxIterations,
             posWeight: config.posWeight,
             rotWeight: config.rotWeight,

@@ -13,9 +13,13 @@ export interface GenericIKOptions {
     epsilon: number;
     posWeight: number;
     rotWeight: number;
+    jointLimits?: ReadonlyArray<readonly [number, number] | null | undefined>;
 }
 
-const DEFAULTS: GenericIKOptions = {
+type ResolvedGenericIKOptions = Required<Omit<GenericIKOptions, 'jointLimits'>> &
+    Pick<GenericIKOptions, 'jointLimits'>;
+
+const DEFAULTS: Required<Omit<GenericIKOptions, 'jointLimits'>> = {
     maxIterations: 50,
     damping: 0.01,
     tolerance: 1e-3,
@@ -24,7 +28,7 @@ const DEFAULTS: GenericIKOptions = {
     rotWeight: 0.3,
 };
 
-function resolveOptions(opts?: Partial<GenericIKOptions>): GenericIKOptions {
+function resolveOptions(opts?: Partial<GenericIKOptions>): ResolvedGenericIKOptions {
     return {
         maxIterations: opts?.maxIterations ?? DEFAULTS.maxIterations,
         damping: opts?.damping ?? DEFAULTS.damping,
@@ -32,7 +36,15 @@ function resolveOptions(opts?: Partial<GenericIKOptions>): GenericIKOptions {
         epsilon: opts?.epsilon ?? DEFAULTS.epsilon,
         posWeight: opts?.posWeight ?? DEFAULTS.posWeight,
         rotWeight: opts?.rotWeight ?? DEFAULTS.rotWeight,
+        jointLimits: opts?.jointLimits,
     };
+}
+
+function clampJoint(value: number, limit: readonly [number, number] | null | undefined) {
+    if (!limit) return value;
+    const [min, max] = limit;
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) return value;
+    return Math.max(min, Math.min(max, value));
 }
 
 /**
@@ -81,7 +93,7 @@ export class GenericIK {
 
         // Working joint angles — start from current configuration
         const q = new Float64Array(n);
-        for (let i = 0; i < n; i++) q[i] = currentQ[i];
+        for (let i = 0; i < n; i++) q[i] = clampJoint(currentQ[i], o.jointLimits?.[i]);
 
         // Pre-allocate work arrays
         const J = new Float64Array(6 * n);       // 6×n Jacobian (row-major)
@@ -196,7 +208,7 @@ export class GenericIK {
             }
 
             // Update joints
-            for (let i = 0; i < n; i++) q[i] += dq[i];
+            for (let i = 0; i < n; i++) q[i] = clampJoint(q[i] + dq[i], o.jointLimits?.[i]);
         }
 
         // Restore original qpos

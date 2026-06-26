@@ -496,9 +496,10 @@ function sceneObjectToXml(obj: SceneObject): string {
   const solref = obj.solref ? ` solref="${obj.solref}"` : '';
   const solimp = obj.solimp ? ` solimp="${obj.solimp}"` : '';
   const condim = obj.condim ? ` condim="${obj.condim}"` : '';
+  const contype = obj.contype ?? 1;
+  const conaffinity = obj.conaffinity ?? 1;
   const group = obj.group !== undefined ? ` group="${obj.group}"` : '';
-  // Always set contype/conaffinity=1 so objects collide regardless of model defaults
-  return `<body name="${obj.name}" pos="${pos}">${joint}<geom name="${geomName}" type="${obj.type}" size="${size}" rgba="${rgba}" contype="1" conaffinity="1"${mass}${friction}${solref}${solimp}${condim}${group}/></body>`;
+  return `<body name="${obj.name}" pos="${pos}">${joint}<geom name="${geomName}" type="${obj.type}" size="${size}" rgba="${rgba}" contype="${contype}" conaffinity="${conaffinity}"${mass}${friction}${solref}${solimp}${condim}${group}/></body>`;
 }
 
 /** Create virtual directory structure for a file path. */

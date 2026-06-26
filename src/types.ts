@@ -7,6 +7,11 @@ import type React from 'react';
 import type { ReactNode } from 'react';
 import type { CanvasProps, ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
+import type {
+  CameraFrameCaptureSession,
+  CameraFrameCaptureTensorOptions,
+  CameraFrameTensorResult,
+} from './rendering/cameraFrameCapture';
 
 // ---- Register (type-safe named resources) ----
 
@@ -459,6 +464,10 @@ export interface SceneObject {
   solref?: string;
   solimp?: string;
   condim?: number;
+  /** MuJoCo geom contact type bitmask. Defaults to 1 for generated objects. */
+  contype?: number;
+  /** MuJoCo geom contact affinity bitmask. Defaults to 1 for generated objects. */
+  conaffinity?: number;
   /** MuJoCo geom group. Group 3 is conventionally used for collision-only helper geoms. */
   group?: number;
 }
@@ -527,6 +536,12 @@ export interface IkConfig {
    * starting at index 0. Prefer inferred IK or `joints`/`actuators`.
    */
   numJoints?: number;
+  /**
+   * Optional solve-space joint limits in the same order as the resolved joints.
+   * Use this when MJCF limits are intentionally broad or when a setup/calibration
+   * tool should stay within a narrower envelope.
+   */
+  jointLimits?: ReadonlyArray<readonly [number, number] | null | undefined>;
   /** Custom IK solver. When omitted, uses built-in Damped Least-Squares solver. */
   ikSolveFn?: IKSolveFn;
   /** DLS damping. Default: 0.01. */
@@ -1458,6 +1473,19 @@ export interface MujocoSimAPI {
   captureFrameBlob(options?: MujocoFrameCaptureOptions): Promise<FrameCaptureBlobResult>;
   captureCameraFrame(options?: CameraFrameCaptureOptions): Promise<CameraFrameCaptureResult>;
   captureCameraFrameBlob(options?: CameraFrameCaptureOptions): Promise<CameraFrameCaptureBlobResult>;
+  /** Capture a camera frame straight into a policy image tensor (no canvas/PNG encode). */
+  captureCameraFrameTensor(options?: CameraFrameCaptureTensorOptions): CameraFrameTensorResult;
+  /**
+   * Create a reusable offscreen capture session bound to this scene. Reuse it
+   * for live inference/recording so the render target and buffers persist
+   * across frames; call `session.captureTensor()` / `capturePixels()` each step.
+   */
+  createCameraFrameCaptureSession(options?: CameraFrameCaptureOptions): CameraFrameCaptureSession;
+  /**
+   * Resolve a named MuJoCo camera/site/body into concrete capture options with
+   * the current world pose. Useful for re-aiming a persistent session each step.
+   */
+  resolveCameraCaptureOptions(options?: CameraFrameCaptureOptions): CameraFrameCaptureOptions;
   recordCameraSequence(options: CameraFrameSequenceOptions): Promise<CameraFrameSequenceResult>;
   project2DTo3D(
     x: number,

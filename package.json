@@ -25,7 +25,13 @@
         "default": "./dist/spark.js"
       }
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./onnx": {
+      "import": {
+        "types": "./dist/onnx.d.ts",
+        "default": "./dist/onnx.js"
+      }
+    }
   },
   "bin": {
     "mujoco-react": "./bin/mujoco-react.mjs",
@@ -63,10 +69,14 @@
     "@react-three/fiber": ">=8",
     "@sparkjsdev/spark": ">=2.1.0",
     "react": ">=18",
-    "three": ">=0.180.0"
+    "three": ">=0.180.0",
+    "onnxruntime-web": ">=1.20.0"
   },
   "peerDependenciesMeta": {
     "@sparkjsdev/spark": {
+      "optional": true
+    },
+    "onnxruntime-web": {
       "optional": true
     }
   },
@@ -82,6 +92,7 @@
     "@types/node": "^25.9.1",
     "@types/react": "^19.0.0",
     "@types/three": "^0.181.0",
+    "onnxruntime-web": "^1.27.0",
     "react": "^19.2.0",
     "semantic-release": "^25.0.3",
     "three": "^0.181.0",

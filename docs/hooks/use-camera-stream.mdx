@@ -1,0 +1,78 @@
+---
+title: "useCameraStream"
+description: "Stream a live MuJoCo camera into a DOM canvas"
+icon: "video"
+---
+
+Render the live scene from a MuJoCo camera, site, or body into a DOM `<canvas>`
+every frame. Each frame is rendered offscreen and blitted into the canvas, so it
+composites normally in the DOM — including inside opaque panels — and does **not**
+take over the render loop.
+
+This is the right tool for on-screen camera preview tiles (a wrist-cam pane, a
+scene-cam pane, a debug inset). It avoids the PNG encode/decode round-trip of the
+snapshot helpers, so it can run at full frame rate.
+
+<Tip>
+  For the distinction between snapshots, live streams, and policy tensors, and
+  when to use `<CameraView>` instead, see [Cameras and Captures](/guides/cameras-and-captures).
+</Tip>
+
+## Signature
+
+```tsx
+useCameraStream(
+  canvasRef: RefObject<HTMLCanvasElement | null>,
+  options: CameraFrameCaptureOptions & {
+    fps?: number     // optional cap on updates per second
+    paused?: boolean // freeze updates without unmounting
+  }
+): void
+```
+
+`options` accepts the same camera-selection and pose fields as
+`captureCameraFrame` (`cameraName`, `siteName`, `bodyName`, `position` + `lookAt`,
+`width`, `height`, `fov`, offsets, `mujocoCameraCompatibility`, and so on).
+
+Call the hook **inside** `<MujocoCanvas>` so it can render the scene; the
+`<canvas>` it draws into can live anywhere in the DOM.
+
+## Usage
+
+```tsx
+import { useRef } from "react";
+import { MujocoCanvas, useCameraStream } from "mujoco-react";
+
+function WristStream({ canvasRef }) {
+  // Inside the canvas tree — drives the offscreen render each frame.
+  useCameraStream(canvasRef, { cameraName: "wrist_cam", width: 256, height: 192 });
+  return null;
+}
+
+export function App({ config }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  return (
+    <>
+      <MujocoCanvas config={config}>
+        <WristStream canvasRef={canvasRef} />
+      </MujocoCanvas>
+
+      {/* Place the tile anywhere — a panel, sidebar, or overlay. */}
+      <canvas ref={canvasRef} style={{ width: 240, height: 180 }} />
+    </>
+  );
+}
+```
+
+## Notes
+
+- Uses the async capture path, so Gaussian-splat (Spark) environments render
+  through their dedicated capture renderer. Streaming a splat scene at full rate
+  does not disturb the main view's splat sort.
+- One capture is in flight at a time, so the stream self-limits to capture speed.
+  Pass `fps` to cap it further, or `paused` to freeze the feed.
+- Unlike `<CameraView>` / `useCameraViewport`, this does not take over the render
+  loop and is not occluded by opaque DOM over the canvas — prefer it for camera
+  tiles embedded in HTML UI.
+- For policy inference you usually want a `Float32Array` instead of an on-screen
+  canvas — use [`usePolicyCameraTensors`](/hooks/use-policy-camera-tensors).

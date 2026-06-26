@@ -16,6 +16,7 @@ import {
 import * as THREE from 'three';
 import { MujocoData, MujocoModel, MujocoModule, getContact, withContacts } from '../types';
 import { SceneRenderer } from '../components/SceneRenderer';
+import { CameraViewportProvider } from '../components/CameraView';
 import {
   ActuatedJointInfo,
   ActuatorInfo,
@@ -59,6 +60,7 @@ import {
   captureCameraFrame,
   captureCameraFrameBlob,
   createCameraFrameCaptureSession,
+  type CameraFrameCaptureTensorOptions,
 } from '../rendering/cameraFrameCapture';
 import {
   getCameraFrameCaptureSourceTarget,
@@ -1558,6 +1560,35 @@ export function MujocoSimProvider({
     [camera, gl, resolveCameraCaptureOptions, scene]
   );
 
+  const createCameraFrameCaptureSessionApi = useCallback(
+    (options: CameraFrameCaptureOptions = {}) =>
+      createCameraFrameCaptureSession(
+        gl,
+        scene,
+        camera,
+        resolveCameraCaptureOptions(options)
+      ),
+    [camera, gl, resolveCameraCaptureOptions, scene]
+  );
+
+  const captureCameraFrameTensorApi = useCallback(
+    (options: CameraFrameCaptureTensorOptions = {}) => {
+      const resolved: CameraFrameCaptureTensorOptions = {
+        ...resolveCameraCaptureOptions(options),
+        channels: options.channels,
+        layout: options.layout,
+        range: options.range,
+      };
+      const session = createCameraFrameCaptureSession(gl, scene, camera, resolved);
+      try {
+        return session.captureTensor(resolved);
+      } finally {
+        session.dispose();
+      }
+    },
+    [camera, gl, resolveCameraCaptureOptions, scene]
+  );
+
   const recordCameraSequenceApi = useCallback(
     async (
       options: CameraFrameSequenceOptions
@@ -1882,6 +1913,9 @@ export function MujocoSimProvider({
       captureFrameBlob: captureFrameBlobApi,
       captureCameraFrame: captureCameraFrameApi,
       captureCameraFrameBlob: captureCameraFrameBlobApi,
+      captureCameraFrameTensor: captureCameraFrameTensorApi,
+      createCameraFrameCaptureSession: createCameraFrameCaptureSessionApi,
+      resolveCameraCaptureOptions,
       recordCameraSequence: recordCameraSequenceApi,
       project2DTo3D,
       projectImagePointTo3D,
@@ -1903,6 +1937,8 @@ export function MujocoSimProvider({
       loadFromFilesApi, addBodyApi, removeBodyApi, recompileApi,
       getCanvas, getCanvasSnapshot, captureFrameApi, captureFrameBlobApi,
       captureCameraFrameApi, captureCameraFrameBlobApi,
+      captureCameraFrameTensorApi, createCameraFrameCaptureSessionApi,
+      resolveCameraCaptureOptions,
       recordCameraSequenceApi,
       project2DTo3D,
       projectImagePointTo3D,
@@ -1940,7 +1976,7 @@ export function MujocoSimProvider({
   return (
     <MujocoSimContext.Provider value={contextValue}>
       <SceneRenderer renderOptions={renderOptions} />
-      {children}
+      <CameraViewportProvider>{children}</CameraViewportProvider>
     </MujocoSimContext.Provider>
   );
 }

@@ -1,0 +1,227 @@
+---
+title: "Cameras and Captures"
+description: "How MuJoCo cameras, viewer cameras, virtual debug cameras, and offscreen captures relate"
+icon: "camera"
+---
+
+mujoco-react has a few camera concepts because rendering, simulation, debugging,
+and dataset capture are different jobs.
+
+## Camera Types
+
+| Type | Where it comes from | What it is for |
+| --- | --- | --- |
+| Viewer camera | React Three Fiber / drei controls | The user's interactive viewport |
+| MuJoCo camera | MJCF `<camera>` element | Robot-mounted or fixed cameras defined by the model |
+| Mounted capture pose | MuJoCo camera, site, or body | Dataset and policy images tied to model state |
+| Explicit capture pose | `position` + `lookAt` or `quaternion` | Synthetic offscreen captures |
+| Virtual debug camera | `<Debug virtualCameras>` | Visualizing a synthetic camera pose in the scene |
+
+## Viewer Camera
+
+The viewer camera is the camera the user sees through. It is owned by React
+Three Fiber and can be controlled with tools such as `OrbitControls`.
+
+```tsx
+<MujocoCanvas
+  config={config}
+  camera={{ position: [2, -1.5, 2.5], up: [0, 0, 1], fov: 45 }}
+>
+  <OrbitControls makeDefault />
+</MujocoCanvas>
+```
+
+Changing the viewer camera changes the visible browser viewport. It does not
+change MuJoCo model cameras.
+
+## MuJoCo Cameras
+
+MuJoCo cameras are declared in MJCF. They move with their parent body and are
+exposed through MuJoCo camera state such as `cam_xpos` and `cam_xmat`.
+
+Use `cameraName` when you want a frame from an MJCF `<camera>`:
+
+```tsx
+const frame = await api.captureCameraFrame({
+  cameraName: "wrist_cam",
+  mujocoCameraCompatibility: true,
+});
+```
+
+`mujocoCameraCompatibility` applies MuJoCo camera metadata such as resolution,
+field of view, clipping, and intrinsics when the WASM model exposes them.
+
+## Mounted Capture Poses
+
+For policy or dataset streams, a camera can also be resolved from a MuJoCo site
+or body. This is useful when a robot model exposes optical frames as sites
+instead of MJCF cameras.
+
+```tsx
+const capture = useCameraFrameCapture({
+  siteName: "head_camera_rgb_optical_frame",
+  width: 640,
+  height: 480,
+});
+
+const result = await capture.captureBlob();
+```
+
+Mounted poses follow simulation state, but they still render offscreen. The
+user's orbit camera does not move.
+
+## Explicit Capture Poses
+
+Use `position` with `lookAt` when the camera is synthetic and not part of the
+MuJoCo model.
+
+```tsx
+const frame = await api.captureCameraFrame({
+  position: [1.1, -0.3, 1.3],
+  lookAt: [0.45, -0.3, 0.8],
+  up: [0, 0, 1],
+  fov: 48.5,
+  width: 640,
+  height: 480,
+});
+```
+
+This creates an offscreen Three.js camera for the capture only. It is not a
+MuJoCo `<camera>`, and it is not automatically visible in the scene.
+
+## Virtual Debug Cameras
+
+`virtualCameras` on `<Debug>` draws a marker and frustum for synthetic camera
+poses. This helps you line up explicit policy or offscreen render viewpoints
+without adding extra MJCF cameras.
+
+```tsx
+<Debug
+  showCameras
+  virtualCameras={[
+    {
+      name: "policy front",
+      position: [0.72, 0, 1.08],
+      lookAt: [0.4, 0, 0.43],
+      up: [0, 0, 1],
+      fov: 50,
+      width: 640,
+      height: 480,
+    },
+  ]}
+/>
+```
+
+Virtual debug cameras are visual overlays only. They do not create a MuJoCo
+camera, do not change the viewer camera, and are excluded from camera captures
+so debug geometry does not contaminate policy images.
+
+## Output Modes: Snapshot, Live Stream, Tensor
+
+Any camera pose above (MJCF camera, mounted site/body, or explicit pose) can be
+turned into three different outputs. Pick the output by what consumes it.
+
+| Output | Use it for | Cost |
+| --- | --- | --- |
+| **Snapshot** — `dataUrl`/`Blob` | One-off PNG/JPEG: download, thumbnail, single dataset frame | Encodes PNG every call |
+| **Live stream** — a `<canvas>` updated every frame | On-screen camera preview panes | Renders offscreen, no encode |
+| **Tensor** — a `Float32Array` | Browser policy inference (ONNX) and recording | Renders offscreen, no encode |
+
+The snapshot helpers (`captureCameraFrame`, `useCameraFrameCapture`,
+`usePolicyCameraFrames`, `recordMountedCameraFrameSequence`) all produce a data
+URL or `Blob` — they encode a PNG/JPEG on every call. That is the right tool for
+a download or a single saved frame, but too slow for live preview or per-step
+inference. For those, use the live-stream and tensor APIs below, which read
+pixels straight off the GPU.
+
+## Live Camera Streams
+
+To show a live camera feed on screen, render the scene from a MuJoCo camera into
+a `<canvas>` every frame — no PNG round-trip.
+
+For a camera tile embedded in HTML UI (a panel, sidebar, or overlay), use
+`useCameraStream`. Put the `<canvas>` anywhere in the DOM and call the hook
+inside `<MujocoCanvas>` with a ref to it:
+
+```tsx
+function WristPreview() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  return (
+    <>
+      <MujocoCanvas config={config}>
+        {/* inside the canvas tree — drives the offscreen render */}
+        <WristStream canvasRef={canvasRef} />
+      </MujocoCanvas>
+      {/* anywhere in your DOM */}
+      <canvas ref={canvasRef} />
+    </>
+  );
+}
+
+function WristStream({ canvasRef }) {
+  useCameraStream(canvasRef, { cameraName: 'wrist_cam', width: 256, height: 192 });
+  return null;
+}
+```
+
+`useCameraStream` renders offscreen and blits into the canvas, so it composites
+normally in the DOM (including inside opaque panels) and does **not** take over
+the render loop. It uses the async capture path, so Gaussian-splat environments
+render through their dedicated capture renderer — streaming a splat scene at full
+rate does not disturb the main view's splat sort. Pass `fps` to cap the update
+rate, or `paused` to freeze it.
+
+For a transparent picture-in-picture overlay on a full-bleed canvas, use
+`<CameraView>` / `useCameraViewport`, which render the camera into a
+`gl.scissor` region tracking a DOM element:
+
+```tsx
+<MujocoCanvas config={config}>
+  <CameraView cameraName="wrist_cam" style={{ right: 16, bottom: 16, width: 240, height: 180 }} />
+</MujocoCanvas>
+```
+
+`<CameraView>` is cheaper (it scissors into the main canvas instead of
+re-reading pixels) but while a view is mounted the canvas switches to a managed
+render loop. That is incompatible with `EffectComposer`/postprocessing and is
+occluded by opaque DOM layered over the canvas — prefer `useCameraStream` for
+panel tiles, and `<CameraView>` for transparent overlays.
+
+## Policy Image Tensors
+
+For in-browser policy inference, capture straight into a `Float32Array` — no
+canvas, no PNG. `usePolicyCameraTensors` keeps one reusable session per camera
+and re-aims it to the live MuJoCo pose each step:
+
+```tsx
+const cams = usePolicyCameraTensors({
+  streams: [
+    { key: 'wrist', cameraName: 'wrist_cam', width: 96, height: 96, layout: 'CHW' },
+    { key: 'front', cameraName: 'front',     width: 96, height: 96, layout: 'CHW' },
+  ],
+});
+
+useAfterPhysicsStep(() => {
+  const { tensors } = cams.capture();
+  const wrist = new ort.Tensor('float32', tensors.wrist.data, [1, ...tensors.wrist.shape]);
+  // feed wrist/front into your ONNX session
+});
+```
+
+For one-off conversions use `captureCameraFrameTensor()`; for lower-level
+control, `createCameraFrameCaptureSession()` exposes `captureTensor()` and
+`capturePixels()`, and `pixelsToPolicyImageTensor()` converts a raw RGBA buffer.
+
+## Choosing an API
+
+| Need | Use |
+| --- | --- |
+| Live on-screen preview in a panel/canvas | `useCameraStream` |
+| Live transparent picture-in-picture overlay | `<CameraView>` / `useCameraViewport` |
+| Policy inference tensors (ONNX) | `usePolicyCameraTensors` / `captureCameraFrameTensor` |
+| One-off snapshot from an MJCF camera | `captureCameraFrame({ cameraName })` |
+| One-off snapshot from a robot optical frame | `captureCameraFrame({ siteName })` or `useCameraFrameCapture({ siteName })` |
+| One-off snapshot from a synthetic fixed pose | `captureCameraFrame({ position, lookAt })` |
+| Record a dataset of PNG/JPEG frames | `usePolicyCameraFramesFromMountedStreams` / `recordMountedCameraFrameSequence` |
+| Draw a synthetic pose in the viewport | `<Debug virtualCameras={[...]}>` |
+| Capture the visible browser viewport | `useFrameCapture` |

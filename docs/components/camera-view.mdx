@@ -1,0 +1,68 @@
+---
+title: "CameraView"
+description: "Transparent picture-in-picture overlay of a MuJoCo camera"
+icon: "clone"
+---
+
+Render the live scene from a MuJoCo camera into a `gl.scissor` region tracking a
+DOM element — a transparent picture-in-picture overlay on the main canvas. Unlike
+[`useCameraStream`](/hooks/use-camera-stream), it scissors into the main canvas
+instead of re-reading pixels, so it is cheaper, but it has constraints (see
+below).
+
+## Signature
+
+```tsx
+// Drop-in overlay: creates a transparent <div> over the canvas.
+<CameraView
+  cameraName?={string}
+  siteName?={string}
+  bodyName?={string}
+  // ...pose fields: position, lookAt, quaternion, up, offsets, fov, near, far
+  className?={string}
+  style?={CSSProperties}
+/>
+
+// Lower level: track a DOM element you position yourself.
+useCameraViewport(
+  elementRef: RefObject<HTMLElement | null>,
+  options: CameraViewportOptions
+): void
+```
+
+`CameraViewportOptions` is the camera-selection and pose subset of
+`CameraFrameCaptureOptions` (`cameraName` / `siteName` / `bodyName`, `position` +
+`lookAt`, `fov`, offsets, `mujocoCameraCompatibility`, …).
+
+## Usage
+
+```tsx
+import { MujocoCanvas, CameraView } from "mujoco-react";
+
+<MujocoCanvas config={config}>
+  {/* Picture-in-picture wrist + scene panes over the viewport. */}
+  <CameraView cameraName="wrist_cam" style={{ right: 16, bottom: 16, width: 240, height: 180 }} />
+  <CameraView cameraName="front"     style={{ right: 16, bottom: 210, width: 240, height: 180 }} />
+</MujocoCanvas>;
+```
+
+For a pane positioned in your own layout (a sidebar, a flex row), use
+`useCameraViewport` with a ref to your element. Call it inside `<MujocoCanvas>`;
+the tracked element can live anywhere in the DOM:
+
+```tsx
+function SidebarCamera({ paneRef }) {
+  useCameraViewport(paneRef, { siteName: "wrist_cam" });
+  return null;
+}
+```
+
+## Notes
+
+- The render is composited into the main canvas at the tracked element's screen
+  rect, so the element itself stays transparent — style it with a border/label,
+  not a background.
+- The managed render loop only activates while a view is mounted; apps that never
+  use `CameraView`/`useCameraViewport` keep R3F's automatic rendering.
+- Prefer [`useCameraStream`](/hooks/use-camera-stream) for tiles embedded in HTML
+  panels, postprocessing setups, or splat-heavy scenes.

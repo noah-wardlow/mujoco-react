@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/vite.ts', 'src/spark.tsx'],
+  entry: ['src/index.ts', 'src/vite.ts', 'src/spark.tsx', 'src/onnx.ts'],
   format: ['esm'],
   dts: true,
   sourcemap: true,
@@ -15,6 +15,7 @@ export default defineConfig({
     '@react-three/drei',
     '@mujoco/mujoco',
     '@sparkjsdev/spark',
+    'onnxruntime-web',
   ],
   treeshake: true,
 });

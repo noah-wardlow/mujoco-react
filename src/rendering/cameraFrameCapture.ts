@@ -13,6 +13,29 @@ import type {
   CameraFrameCaptureSource,
   CameraFrameCaptureVector3,
 } from '../types';
+import {
+  pixelsToPolicyImageTensor,
+  type PolicyImageTensorOptions,
+  type PolicyImageTensorResult,
+} from '../policyImageTensors';
+
+/** Options for capturing a camera frame straight into a policy image tensor. */
+export type CameraFrameCaptureTensorOptions = CameraFrameCaptureOptions &
+  Pick<PolicyImageTensorOptions, 'channels' | 'layout' | 'range'>;
+
+export interface CameraFramePixelsResult {
+  /** Raw RGBA pixels, bottom-left origin (reused buffer — consume before the next capture). */
+  pixels: Uint8Array;
+  camera: THREE.Camera;
+  width: number;
+  height: number;
+  source: CameraFrameCaptureSource;
+}
+
+export interface CameraFrameTensorResult extends PolicyImageTensorResult {
+  camera: THREE.Camera;
+  source: CameraFrameCaptureSource;
+}
 
 export interface CameraFrameCaptureSession {
   readonly width: number;
@@ -36,6 +59,14 @@ export interface CameraFrameCaptureSession {
     options?: CameraFrameCaptureOptions
   ): Promise<CameraFrameCaptureResult>;
   captureBlob(options?: CameraFrameCaptureOptions): Promise<CameraFrameCaptureBlobResult>;
+  /**
+   * Render and read raw RGBA pixels without any canvas/PNG round-trip. The
+   * returned buffer is reused between calls — copy or convert it before the
+   * next capture.
+   */
+  capturePixels(options?: CameraFrameCaptureOptions): CameraFramePixelsResult;
+  /** Render straight into a normalized policy image tensor (no canvas/PNG encode). */
+  captureTensor(options?: CameraFrameCaptureTensorOptions): CameraFrameTensorResult;
   dispose(): void;
 }
 
@@ -250,7 +281,7 @@ function applyProjectionMatrix(
   camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
 }
 
-function createCaptureCamera(
+export function createCaptureCamera(
   options: CameraFrameCaptureOptions,
   fallbackCamera: THREE.Camera,
   width: number,
@@ -290,7 +321,7 @@ function getCaptureDimensions(
   return { width, height };
 }
 
-function prepareCaptureCamera(
+export function prepareCaptureCamera(
   camera: THREE.Camera,
   options: CameraFrameCaptureOptions,
   fallbackCamera: THREE.Camera,
@@ -646,7 +677,10 @@ export function createCameraFrameCaptureSession(
     return captureOptions;
   }
 
-  function renderPreparedCapture(captureOptions: CameraFrameCaptureOptions) {
+  function renderCaptureToTarget(
+    captureOptions: CameraFrameCaptureOptions,
+    readback: () => void
+  ) {
     const previousState = saveRendererState(sessionRenderer);
     const previousSceneState = applyCaptureVisualOverrides(
       sessionRenderer,
@@ -676,6 +710,16 @@ export function createCameraFrameCaptureSession(
       }
       sessionRenderer.clear();
       sessionRenderer.render(scene, camera);
+      readback();
+    } finally {
+      restoreObjectVisibility(hidden);
+      if (previousSceneState) restoreSceneVisualState(scene, previousSceneState);
+      restoreRendererState(sessionRenderer, previousState);
+    }
+  }
+
+  function renderPreparedCapture(captureOptions: CameraFrameCaptureOptions) {
+    renderCaptureToTarget(captureOptions, () => {
       readRenderTargetToCanvas(
         sessionRenderer,
         target,
@@ -688,22 +732,48 @@ export function createCameraFrameCaptureSession(
         sessionRenderer.outputColorSpace,
         captureOptions.flipX ?? false
       );
-      return {
-        canvas,
-        camera,
-        width,
-        height,
-        source: getCameraFrameCaptureSource(captureOptions),
-      };
-    } finally {
-      restoreObjectVisibility(hidden);
-      if (previousSceneState) restoreSceneVisualState(scene, previousSceneState);
-      restoreRendererState(sessionRenderer, previousState);
-    }
+    });
+    return {
+      canvas,
+      camera,
+      width,
+      height,
+      source: getCameraFrameCaptureSource(captureOptions),
+    };
   }
 
   function capture(nextOptions: CameraFrameCaptureOptions = {}) {
     return renderPreparedCapture(resolveCaptureOptions(nextOptions));
+  }
+
+  function capturePixels(nextOptions: CameraFrameCaptureOptions = {}): CameraFramePixelsResult {
+    const captureOptions = resolveCaptureOptions(nextOptions);
+    renderCaptureToTarget(captureOptions, () => {
+      sessionRenderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
+    });
+    return {
+      pixels,
+      camera,
+      width,
+      height,
+      source: getCameraFrameCaptureSource(captureOptions),
+    };
+  }
+
+  function captureTensor(
+    nextOptions: CameraFrameCaptureTensorOptions = {}
+  ): CameraFrameTensorResult {
+    const result = capturePixels(nextOptions);
+    const tensor = pixelsToPolicyImageTensor(pixels, {
+      width,
+      height,
+      channels: nextOptions.channels,
+      layout: nextOptions.layout,
+      range: nextOptions.range,
+      sourceOrigin: 'bottom-left',
+      flipX: nextOptions.flipX,
+    });
+    return { ...tensor, camera, source: result.source };
   }
 
   async function captureAsync(nextOptions: CameraFrameCaptureOptions = {}) {
@@ -779,6 +849,8 @@ export function createCameraFrameCaptureSession(
     height,
     capture,
     captureAsync,
+    capturePixels,
+    captureTensor,
     captureDataUrl(nextOptions = {}) {
       const type = nextOptions.type ?? options.type ?? 'image/png';
       const result = capture(nextOptions);
@@ -885,6 +957,31 @@ export async function captureCameraFrameBlob(
   );
   try {
     return await session.captureBlob();
+  } finally {
+    session.dispose();
+  }
+}
+
+/**
+ * One-shot camera frame capture straight into a policy image tensor, skipping
+ * the canvas/PNG round-trip. For repeated captures (live inference, recording),
+ * create a session once with {@link createCameraFrameCaptureSession} and call
+ * `session.captureTensor()` so the render target and buffers are reused.
+ */
+export function captureCameraFrameTensor(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  fallbackCamera: THREE.Camera,
+  options: CameraFrameCaptureTensorOptions = {}
+): CameraFrameTensorResult {
+  const session = createCameraFrameCaptureSession(
+    renderer,
+    scene,
+    fallbackCamera,
+    options
+  );
+  try {
+    return session.captureTensor(options);
   } finally {
     session.dispose();
   }

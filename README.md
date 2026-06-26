@@ -1095,29 +1095,20 @@ const video = useVideoRecorder({ fps: 30, mimeType: "video/webm" });
 // video.start(), video.stop() -> returns Blob
 ```
 
-### Frame Capture
+### Camera Frames, Streams, and Tensors
 
-Capture dataset/debug stills from the rendered MuJoCo canvas:
+A camera pose — the viewer camera, a MuJoCo `cameraName`/`siteName`/`bodyName`, or
+an explicit `position`+`lookAt` — can be turned into three outputs: a **snapshot**
+(PNG/JPEG), a **live on-screen stream**, or a **policy tensor**.
 
-```tsx
-const apiRef = useRef<MujocoSimAPI>(null);
-
-const frame = await apiRef.current?.captureFrame({ type: "image/png" });
-const blob = await apiRef.current?.captureFrameBlob({ type: "image/png" });
-```
-
-Use `useFrameCapture()` or the standalone `captureFrame()` helpers when you own
-the canvas or want to capture a custom container.
-
-Use `captureCameraFrame()` / `captureCameraFrameBlob()` when dataset generation
-needs an offscreen camera render at a stable resolution without moving the
-user's interactive viewport. Pass `cameraName`, `siteName`, or `bodyName` to
-record true MuJoCo-mounted camera frames; the returned image includes
-`source.kind` so dataset pipelines can reject fallback or synthetic fixed poses.
-For named MuJoCo cameras, set `mujocoCameraCompatibility` when you want the
-Three.js offscreen camera to inherit the MJCF camera's `resolution`, `fovy`,
-near/far clipping, and calibrated intrinsics when the WASM model exposes
-`cam_intrinsic` plus `cam_sensorsize`:
+**Snapshots.** `captureFrame()`/`captureFrameBlob()` grab the live canvas (or use
+`useFrameCapture()` / the standalone `captureFrame()` when you own the canvas).
+`captureCameraFrame()`/`captureCameraFrameBlob()` render a chosen camera offscreen
+at a stable resolution without moving the viewport; pass `cameraName`/`siteName`/
+`bodyName` for true mounted frames (`source.kind` lets dataset pipelines reject
+fallback/synthetic poses). Set `mujocoCameraCompatibility` to inherit a MJCF
+camera's `resolution`, `fovy`, clipping, and calibrated intrinsics; use
+`visualOverrides`/`renderIsolation` for canonical training captures.
 
 ```tsx
 const frame = await apiRef.current?.captureCameraFrame({
@@ -1128,21 +1119,60 @@ const frame = await apiRef.current?.captureCameraFrame({
 });
 ```
 
-This is still rendered by Three.js. It is useful for browser policy payloads and
-dataset debugging until you have native MuJoCo framebuffer bindings available.
-For canonical policy/training captures, use `visualOverrides` to temporarily
-override scene background, environment, fog, shadow maps, tone mapping, or color
-space, and `renderIsolation` to render with an independent offscreen
-`WebGLRenderer` instead of inheriting viewer renderer state.
+**Live streams.** `useCameraStream(canvasRef, options)` renders a camera into a
+DOM `<canvas>` every frame (offscreen render → blit: no PNG round-trip, no render-
+loop takeover, splat scenes stream safely). Call it inside `<MujocoCanvas>`; the
+canvas can live anywhere in your DOM:
 
-Use `recordCameraSequence()` / `useCameraSequenceRecorder()` to step policy
-rollouts and capture synchronized per-camera frames from one or more MuJoCo
-camera configs. Sequence recording requires mounted MuJoCo camera, site, or
-body selectors by default; use still capture APIs for synthetic debug poses.
+```tsx
+function WristStream({ canvasRef }) {
+  useCameraStream(canvasRef, { cameraName: "wrist_cam", width: 256, height: 192 });
+  return null;
+}
+```
 
-For LeRobot-style datasets, prefer the named-camera wrapper. It resolves task
-camera keys to MuJoCo cameras/sites/bodies, records the sequence, and returns
-the plan and readiness summary alongside frame provenance:
+For a transparent picture-in-picture overlay, use `<CameraView>` (or
+`useCameraViewport` to track your own element). It scissors into the main canvas —
+cheaper, but it takes over the render loop while mounted (incompatible with
+postprocessing, occluded by opaque DOM), so prefer `useCameraStream` for panel
+tiles:
+
+```tsx
+<MujocoCanvas config={config}>
+  <CameraView cameraName="wrist_cam" style={{ right: 16, bottom: 16, width: 240, height: 180 }} />
+</MujocoCanvas>
+```
+
+**Policy tensors.** For in-browser inference, capture straight into a
+`Float32Array` — no canvas, no PNG. `usePolicyCameraTensors` keeps one reusable
+session per camera and re-aims it to the live pose each step:
+
+```tsx
+const cams = usePolicyCameraTensors({
+  streams: [
+    { key: "wrist", cameraName: "wrist_cam", width: 96, height: 96, layout: "CHW" },
+    { key: "front", cameraName: "front",     width: 96, height: 96, layout: "CHW" },
+  ],
+});
+
+useAfterPhysicsStep(() => {
+  const { tensors } = cams.capture();
+  const wrist = new ort.Tensor("float32", tensors.wrist.data, [1, ...tensors.wrist.shape]);
+});
+```
+
+Use `usePolicyCameraTensorsFromMountedStreams` for dataset-name resolution,
+`captureCameraFrameTensor()` for one-offs, or `createCameraFrameCaptureSession()`
++ `pixelsToPolicyImageTensor()` for lower-level control. The optional
+`mujoco-react/onnx` entry point wraps ONNX Runtime Web: `createOnnxPolicySession()`
+loads a manifest plus model, and `onnxTensorToPolicyActionChunk()` decodes the
+output into action chunks.
+
+**Dataset recording.** `recordMountedCameraFrameSequence()` steps a rollout and
+captures synchronized per-camera frames, resolving LeRobot-style task camera keys
+to MuJoCo cameras/sites/bodies. It requires every requested `cameraKey` by default
+(set `requireAll: false` for exploratory tooling) and returns a plan, readiness,
+and per-camera source provenance:
 
 ```tsx
 const sequence = await recordMountedCameraFrameSequence(api, {
@@ -1152,114 +1182,21 @@ const sequence = await recordMountedCameraFrameSequence(api, {
     left_wrist: [{ siteName: "left_wrist_camera_optical_frame" }],
     right_wrist: [{ siteName: "right_wrist_camera_optical_frame" }],
   },
-  defaults: {
-    width: 640,
-    height: 480,
-    type: "image/png",
-    fov: 45,
-    near: 0.01,
-    far: 100,
-  },
+  defaults: { width: 640, height: 480, type: "image/png", fov: 45 },
   frames: 16,
-  stepsPerFrame: 1,
-  retainFrames: false,
-  requireMountedSources: true,
-  onFrame: ({ frameIndex, cameras }) => {
-    queueLeRobotImages(frameIndex, cameras);
-  },
+  onFrame: ({ frameIndex, cameras }) => queueLeRobotImages(frameIndex, cameras),
 });
 
-sequence.readiness.ready; // true when every requested stream resolved
-sequence.plan.missingKeys; // unresolved task cameras, if requireAll is false
-sequence.cameraSummaries.head.source; // mounted source provenance
-
-const manifest = createMountedCameraFrameSequenceManifest(sequence);
-manifest.streamSummaries.head.complete; // per-camera frame coverage
-manifest.status; // "complete", "partial", or "missing"
+const manifest = createMountedCameraFrameSequenceManifest(sequence); // dataset-facing manifest
 ```
 
-`recordMountedCameraFrameSequence()` requires all requested `cameraKeys` by
-default so dataset recording cannot silently omit a camera stream. Set
-`requireAll: false` only for exploratory tooling that can tolerate partial
-camera coverage.
-
-Use `createMountedCameraFrameSequenceManifest()` after recording to persist a
-stable dataset-facing manifest with readiness, source targets, dimensions,
-first/last frame indices, timestamps, and per-camera missing-frame counts.
-
-Inside `<MujocoCanvas>` children, `useMountedCameraSequenceRecorder()` exposes
-the same planning and recording surface with React status/error/result state.
-Use `checkReadiness()` before recording when the UI needs a preflight gate for
-LeRobot camera streams:
-
-```tsx
-function DatasetRecorder() {
-  const recorder = useMountedCameraSequenceRecorder({
-    defaults: { width: 640, height: 480, type: "image/png" },
-    aliases: {
-      head: { cameraName: "head" },
-      left_wrist: { siteName: "left_wrist_camera_optical_frame" },
-      right_wrist: { siteName: "right_wrist_camera_optical_frame" },
-    },
-  });
-
-  async function recordDatasetEpisode() {
-    const cameraKeys = ["head", "left_wrist", "right_wrist"];
-    const readiness = recorder.checkReadiness(cameraKeys);
-    if (!readiness.ready) return;
-
-    await recorder.record({
-      cameraKeys,
-      frames: 16,
-      retainFrames: false,
-      onFrame: ({ frameIndex, cameras }) => {
-        queueLeRobotImages(frameIndex, cameras);
-      },
-    });
-  }
-
-  return (
-    <button disabled={recorder.isRecording} onClick={recordDatasetEpisode}>
-      Record camera streams
-    </button>
-  );
-}
-```
-
-`recorder.readiness` keeps the latest preflight result, and
-`recorder.result?.readiness` keeps the readiness that shipped with the most
-recent recording.
-
-Use `resolveMountedCameraFrameSource()` when dataset feature names need to map
-to named MuJoCo cameras, sites, or bodies before recording. The helper honors
-aliases first, then prefers camera matches over sites and bodies, then falls
-back to exact body/site names. This keeps streams such as `wrist` mapped to a
-real `<camera name="wrist_cam">` even when the model also has a body named
-`wrist`. It also handles normalized/prefix/suffix matches such as
-`left_wrist` -> `left_wrist_camera_optical_frame`, and token-contained
-imported-model names such as `observation.images.head` ->
-`robot_head_camera`. It returns both the capture selector and the mounted-source
-provenance that should be stored beside the dataset:
-
-```tsx
-const resolved = resolveMountedCameraFrameSource("head", {
-  cameras: api.getCameras(),
-  sites: api.getSites(),
-  bodies: api.getBodies(),
-});
-
-if (!resolved) throw new Error("head does not resolve to a MuJoCo source");
-
-await api.recordCameraSequence({
-  frames: 16,
-  requireMountedSources: true,
-  cameras: [{ key: "head", width: 640, height: 480, ...resolved.selector }],
-});
-```
-
-Pass `aliases` when multiple MuJoCo resources could match a dataset stream key
-or when the model uses names that do not share a normalized prefix/suffix with
-the LeRobot camera feature.
+Inside `<MujocoCanvas>`, `useMountedCameraSequenceRecorder()` exposes the same
+planning/recording with React status and a `checkReadiness()` preflight gate.
+`resolveMountedCameraFrameSource()` maps a single dataset feature name to a MuJoCo
+source (aliases first, then camera > site > body, then normalized prefix/suffix
+matches) when you need the selector before recording. The lower-level
+`recordCameraSequence()` / `useCameraSequenceRecorder()` take explicit camera
+configs.
 
 ### `useCtrlNoise(config)`
 

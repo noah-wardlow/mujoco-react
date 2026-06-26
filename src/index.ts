@@ -34,6 +34,8 @@ export type { ControllerOptions, ControllerComponent } from './core/createContro
 
 // IK controller hook
 export { useIkController } from './hooks/useIkController';
+export { GenericIK } from './core/GenericIK';
+export type { GenericIKOptions } from './core/GenericIK';
 
 // Components
 export { Body } from './components/Body';
@@ -74,6 +76,10 @@ export type {
   SplatCollisionProxyPreviewVector3,
   UseSplatCollisionProxyGeomsOptions,
 } from './components/SplatCollisionProxyPreview';
+export { CameraView, useCameraViewport } from './components/CameraView';
+export type { CameraViewProps, CameraViewportOptions } from './components/CameraView';
+export { useCameraStream } from './hooks/useCameraStream';
+export type { CameraStreamOptions } from './hooks/useCameraStream';
 export { Debug } from './components/Debug';
 export { TendonRenderer } from './components/TendonRenderer';
 export { FlexRenderer } from './components/FlexRenderer';
@@ -91,6 +97,13 @@ export { useBodyState } from './hooks/useBodyState';
 export { useBodyPose, useGeomPose, useSitePose } from './hooks/usePose';
 export type { PoseReadout, PoseResourceKind } from './hooks/usePose';
 export { useCtrl } from './hooks/useCtrl';
+export { controlGroup, useControlGroup } from './hooks/useControlGroup';
+export type {
+  ControlGroup,
+  ControlGroupHandle,
+  ControlGroupSetOptions,
+  UseControlGroupOptions,
+} from './hooks/useControlGroup';
 export { useControlWriter } from './hooks/useControlWriter';
 export type {
   ControlWriterConflict,
@@ -130,6 +143,17 @@ export type {
   MountedPolicyCameraFrameCaptureAPI,
   MountedPolicyCameraFrameCaptureOptions,
 } from './hooks/usePolicyCameraFrames';
+export {
+  usePolicyCameraTensors,
+  usePolicyCameraTensorsFromMountedStreams,
+} from './hooks/usePolicyCameraTensors';
+export type {
+  MountedPolicyCameraTensorOptions,
+  PolicyCameraTensorsAPI,
+  PolicyCameraTensorsOptions,
+  PolicyCameraTensorsResult,
+  PolicyCameraTensorStream,
+} from './hooks/usePolicyCameraTensors';
 export { useCameraSequenceRecorder } from './hooks/useCameraSequenceRecorder';
 export { useMountedCameraSequenceRecorder } from './hooks/useMountedCameraSequenceRecorder';
 export type {
@@ -145,8 +169,15 @@ export {
   CAPTURE_EXCLUDE_KEY,
   captureCameraFrame,
   captureCameraFrameBlob,
+  captureCameraFrameTensor,
   createCameraFrameCaptureSession,
   renderCameraFrameToCanvas,
+} from './rendering/cameraFrameCapture';
+export type {
+  CameraFrameCaptureSession,
+  CameraFrameCaptureTensorOptions,
+  CameraFramePixelsResult,
+  CameraFrameTensorResult,
 } from './rendering/cameraFrameCapture';
 export {
   imagePointToNdc,
@@ -172,6 +203,11 @@ export {
   readNamedObservation,
   sitePositionField,
 } from './policyObservation';
+export {
+  dataUrlToPolicyImageTensor,
+  imageDataToPolicyImageTensor,
+  pixelsToPolicyImageTensor,
+} from './policyImageTensors';
 export type {
   CreatePolicyCameraFrameCapturePlanOptions,
   PolicyCameraFrameCapturePlan,
@@ -191,6 +227,14 @@ export type {
   NamedObservationOptions,
   NamedObservationResult,
 } from './policyObservation';
+export type {
+  PolicyImageTensorLayout,
+  PolicyImageTensorOptions,
+  PolicyImageTensorPixelOptions,
+  PolicyImageTensorRange,
+  PolicyImageTensorResult,
+  PolicyImageTensorSourceOrigin,
+} from './policyImageTensors';
 export {
   createMountedCameraFrameSequenceManifest,
   createMountedCameraFrameSequenceReadiness,

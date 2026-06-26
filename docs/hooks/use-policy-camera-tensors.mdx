@@ -1,0 +1,103 @@
+---
+title: "usePolicyCameraTensors"
+description: "Capture policy observation tensors straight from MuJoCo cameras"
+icon: "brain"
+---
+
+Capture camera observations directly into `Float32Array` tensors for in-browser
+policy inference (for example ONNX Runtime Web). This skips the
+`toDataURL` → `Image.decode` round-trip the snapshot helpers use: the scene is
+rendered offscreen and read straight from the GPU into a normalized tensor.
+
+The hook keeps one reusable capture session per camera and re-aims each session
+to the live MuJoCo pose every step, so it is cheap to call inside a physics loop.
+
+<Tip>
+  For the difference between snapshots, live streams, and tensors, see
+  [Cameras and Captures](/guides/cameras-and-captures).
+</Tip>
+
+## Signature
+
+```tsx
+usePolicyCameraTensors(options: {
+  streams: Array<
+    CameraFrameCaptureOptions & {
+      key: string                 // payload key for this stream's tensor
+      aliases?: readonly string[] // extra keys that reference the same tensor
+      channels?: 3 | 4
+      layout?: "CHW" | "HWC"      // default "CHW"
+      range?: readonly [number, number] // default [0, 1]
+    }
+  >
+  includeObservationImageAliases?: boolean // also expose observation.images.<key>
+}): {
+  status: "idle" | "capturing" | "captured" | "error"
+  error: Error | null
+  isCapturing: boolean
+  capture: () => {
+    tensors: Record<string, CameraFrameTensorResult>
+    sourceSummary: string
+    capturedAt: number
+  }
+  reset: () => void
+}
+```
+
+Each `CameraFrameTensorResult` has `data` (a `Float32Array`), `shape`, `width`,
+`height`, `channels`, `layout`, `range`, plus the `camera` and `source` used.
+
+## Usage
+
+```tsx
+import { usePolicyCameraTensors, useAfterPhysicsStep } from "mujoco-react";
+import * as ort from "onnxruntime-web";
+
+function PolicyLoop({ session }: { session: ort.InferenceSession }) {
+  const cams = usePolicyCameraTensors({
+    streams: [
+      { key: "wrist", cameraName: "wrist_cam", width: 96, height: 96, layout: "CHW" },
+      { key: "front", cameraName: "front",     width: 96, height: 96, layout: "CHW" },
+    ],
+  });
+
+  useAfterPhysicsStep(async () => {
+    const { tensors } = cams.capture();
+    const wrist = new ort.Tensor("float32", tensors.wrist.data, [1, ...tensors.wrist.shape]);
+    const front = new ort.Tensor("float32", tensors.front.data, [1, ...tensors.front.shape]);
+    const out = await session.run({ "observation.images.wrist": wrist, "observation.images.front": front });
+    // apply out to controls...
+  });
+
+  return null;
+}
+```
+
+## Mounted streams
+
+Use `usePolicyCameraTensorsFromMountedStreams` to resolve dataset stream names to
+mounted MuJoCo cameras, sites, or bodies automatically, mirroring
+[`usePolicyCameraFramesFromMountedStreams`](/hooks/use-camera-frame-capture):
+
+```tsx
+const cams = usePolicyCameraTensorsFromMountedStreams({
+  cameraKeys: ["front", "wrist"],
+  aliases: {
+    front: [{ cameraName: "realsense_d435i" }],
+    wrist: [{ cameraName: "wrist_cam" }],
+  },
+  tensor: { width: 96, height: 96, layout: "CHW" },
+  requireAll: true,
+});
+```
+
+## Notes
+
+- `capture()` is synchronous and returns fresh `Float32Array`s each call.
+- Render at the model's input resolution (set `width`/`height` per stream) so no
+  separate downscale step is needed.
+- For one-off conversions use `captureCameraFrameTensor()`; for lower-level
+  control, `createCameraFrameCaptureSession()` exposes `captureTensor()` and
+  `capturePixels()`, and `pixelsToPolicyImageTensor()` converts a raw RGBA buffer.
+- Use the snapshot APIs (`usePolicyCameraFramesFromMountedStreams`) instead when a
+  policy endpoint expects PNG/JPEG data URLs rather than tensors.
