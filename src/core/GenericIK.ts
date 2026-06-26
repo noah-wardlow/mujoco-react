@@ -40,13 +40,6 @@ function resolveOptions(opts?: Partial<GenericIKOptions>): ResolvedGenericIKOpti
     };
 }
 
-function clampJoint(value: number, limit: readonly [number, number] | null | undefined) {
-    if (!limit) return value;
-    const [min, max] = limit;
-    if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) return value;
-    return Math.max(min, Math.min(max, value));
-}
-
 /**
  * Generic Damped Least-Squares IK solver.
  * Uses finite-difference Jacobian via MuJoCo's mj_forward.
@@ -93,7 +86,7 @@ export class GenericIK {
 
         // Working joint angles — start from current configuration
         const q = new Float64Array(n);
-        for (let i = 0; i < n; i++) q[i] = clampJoint(currentQ[i], o.jointLimits?.[i]);
+        for (let i = 0; i < n; i++) q[i] = currentQ[i];
 
         // Pre-allocate work arrays
         const J = new Float64Array(6 * n);       // 6×n Jacobian (row-major)
@@ -108,6 +101,14 @@ export class GenericIK {
 
         let bestQ: number[] | null = null;
         let bestErr = Infinity;
+        // Stop early once the error stops improving. The solver always returns the
+        // best configuration it has seen, so when it stalls or diverges (an
+        // unreachable target, e.g. a near-singular wrist orientation) further
+        // iterations can't beat bestQ — they only burn (1 + n) mj_forward calls
+        // each and feed jitter into ctrl. This is what bounds the cost of dragging
+        // the target into an unreachable region.
+        const patience = 4;
+        let noImprove = 0;
 
         if (n === 0) return null;
 
@@ -145,13 +146,19 @@ export class GenericIK {
             );
 
             // Track best solution
-            if (errNorm < bestErr) {
+            if (errNorm < bestErr - 1e-9) {
                 bestErr = errNorm;
                 bestQ = Array.from(q);
+                noImprove = 0;
+            } else {
+                noImprove++;
             }
 
             // Converged
             if (errNorm < o.tolerance) break;
+
+            // Stalled or diverging — bestQ can no longer improve, so stop.
+            if (noImprove >= patience) break;
 
             // Compute Jacobian via finite differences
             for (let j = 0; j < n; j++) {
@@ -208,7 +215,7 @@ export class GenericIK {
             }
 
             // Update joints
-            for (let i = 0; i < n; i++) q[i] = clampJoint(q[i] + dq[i], o.jointLimits?.[i]);
+            for (let i = 0; i < n; i++) q[i] += dq[i];
         }
 
         // Restore original qpos
