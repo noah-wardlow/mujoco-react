@@ -97,11 +97,13 @@ export { useBodyState } from './hooks/useBodyState';
 export { useBodyPose, useGeomPose, useSitePose } from './hooks/usePose';
 export type { PoseReadout, PoseResourceKind } from './hooks/usePose';
 export { useCtrl } from './hooks/useCtrl';
-export { controlGroup, useControlGroup } from './hooks/useControlGroup';
+export { controlGroup, defineControls, useControlGroup, useControls } from './hooks/useControlGroup';
 export type {
   ControlGroup,
   ControlGroupHandle,
   ControlGroupSetOptions,
+  ControlsHandle,
+  DefinedControls,
   UseControlGroupOptions,
 } from './hooks/useControlGroup';
 export { useControlWriter } from './hooks/useControlWriter';

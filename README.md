@@ -372,28 +372,59 @@ function ResetButton() {
 
 ## Map Controls to Joints
 
-Use control groups when a robot's actuator order does not match a simple `qpos[0..n]` layout:
+Use named controls when a controller should write actuator commands without
+hard-coding `data.ctrl` offsets:
 
 ```tsx
-import { useRef } from "react";
-import { resolveControlGroup, ModelSites, useBeforePhysicsStep } from "mujoco-react";
-import type { ControlGroupInfo } from "mujoco-react";
+import {
+  ModelActuators,
+  defineControls,
+  useBeforePhysicsStep,
+  useControls,
+} from "mujoco-react";
 
-function HoldTcpPose() {
-  const armRef = useRef<ControlGroupInfo | null>(null);
+const arm = defineControls({
+  shoulder: ModelActuators.so101.shoulder_pan,
+  lift: ModelActuators.so101.shoulder_lift,
+  elbow: ModelActuators.so101.elbow_flex,
+});
 
-  useBeforePhysicsStep(({ model, data }) => {
-    armRef.current ??= resolveControlGroup(model, { siteName: ModelSites.franka.tcp });
-    if (!armRef.current) return;
+function PolicyDriver({ action }: { action: number[] }) {
+  const controls = useControls(arm);
 
-    armRef.current.writeCtrl(data, armRef.current.readQpos(data));
+  useBeforePhysicsStep(() => {
+    controls.write(action);
+    controls.patch({ elbow: 1.2 });
   });
 
   return null;
 }
 ```
 
-`resolveControlGroup()` accepts `{ siteName }`, `{ bodyName }`, `{ joints }`, or `{ actuators }`. Selectors can be a name, ordered name array, regex, or predicate.
+`defineControls()` preserves the alias keys for `set()`, `patch()`, `get()`,
+and `read()`, while `write()` accepts an ordered vector in the same order as the
+object. The Vite plugin injects the generated register module automatically, so
+application code imports generated names from `mujoco-react`, not from
+`src/mujoco-register.gen.ts`.
+
+Use lower-level control groups when a robot's actuator order does not match a
+simple `qpos[0..n]` layout or you want actuator-name keys directly:
+
+```tsx
+import { controlGroup, ModelActuators, useControlGroup } from "mujoco-react";
+
+const gripper = controlGroup([ModelActuators.so101.gripper]);
+
+function HoldGripper() {
+  const controls = useControlGroup(gripper);
+  controls.set(ModelActuators.so101.gripper, -0.17453);
+  return null;
+}
+```
+
+For selector-based introspection, `resolveControlGroup()` accepts `{ siteName }`,
+`{ bodyName }`, `{ joints }`, or `{ actuators }`. Selectors can be a name,
+ordered name array, regex, or predicate.
 
 ## Build Observations
 

@@ -1,13 +1,17 @@
 import {
   bodyPositionField,
   ctrlField,
+  controlGroup,
   createNamedObservationBuilder,
+  defineControls,
   qposField,
   readNamedObservation,
   sitePositionField,
   useBodyPose,
   useContactHistory,
+  useControlGroup,
   useControlWriter,
+  useControls,
   useGeomPose,
   useNamedObservation,
   useSitePose,
@@ -69,6 +73,31 @@ function PrimitiveHarness() {
   writer.canWrite().valueOf();
   writer.write([0, 1]);
   writer.conflicts.current.map((conflict) => conflict.owner);
+
+  const armGroup = controlGroup(['shoulder_pan', 'shoulder_lift']);
+  const group = useControlGroup(armGroup);
+  group.set('shoulder_pan', 0.1);
+  group.patch({ shoulder_lift: 0.2 });
+  group.write([0.1, 0.2]);
+  group.get('shoulder_pan').toFixed();
+  group.read().shoulder_lift.toFixed();
+  // @ts-expect-error wrong actuator name for the declared group
+  group.set('elbow', 0.3);
+
+  const armControls = defineControls({
+    shoulder: 'shoulder_pan',
+    lift: 'shoulder_lift',
+  });
+  const controls = useControls(armControls);
+  controls.set('shoulder', 0.1);
+  controls.patch({ lift: 0.2 });
+  controls.write([0.1, 0.2]);
+  controls.get('shoulder').toFixed();
+  controls.read().lift.toFixed();
+  // @ts-expect-error aliases, not raw actuator names
+  controls.set('shoulder_pan', 0.1);
+  // @ts-expect-error wrong alias
+  controls.patch({ elbow: 0.3 });
 
   return null;
 }

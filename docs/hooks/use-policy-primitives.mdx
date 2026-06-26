@@ -9,26 +9,56 @@ controllers explicit and composable.
 
 ## Control Ownership
 
-Use `useControlWriter` when a controller, policy, replay, or teleop path writes
-to `data.ctrl`. It cooperatively claims a control group and refuses to write
-when another owner has already claimed the same actuators.
+Use `defineControls()` with `useControls()` when a controller, policy, replay,
+or teleop path writes actuator controls by name. The hook cooperatively claims
+the declared actuators, uses a generated owner by default, and refuses to write
+when another writer has already claimed the same actuators.
 
 ```tsx
-import { useBeforePhysicsStep, useControlWriter } from "mujoco-react";
+import {
+  ModelActuators,
+  defineControls,
+  useBeforePhysicsStep,
+  useControls,
+} from "mujoco-react";
+
+const arm = defineControls({
+  shoulder: ModelActuators.so101.shoulder_pan,
+  lift: ModelActuators.so101.shoulder_lift,
+  elbow: ModelActuators.so101.elbow_flex,
+});
 
 function PolicyControls({ action }: { action: number[] }) {
-  const writer = useControlWriter({
-    owner: "policy",
-    selector: { actuators: ["shoulder_pan", "shoulder_lift"] },
-  });
+  const controls = useControls(arm);
 
   useBeforePhysicsStep(() => {
-    writer.write(action);
+    controls.write(action);
   });
 
   return null;
 }
 ```
+
+For sparse updates, use aliases:
+
+```tsx
+controls.set("elbow", 1.2);
+controls.patch({ shoulder: 0.1, lift: -0.4 });
+controls.read().elbow;
+```
+
+For lower-level actuator-name controls, use `controlGroup()` with
+`useControlGroup()`:
+
+```tsx
+const gripper = controlGroup([ModelActuators.so101.gripper]);
+const controls = useControlGroup(gripper, { label: "debug-gripper" });
+
+controls.set(ModelActuators.so101.gripper, -0.17453);
+```
+
+Use `useControlWriter` directly only when you need selector-based ownership for
+sites, bodies, joints, regular expressions, or predicates.
 
 For real policy evaluation, make policy, IK, keyboard teleop, replay, and debug
 state mutation mutually exclusive. Use `force: true` only for deliberate
