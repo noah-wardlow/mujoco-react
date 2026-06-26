@@ -101,16 +101,26 @@ interface IkContextValue {
   ikTargetRef: React.RefObject<THREE.Group>;
   siteIdRef: React.RefObject<number>;
   setIkEnabled(enabled: boolean): void;
-  moveTarget(pos: THREE.Vector3, duration?: number): void;
+  moveTarget(pos: IkTargetPosition, duration?: number): void;
   syncTargetToSite(): void;
   solveIK(input: {
-    position: THREE.Vector3;
-    quaternion: THREE.Quaternion;
+    position: IkTargetPosition;
+    quaternion: IkTargetQuaternion;
     currentQ: number[];
     context?: IKSolveContext;
   }): number[] | null;
   getGizmoStats(): { pos: THREE.Vector3; rot: THREE.Euler } | null;
 }
+
+// Positions/quaternions accept a THREE object, a tuple, or a plain object:
+type IkTargetPosition =
+  | THREE.Vector3
+  | readonly [number, number, number]
+  | { x: number; y: number; z: number };
+type IkTargetQuaternion =
+  | THREE.Quaternion
+  | readonly [number, number, number, number]
+  | { x: number; y: number; z: number; w: number };
 ```
 
 ### Methods
@@ -118,7 +128,7 @@ interface IkContextValue {
 | Method | Description |
 |--------|-------------|
 | `setIkEnabled(enabled)` | Enable/disable IK solving |
-| `moveTarget(pos, duration?)` | Move IK target with optional animation |
+| `moveTarget(pos, duration?)` | Move IK target with optional animation. `pos` accepts a `THREE.Vector3`, `[x, y, z]` tuple, or `{ x, y, z }` object |
 | `syncTargetToSite()` | Snap IK target to current site position |
 | `solveIK({ position, quaternion, currentQ })` | Solve IK manually, returns joint angles or null |
 | `getGizmoStats()` | Get current gizmo position and rotation |

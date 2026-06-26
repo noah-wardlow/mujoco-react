@@ -10,10 +10,30 @@ import { createControllerHook } from '../core/createController';
 import { useMujocoContext, useBeforePhysicsStep } from '../core/MujocoSimProvider';
 import { GenericIK } from '../core/GenericIK';
 import { createContiguousControlGroup, findSiteByName, resolveControlGroup } from '../core/SceneLoader';
-import type { ControlGroupInfo, IkConfig, IkContextValue, IKSolveFn, IkSolveInput, MujocoData } from '../types';
+import type {
+  ControlGroupInfo,
+  IkConfig,
+  IkContextValue,
+  IKSolveFn,
+  IkSolveInput,
+  IkTargetPosition,
+  MujocoData,
+} from '../types';
 
 // Preallocated temp for syncGizmoToSite
 const _syncMat4 = new THREE.Matrix4();
+
+function toIkVector3(value: IkSolveInput['position']): THREE.Vector3 {
+  return 'x' in value
+    ? new THREE.Vector3(value.x, value.y, value.z)
+    : new THREE.Vector3(value[0], value[1], value[2]);
+}
+
+function toIkQuaternion(value: IkSolveInput['quaternion']): THREE.Quaternion {
+  return 'x' in value
+    ? new THREE.Quaternion(value.x, value.y, value.z, value.w)
+    : new THREE.Quaternion(value[0], value[1], value[2], value[3]);
+}
 
 function syncGizmoToSite(data: MujocoData, siteId: number, target: THREE.Group) {
   if (siteId === -1) return;
@@ -86,14 +106,22 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
     const ikSolveFn = useCallback(
       ({ position, quaternion, currentQ, context }: IkSolveInput): number[] | null => {
         if (!config) return null;
-        if (config.ikSolveFn) return config.ikSolveFn({ position, quaternion, currentQ, context });
+        const targetPosition = toIkVector3(position);
+        const targetQuaternion = toIkQuaternion(quaternion);
+        const normalizedInput: IkSolveInput = {
+          position: targetPosition,
+          quaternion: targetQuaternion,
+          currentQ,
+          context,
+        };
+        if (config.ikSolveFn) return config.ikSolveFn(normalizedInput);
         const model = mjModelRef.current;
         const data = mjDataRef.current;
         const controlGroup = controlGroupRef.current;
         if (!model || !data || !controlGroup || siteIdRef.current === -1) return null;
         return genericIkRef.current.solve(
           model, data, siteIdRef.current, controlGroup.qposAdr,
-          position, quaternion, currentQ,
+          targetPosition, targetQuaternion, currentQ,
           {
             damping: config.damping,
             epsilon: config.epsilon,
@@ -218,12 +246,12 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
     );
 
     const moveTarget = useCallback(
-      (pos: THREE.Vector3, duration = 0) => {
+      (pos: IkTargetPosition, duration = 0) => {
         if (!ikEnabledRef.current) setIkEnabled(true);
         const target = ikTargetRef.current;
         if (!target) return;
 
-        const targetPos = pos.clone();
+        const targetPos = toIkVector3(pos);
         const targetRot = new THREE.Quaternion().setFromEuler(
           new THREE.Euler(Math.PI, 0, 0),
         );

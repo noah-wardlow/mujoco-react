@@ -564,7 +564,7 @@ export interface IkContextValue {
   ikTargetRef: React.RefObject<THREE.Group>;
   siteIdRef: React.RefObject<number>;
   setIkEnabled: (enabled: boolean) => void;
-  moveTarget: (pos: THREE.Vector3, duration?: number) => void;
+  moveTarget: (pos: IkTargetPosition, duration?: number) => void;
   syncTargetToSite: () => void;
   solveIK: (input: IkSolveInput) => number[] | null;
   getGizmoStats: () => { pos: THREE.Vector3; rot: THREE.Euler } | null;
@@ -592,9 +592,28 @@ export type IKSolveFn = (
   input: IkSolveInput
 ) => number[] | null;
 
+export type IkTargetPosition =
+  | THREE.Vector3
+  | readonly [number, number, number]
+  | {
+      readonly x: number;
+      readonly y: number;
+      readonly z: number;
+    };
+
+export type IkTargetQuaternion =
+  | THREE.Quaternion
+  | readonly [number, number, number, number]
+  | {
+      readonly x: number;
+      readonly y: number;
+      readonly z: number;
+      readonly w: number;
+    };
+
 export interface IkSolveInput {
-  position: THREE.Vector3;
-  quaternion: THREE.Quaternion;
+  position: IkTargetPosition;
+  quaternion: IkTargetQuaternion;
   currentQ: number[];
   context?: IKSolveContext;
 }
