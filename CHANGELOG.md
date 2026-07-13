@@ -1,3 +1,10 @@
+# [10.8.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.7.0...v10.8.0) (2026-07-13)
+
+
+### Features
+
+* add hiddenBodies prop to skip rendering named bodies ([f0108cd](https://github.com/noah-wardlow/mujoco-react/commit/f0108cdb65670e913591c958955d791ae5092272))
+
 # [10.7.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.6.0...v10.7.0) (2026-06-26)
 
 
