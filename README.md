@@ -780,6 +780,7 @@ Thin wrapper around R3F `<Canvas>`. Accepts all R3F Canvas props plus:
 | `paused` | `boolean` | Declarative pause |
 | `speed` | `number` | Simulation speed multiplier |
 | `renderOptions` | `MujocoRenderOptions` | Optional render-time geometry settings such as `meshNormalSmoothing` |
+| `hiddenBodies` | `readonly string[]` | Names of model bodies whose meshes are skipped at build time. The bodies still simulate (indices unchanged); only rendering is skipped. Reapplied on every rebuild, so toggling names can't be lost to a scene rebuild |
 
 ### `<MujocoPhysics>`
 

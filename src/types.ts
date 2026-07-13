@@ -291,6 +291,9 @@ export interface MujocoModel {
   mesh_vert: Float32Array;
   mesh_face: Int32Array;
   mesh_normal: Float32Array;
+  mesh_texcoordadr?: Int32Array;
+  mesh_texcoord?: Float32Array;
+  mesh_facetexcoord?: Int32Array;
 
   // Site
   site_bodyid: Int32Array;
@@ -1843,6 +1846,13 @@ export type MujocoCanvasProps = Omit<CanvasProps, 'onError'> & {
   speed?: number;
   interpolate?: boolean;
   renderOptions?: MujocoRenderOptions;
+  /**
+   * Names of model bodies whose geometry should not be rendered. The bodies stay
+   * in the compiled model and continue to simulate — only their meshes are
+   * skipped at scene-build time, so body/joint/actuator indices are unchanged.
+   * Applied on every (re)build, so toggling names cannot be lost to a rebuild.
+   */
+  hiddenBodies?: readonly string[];
 };
 
 // ---- Hook Return Types ----

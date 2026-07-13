@@ -32,6 +32,7 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
       speed,
       interpolate,
       renderOptions,
+      hiddenBodies,
       loadingFallback,
       children,
       ...canvasProps
@@ -75,6 +76,7 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
           speed={speed}
           interpolate={interpolate}
           renderOptions={renderOptions}
+          hiddenBodies={hiddenBodies}
         >
           {children}
         </MujocoSimProvider>

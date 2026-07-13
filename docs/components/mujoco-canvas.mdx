@@ -96,6 +96,14 @@ function App() {
   it unset when you need exact policy-render parity.
 </ParamField>
 
+<ParamField body="hiddenBodies" type="readonly string[]">
+  Names of model bodies whose geometry should not be rendered. The bodies stay
+  in the compiled model and keep simulating — only their meshes are skipped at
+  scene-build time, so body, joint, and actuator indices are unchanged. The set
+  is reapplied on every render rebuild, so toggling names can never be lost to a
+  scene rebuild. Use it to show one arm of a bimanual model, hide fixtures, etc.
+</ParamField>
+
 ### R3F Canvas Props
 
 All standard `@react-three/fiber` Canvas props are passed through:

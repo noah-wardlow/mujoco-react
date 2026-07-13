@@ -441,6 +441,8 @@ export interface MujocoSimContextValue {
   errorRef: React.RefObject<string | null>;
   bodyRegistryRef: React.RefObject<Map<string, { definition: SceneObject; hasCustomChildren: boolean }>>;
   hiddenBodiesRef: React.RefObject<Set<string>>;
+  /** Bumped whenever the hidden-body set changes, forcing SceneRenderer to rebuild. */
+  hiddenBodiesVersion: number;
   requestBodyReload: () => void;
   status: 'loading' | 'ready' | 'error';
 }
@@ -547,6 +549,7 @@ interface MujocoSimProviderProps {
   speed?: number;
   interpolate?: boolean;
   renderOptions?: MujocoRenderOptions;
+  hiddenBodies?: readonly string[];
   children: React.ReactNode;
 }
 
@@ -565,6 +568,7 @@ export function MujocoSimProvider({
   speed,
   interpolate,
   renderOptions,
+  hiddenBodies,
   children,
 }: MujocoSimProviderProps) {
   const { gl, camera, scene } = useThree();
@@ -602,6 +606,8 @@ export function MujocoSimProvider({
   const errorRef = useRef<string | null>(null);
   const bodyRegistryRef = useRef(new Map<string, { definition: SceneObject; hasCustomChildren: boolean }>());
   const hiddenBodiesRef = useRef(new Set<string>());
+  const providedHiddenBodiesRef = useRef<Set<string>>(new Set(hiddenBodies ?? []));
+  const [hiddenBodiesVersion, setHiddenBodiesVersion] = useState(0);
   const bodyReloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   configRef.current = config;
@@ -629,16 +635,43 @@ export function MujocoSimProvider({
     model.opt.timestep = timestep;
   }, [timestep]);
 
-  // --- Build merged config (base + body registry) ---
-  function buildMergedConfig(baseConfig: SceneConfig): SceneConfig {
-    if (bodyRegistryRef.current.size === 0) return baseConfig;
-    const registeredNames = new Set(bodyRegistryRef.current.keys());
-    const baseObjects = (baseConfig.sceneObjects ?? []).filter(o => !registeredNames.has(o.name));
-    const registeredBodies = Array.from(bodyRegistryRef.current.values()).map(e => e.definition);
+  // Sync hiddenBodies prop. Rebuilds the render meshes (not the model) when the
+  // set changes so a toggle can never be lost to SceneRenderer's own rebuilds.
+  const hiddenBodiesKey = (hiddenBodies ?? []).join(' ');
+  useEffect(() => {
+    const next = new Set(hiddenBodies ?? []);
+    const prev = providedHiddenBodiesRef.current;
+    let unchanged = next.size === prev.size;
+    if (unchanged) {
+      for (const name of next) {
+        if (!prev.has(name)) { unchanged = false; break; }
+      }
+    }
+    if (unchanged) return;
+    providedHiddenBodiesRef.current = next;
+    recomputeHiddenBodies();
+    setHiddenBodiesVersion(v => v + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hiddenBodiesKey]);
+
+  // Recompute the set of bodies SceneRenderer must skip: bodies whose rendering
+  // a <Body> replaces with custom children, plus any named via the hiddenBodies
+  // prop. SceneRenderer reads this ref on every build.
+  function recomputeHiddenBodies() {
     hiddenBodiesRef.current.clear();
     for (const [name, entry] of bodyRegistryRef.current) {
       if (entry.hasCustomChildren) hiddenBodiesRef.current.add(name);
     }
+    for (const name of providedHiddenBodiesRef.current) hiddenBodiesRef.current.add(name);
+  }
+
+  // --- Build merged config (base + body registry) ---
+  function buildMergedConfig(baseConfig: SceneConfig): SceneConfig {
+    recomputeHiddenBodies();
+    if (bodyRegistryRef.current.size === 0) return baseConfig;
+    const registeredNames = new Set(bodyRegistryRef.current.keys());
+    const baseObjects = (baseConfig.sceneObjects ?? []).filter(o => !registeredNames.has(o.name));
+    const registeredBodies = Array.from(bodyRegistryRef.current.values()).map(e => e.definition);
     return { ...baseConfig, sceneObjects: [...baseObjects, ...registeredBodies] };
   }
 
@@ -1967,10 +2000,11 @@ export function MujocoSimProvider({
       errorRef,
       bodyRegistryRef,
       hiddenBodiesRef,
+      hiddenBodiesVersion,
       requestBodyReload,
       status,
     }),
-    [api, status, requestBodyReload]
+    [api, status, requestBodyReload, hiddenBodiesVersion]
   );
 
   return (

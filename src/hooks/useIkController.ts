@@ -61,7 +61,20 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
     const ikTargetRef = useRef<THREE.Group>(new THREE.Group());
     const siteIdRef = useRef(-1);
     const controlGroupRef = useRef<ControlGroupInfo | null>(null);
-    const genericIkRef = useRef<GenericIK>(new GenericIK(mujocoRef.current));
+    // The solver must always call into the module that owns the live
+    // model/data. Capturing the module once at mount breaks when the provider
+    // remounts (e.g. StrictMode double-mount): embind then rejects the model
+    // with "Expected null or instance of MjModel, got an instance of MjModel".
+    const genericIkRef = useRef<GenericIK | null>(null);
+    const genericIkModuleRef = useRef<unknown>(null);
+    const getGenericIk = useCallback(() => {
+      const module = mujocoRef.current;
+      if (!genericIkRef.current || genericIkModuleRef.current !== module) {
+        genericIkRef.current = new GenericIK(module);
+        genericIkModuleRef.current = module;
+      }
+      return genericIkRef.current;
+    }, [mujocoRef]);
     const firstIkEnableRef = useRef(true);
     const needsInitialSync = useRef(true);
 
@@ -119,7 +132,7 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
         const data = mjDataRef.current;
         const controlGroup = controlGroupRef.current;
         if (!model || !data || !controlGroup || siteIdRef.current === -1) return null;
-        return genericIkRef.current.solve(
+        return getGenericIk().solve(
           model, data, siteIdRef.current, controlGroup.qposAdr,
           targetPosition, targetQuaternion, currentQ,
           {
@@ -135,7 +148,7 @@ export const useIkController = createControllerHook<IkConfig, IkContextValue>(
           },
         );
       },
-      [config, mjModelRef, mjDataRef],
+      [config, mjModelRef, mjDataRef, getGenericIk],
     );
     const ikSolveFnRef = useRef<IKSolveFn>(ikSolveFn);
     ikSolveFnRef.current = ikSolveFn;

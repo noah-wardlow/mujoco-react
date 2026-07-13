@@ -35,6 +35,7 @@ export function SceneRenderer({ renderOptions, ...props }: SceneRendererProps) {
     mujocoRef,
     onSelectionRef,
     hiddenBodiesRef,
+    hiddenBodiesVersion,
     interpolateRef,
     interpolationStateRef,
     status,
@@ -43,6 +44,7 @@ export function SceneRenderer({ renderOptions, ...props }: SceneRendererProps) {
   const bodyRefs = useRef<(THREE.Group | null)[]>([]);
   const prevModelRef = useRef<MujocoModel | null>(null);
   const prevRenderOptionsKeyRef = useRef<string | null>(null);
+  const prevHiddenVersionRef = useRef<number | null>(null);
   const renderOptionsKey = getRenderOptionsKey(renderOptions);
 
   const geomBuilder = useMemo(() => {
@@ -57,15 +59,17 @@ export function SceneRenderer({ renderOptions, ...props }: SceneRendererProps) {
     const group = groupRef.current;
     if (!model || !group) return;
 
-    // Skip if model hasn't changed
+    // Skip if neither the model, render options, nor the hidden-body set changed
     if (
       prevModelRef.current === model &&
-      prevRenderOptionsKeyRef.current === renderOptionsKey
+      prevRenderOptionsKeyRef.current === renderOptionsKey &&
+      prevHiddenVersionRef.current === hiddenBodiesVersion
     ) {
       return;
     }
     prevModelRef.current = model;
     prevRenderOptionsKeyRef.current = renderOptionsKey;
+    prevHiddenVersionRef.current = hiddenBodiesVersion;
 
     // Clear previous bodies
     while (group.children.length > 0) {
@@ -92,7 +96,7 @@ export function SceneRenderer({ renderOptions, ...props }: SceneRendererProps) {
       refs.push(bodyGroup);
     }
     bodyRefs.current = refs;
-  }, [status, geomBuilder, mjModelRef, renderOptionsKey]);
+  }, [status, geomBuilder, mjModelRef, renderOptionsKey, hiddenBodiesRef, hiddenBodiesVersion]);
 
   const syncBodiesToData = useCallback(() => {
     const data = mjDataRef.current;

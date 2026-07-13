@@ -155,16 +155,40 @@ export class GeomBuilder {
             const fAdr = mjModel.mesh_faceadr[mId];
             const fNum = mjModel.mesh_facenum[mId];
 
-            geo = new THREE.BufferGeometry();
-            // 'position' attribute = vertices
-            geo.setAttribute('position', new THREE.Float32BufferAttribute(mjModel.mesh_vert.subarray(vAdr * 3, (vAdr + vNum) * 3), 3));
-            // 'index' = faces (triangles connecting vertices)
-            geo.setIndex(Array.from(mjModel.mesh_face.subarray(fAdr * 3, (fAdr + fNum) * 3)));
-            const smoothingTolerance = this.getMeshNormalSmoothingTolerance();
-            if (smoothingTolerance !== null) {
-                geo = mergeVertices(geo, smoothingTolerance);
+            const tAdr = mjModel.mesh_texcoordadr?.[mId] ?? -1;
+            if (map && tAdr >= 0 && mjModel.mesh_texcoord && mjModel.mesh_facetexcoord) {
+                // Textured mesh. MuJoCo indexes texcoords per face corner
+                // (mesh_facetexcoord), independently of the vertex indices, so
+                // the geometry must be de-indexed to carry a 'uv' attribute.
+                const corners = fNum * 3;
+                const positions = new Float32Array(corners * 3);
+                const uvs = new Float32Array(corners * 2);
+                for (let c = 0; c < corners; c++) {
+                    const v = vAdr + mjModel.mesh_face[fAdr * 3 + c];
+                    positions[c * 3] = mjModel.mesh_vert[v * 3];
+                    positions[c * 3 + 1] = mjModel.mesh_vert[v * 3 + 1];
+                    positions[c * 3 + 2] = mjModel.mesh_vert[v * 3 + 2];
+                    const t = tAdr + mjModel.mesh_facetexcoord[fAdr * 3 + c];
+                    uvs[c * 2] = mjModel.mesh_texcoord[t * 2];
+                    // MuJoCo stores V with image-top origin; flip back to GL convention.
+                    uvs[c * 2 + 1] = 1 - mjModel.mesh_texcoord[t * 2 + 1];
+                }
+                geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+                geo.computeVertexNormals();
+            } else {
+                geo = new THREE.BufferGeometry();
+                // 'position' attribute = vertices
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(mjModel.mesh_vert.subarray(vAdr * 3, (vAdr + vNum) * 3), 3));
+                // 'index' = faces (triangles connecting vertices)
+                geo.setIndex(Array.from(mjModel.mesh_face.subarray(fAdr * 3, (fAdr + fNum) * 3)));
+                const smoothingTolerance = this.getMeshNormalSmoothingTolerance();
+                if (smoothingTolerance !== null) {
+                    geo = mergeVertices(geo, smoothingTolerance);
+                }
+                geo.computeVertexNormals(); // Auto-calculate smooth lighting normals
             }
-            geo.computeVertexNormals(); // Auto-calculate smooth lighting normals
         }
 
         // 5. Construct the final Mesh
