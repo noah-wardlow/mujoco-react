@@ -1,3 +1,10 @@
+# [10.9.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.8.0...v10.9.0) (2026-07-19)
+
+
+### Features
+
+* honor jointLimits in GenericIK and bound per-iteration steps ([d919db8](https://github.com/noah-wardlow/mujoco-react/commit/d919db85f6a0dd9b1de4679925a00840eb0842a3))
+
 # [10.8.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.7.0...v10.8.0) (2026-07-13)
 
 
