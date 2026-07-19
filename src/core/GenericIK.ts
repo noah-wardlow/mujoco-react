@@ -13,6 +13,8 @@ export interface GenericIKOptions {
     epsilon: number;
     posWeight: number;
     rotWeight: number;
+    /** Per-iteration |Δq| cap in radians; bounds near-singular DLS steps. */
+    maxStepRad: number;
     jointLimits?: ReadonlyArray<readonly [number, number] | null | undefined>;
 }
 
@@ -26,6 +28,7 @@ const DEFAULTS: Required<Omit<GenericIKOptions, 'jointLimits'>> = {
     epsilon: 1e-6,
     posWeight: 1.0,
     rotWeight: 0.3,
+    maxStepRad: 0.5,
 };
 
 function resolveOptions(opts?: Partial<GenericIKOptions>): ResolvedGenericIKOptions {
@@ -36,6 +39,7 @@ function resolveOptions(opts?: Partial<GenericIKOptions>): ResolvedGenericIKOpti
         epsilon: opts?.epsilon ?? DEFAULTS.epsilon,
         posWeight: opts?.posWeight ?? DEFAULTS.posWeight,
         rotWeight: opts?.rotWeight ?? DEFAULTS.rotWeight,
+        maxStepRad: opts?.maxStepRad ?? DEFAULTS.maxStepRad,
         jointLimits: opts?.jointLimits,
     };
 }
@@ -214,8 +218,26 @@ export class GenericIK {
                 dq[j] = sum;
             }
 
-            // Update joints
-            for (let i = 0; i < n; i++) q[i] += dq[i];
+            // Update joints: bound each step, then clamp to joint limits.
+            // Clamping inside the loop pins a saturated joint at its limit so
+            // subsequent iterations redistribute the remaining error to the
+            // unclamped joints (gradient projection), instead of returning an
+            // out-of-range solution for the caller to distort with a post-hoc
+            // per-joint clamp.
+            for (let i = 0; i < n; i++) {
+                let step = dq[i];
+                if (step > o.maxStepRad) step = o.maxStepRad;
+                else if (step < -o.maxStepRad) step = -o.maxStepRad;
+                let next = q[i] + step;
+                const limits = o.jointLimits?.[i];
+                if (limits) {
+                    const low = Math.min(limits[0], limits[1]);
+                    const high = Math.max(limits[0], limits[1]);
+                    if (next < low) next = low;
+                    else if (next > high) next = high;
+                }
+                q[i] = next;
+            }
         }
 
         // Restore original qpos
