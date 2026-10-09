@@ -1,3 +1,15 @@
+# [11.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.9.0...v11.0.0) (2026-10-09)
+
+
+### Features
+
+* support MuJoCo 3.15 and analytic quaternion-aware IK ([3782431](https://github.com/noah-wardlow/mujoco-react/commit/3782431eb224234a97d7d092688513e787093bd8)), closes [#1](https://github.com/noah-wardlow/mujoco-react/issues/1)
+
+
+### BREAKING CHANGES
+
+* the engine is now pinned to MuJoCo 3.15.0, with its upstream physics and model migrations. Low-level model and actuator metadata follow 3.15; use ctrlAdr/ctrlCount instead of assuming actuator IDs index controls. Scalar control and IK calls remain supported; epsilon is deprecated and ignored.
+
 # [10.9.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.8.0...v10.9.0) (2026-07-19)
 
 
