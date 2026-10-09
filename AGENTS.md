@@ -11,7 +11,7 @@ This is a TypeScript ESM library for React Three Fiber MuJoCo simulations. Sourc
 - `npm run build`: build ESM outputs, declarations, and sourcemaps into `dist/`.
 - `npm run typecheck`: run `tsc --noEmit` over `src` and `type-tests`.
 
-There is no separate unit-test script in this package; treat `npm run typecheck` and focused type tests as the required verification baseline. Release CI on Node 22 runs `npm ci`, `npm run build`, `npm run typecheck`, then semantic-release.
+Run `npm run test:runtime` for real WASM engine regression tests alongside `npm run typecheck` and focused type tests. Release CI on Node 22 runs `npm ci`, `npm run build`, `npm run typecheck`, then semantic-release.
 
 ## Coding Style & Naming Conventions
 

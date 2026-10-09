@@ -7,7 +7,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useMujocoContext, useBeforePhysicsStep } from '../core/MujocoSimProvider';
-import { findActuatorByName } from '../core/SceneLoader';
+import { findActuatorByName, getActuatorControlAddress } from '../core/SceneLoader';
 import type { KeyboardTeleopConfig } from '../types';
 
 /**
@@ -37,7 +37,7 @@ export function useKeyboardTeleop(config: KeyboardTeleopConfig) {
     const cache = new Map<string, number>();
     for (const binding of Object.values(config.bindings)) {
       if (!cache.has(binding.actuator)) {
-        cache.set(binding.actuator, findActuatorByName(model, binding.actuator));
+        cache.set(binding.actuator, getActuatorControlAddress(model, findActuatorByName(model, binding.actuator)));
       }
     }
     actuatorCacheRef.current = cache;

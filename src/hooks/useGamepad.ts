@@ -7,7 +7,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useMujocoContext, useBeforePhysicsStep } from '../core/MujocoSimProvider';
-import { findActuatorByName } from '../core/SceneLoader';
+import { findActuatorByName, getActuatorControlAddress } from '../core/SceneLoader';
 
 interface GamepadConfig {
   /** Map gamepad axis index to actuator name. */
@@ -43,10 +43,10 @@ export function useGamepad(config: GamepadConfig) {
     axisCacheRef.current.clear();
     buttonCacheRef.current.clear();
     for (const [idx, name] of Object.entries(config.axes ?? {})) {
-      axisCacheRef.current.set(Number(idx), findActuatorByName(model, name));
+      axisCacheRef.current.set(Number(idx), getActuatorControlAddress(model, findActuatorByName(model, name)));
     }
     for (const [idx, name] of Object.entries(config.buttons ?? {})) {
-      buttonCacheRef.current.set(Number(idx), findActuatorByName(model, name));
+      buttonCacheRef.current.set(Number(idx), getActuatorControlAddress(model, findActuatorByName(model, name)));
     }
   }, [config.axes, config.buttons, status, mjModelRef]);
 

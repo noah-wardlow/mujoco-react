@@ -53,3 +53,10 @@ interface ActuatorInfo {
 - The array is recomputed only when the model changes (e.g., after `loadScene()`)
 - Returns a stable reference — safe to use in dependency arrays
 - For reading/writing individual actuator values, see [`useCtrl`](/hooks/use-ctrl)
+
+Actuator IDs identify metadata; control addresses index `data.ctrl`. New actuator
+metadata includes `ctrlAdr`, `ctrlCount`, and `ranges`. A PID or orientation
+actuator can own multiple inputs. Write a complete vector with
+`api.setCtrl(name, values)` or access one input with `useCtrl(name, inputIndex)`.
+Calling scalar-only controls on a multi-input actuator without an input selector
+throws an actionable error.

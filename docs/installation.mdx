@@ -70,6 +70,7 @@ import mtWasmUrl from "@mujoco/mujoco/mt/mujoco.wasm?url";
 <MujocoProvider
   wasmVariant="auto"
   threadedLoader={loadMujocoMt}
+  threadCount={2}
   mtWasmUrl={mtWasmUrl}
 >
   <App />
@@ -114,3 +115,8 @@ If you see a Franka Panda robot in your browser, everything is working.
 <Note>
   The first load may take a few seconds as the WASM module initializes and model assets are fetched from GitHub. Subsequent loads are faster due to browser caching.
 </Note>
+
+`threadCount` defaults to 0. Set a positive integer to initialize `mju_threadpool`
+for each simulation data instance. It requires the threaded build and cross-origin
+isolation. Loading the MT build alone does not request a simulation thread pool.
+Benchmark your scene before increasing the count; small scenes can be slower.

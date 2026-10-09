@@ -5,12 +5,12 @@
 
 import { useMemo } from 'react';
 import { useMujocoContext } from '../core/MujocoSimProvider';
-import { getName } from '../core/SceneLoader';
+import { getActuatorInfo } from '../core/SceneLoader';
 import type { ActuatorInfo } from '../types';
 
 /**
  * Returns a stable array of actuator metadata for building control UIs.
- * Computed once when the model loads. Consumer reads/writes data.ctrl[id] directly.
+ * Computed once when the model loads. Use ctrlAdr and ctrlCount to address controls.
  */
 export function useActuators(): ActuatorInfo[] {
   const { mjModelRef, status } = useMujocoContext();
@@ -20,17 +20,7 @@ export function useActuators(): ActuatorInfo[] {
     const model = mjModelRef.current;
     if (!model) return [];
 
-    const actuators: ActuatorInfo[] = [];
-    for (let i = 0; i < model.nu; i++) {
-      const name = getName(model, model.name_actuatoradr[i]);
-      const lo = model.actuator_ctrlrange[i * 2];
-      const hi = model.actuator_ctrlrange[i * 2 + 1];
-      const hasRange = lo < hi;
-      const range: [number, number] = hasRange
-        ? [lo, hi]
-        : [-Infinity, Infinity];
-      actuators.push({ id: i, name, range });
-    }
+    const actuators = Array.from({ length: model.nactuator }, (_, id) => getActuatorInfo(model, id));
     return actuators;
   }, [status, mjModelRef]);
 }

@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
-import { findActuatorByName } from '../core/SceneLoader';
+import { findActuatorByName, getActuatorControlAddress } from '../core/SceneLoader';
 import { useMujocoContext } from '../core/MujocoSimProvider';
 import { useControlWriter, type ControlWriterOptions } from './useControlWriter';
 import type { Actuators } from '../types';
@@ -150,7 +150,7 @@ export function useControlGroup<K extends Actuators>(
       if (id < 0) {
         console.warn(`[mujoco-react] useControlGroup: actuator "${name}" was not found.`);
       }
-      return id;
+      return getActuatorControlAddress(model, id);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mjModelRef, status, namesKey]);

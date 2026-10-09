@@ -68,7 +68,7 @@ Pass an `IkConfig` object or `null`:
 | `posWeight` | `number` | `1.0` | Position error weight for the built-in solver |
 | `rotWeight` | `number` | `0.3` | Orientation error weight for the built-in solver |
 | `tolerance` | `number` | `1e-3` | Solver convergence tolerance |
-| `epsilon` | `number` | `1e-6` | Finite-difference step for Jacobian estimation |
+| `epsilon` | `number` | `1e-6` | Deprecated; ignored by the analytic solver |
 | `maxIterations` | `number` | `50` | Max solver iterations |
 
 By default, `useIkController` infers scalar hinge/slide joints by walking from the site body toward the model root. For nonstandard actuator layouts, pass explicit ordered names or a selector:
@@ -214,13 +214,13 @@ function WaypointFollower({ waypoints }: { waypoints: THREE.Vector3[] }) {
 
 ## Built-in Solver Details
 
-The default solver uses **Damped Least-Squares** (DLS) with finite-difference Jacobian:
+The default solver uses **Damped Least-Squares** (DLS) with MuJoCo’s analytic `mj_jacSite` Jacobian:
 
 - **Position weight**: 1.0
 - **Rotation weight**: 0.3
 - **Tolerance**: 1e-3
-- **Finite-difference epsilon**: 1e-6
-- **Method**: Finite-difference Jacobian + pseudoinverse
+- **`epsilon`**: deprecated; retained for source compatibility and ignored
+- **Method**: Analytic Jacobian + damped least squares
 
 The solver tracks the best solution across iterations and returns it even if tolerance isn't reached.
 

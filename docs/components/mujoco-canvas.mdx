@@ -138,3 +138,9 @@ const apiRef = useRef<MujocoSimAPI>(null);
 - Must be a child of `<MujocoProvider>`
 - Children can use all mujoco-react hooks (`useMujoco`, `useBeforePhysicsStep`, etc.)
 - The `config` prop is read on mount and when `api.loadScene()` is called — changing it after mount has no effect
+
+### Integrator override
+
+`integrator` accepts `"Euler"`, `"RK4"`, `"implicit"`, `"implicitfast"`, or `"discrete"`.
+Omit it to keep the MJCF setting. `discrete` integrates stiffness and constraints
+implicitly; verify controller tuning and use a compatible solver (CG or Newton).

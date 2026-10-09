@@ -8,6 +8,7 @@ import { useMujocoWasm } from './MujocoProvider';
 import { MujocoSimProvider } from './MujocoSimProvider';
 import type {
   MujocoSimAPI,
+  MujocoIntegrator,
   ReadyCallbackInput,
   SceneConfig,
   SelectionCallbackInput,
@@ -29,6 +30,8 @@ export interface MujocoPhysicsProps {
   gravity?: [number, number, number];
   /** Override model.opt.timestep. */
   timestep?: number;
+  /** Override the integrator; omit to preserve the model setting. */
+  integrator?: MujocoIntegrator;
   /** mj_step calls per frame. */
   substeps?: number;
   /** Declarative pause. */

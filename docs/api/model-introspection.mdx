@@ -281,3 +281,10 @@ function ModelInfo() {
   return <div>{info}</div>;
 }
 ```
+
+Actuator IDs identify metadata; control addresses index `data.ctrl`. New actuator
+metadata includes `ctrlAdr`, `ctrlCount`, and `ranges`. A PID or orientation
+actuator can own multiple inputs. Write a complete vector with
+`api.setCtrl(name, values)` or access one input with `useCtrl(name, inputIndex)`.
+Calling scalar-only controls on a multi-input actuator without an input selector
+throws an actionable error.

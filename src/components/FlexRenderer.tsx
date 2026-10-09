@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
 import * as THREE from 'three';
+import { getFlexTopology } from '../rendering/flexTopology';
 import { useMujocoContext } from '../core/MujocoSimProvider';
 
 /**
@@ -18,7 +19,7 @@ import { useMujocoContext } from '../core/MujocoSimProvider';
 export function FlexRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
   const { mjModelRef, mjDataRef, status } = useMujocoContext();
   const groupRef = useRef<THREE.Group>(null);
-  const meshesRef = useRef<THREE.Mesh[]>([]);
+  const meshesRef = useRef<Array<THREE.Mesh | THREE.LineSegments | THREE.Points>>([]);
 
   // Build flex meshes once when model is ready
   useEffect(() => {
@@ -39,11 +40,8 @@ export function FlexRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
       const positions = new Float32Array(vertNum * 3);
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-      // Note: flex_faceadr/flex_facenum/flex_face may not be available in all MuJoCo WASM builds.
-      // Without face data we render as a point cloud. If future WASM versions expose
-      // face arrays, index-based triangle rendering can be added here.
-
-      geometry.computeVertexNormals();
+      const topology = getFlexTopology(model, f);
+      if (topology.indices.length) geometry.setIndex(topology.indices);
 
       let color = new THREE.Color(0.5, 0.5, 0.5);
       if (model.flex_rgba) {
@@ -54,13 +52,14 @@ export function FlexRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
         );
       }
 
-      const material = new THREE.MeshStandardMaterial({
-        color,
-        roughness: 0.7,
-        side: THREE.DoubleSide,
-      });
-
-      const mesh = new THREE.Mesh(geometry, material);
+      const opacity = model.flex_rgba[4 * f + 3];
+      const materialOptions = { color, opacity, transparent: opacity < 1 };
+      const mesh = topology.kind === 'mesh'
+        ? new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ ...materialOptions, roughness: 0.7, side: THREE.DoubleSide }))
+        : topology.kind === 'lines'
+          ? new THREE.LineSegments(geometry, new THREE.LineBasicMaterial(materialOptions))
+          : new THREE.Points(geometry, new THREE.PointsMaterial({ ...materialOptions, size: 0.01 }));
+      mesh.frustumCulled = false;
       mesh.userData.flexId = f;
       mesh.userData.vertAdr = vertAdr;
       mesh.userData.vertNum = vertNum;
@@ -94,7 +93,7 @@ export function FlexRenderer(props: Omit<ThreeElements['group'], 'ref'>) {
         posAttr.setXYZ(v, data.flexvert_xpos[srcIdx], data.flexvert_xpos[srcIdx + 1], data.flexvert_xpos[srcIdx + 2]);
       }
       posAttr.needsUpdate = true;
-      mesh.geometry.computeVertexNormals();
+      if (mesh instanceof THREE.Mesh) mesh.geometry.computeVertexNormals();
     }
   });
 

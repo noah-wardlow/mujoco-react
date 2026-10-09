@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useMemo } from 'react';
 import { useMujocoContext } from '../core/MujocoSimProvider';
-import { findActuatorByName } from '../core/SceneLoader';
+import { findActuatorByName, getActuatorControlAddress } from '../core/SceneLoader';
 import type { Actuators, CtrlHandle } from '../types';
 
 /**
@@ -16,7 +16,7 @@ import type { Actuators, CtrlHandle } from '../types';
  * Returns a `CtrlHandle` with `read()` and `write()` methods that
  * operate directly on `data.ctrl` without causing React re-renders.
  */
-export function useCtrl(name: Actuators): CtrlHandle {
+export function useCtrl(name: Actuators, input?: number): CtrlHandle {
   const { mjModelRef, mjDataRef, status } = useMujocoContext();
   const actuatorIdRef = useRef(-1);
   const rangeRef = useRef<[number, number]>([0, 0]);
@@ -25,14 +25,15 @@ export function useCtrl(name: Actuators): CtrlHandle {
     const model = mjModelRef.current;
     if (!model || status !== 'ready') return;
     const id = findActuatorByName(model, name);
-    actuatorIdRef.current = id;
+    const adr = getActuatorControlAddress(model, id, input);
+    actuatorIdRef.current = adr;
     if (id >= 0) {
       rangeRef.current = [
-        model.actuator_ctrlrange[id * 2],
-        model.actuator_ctrlrange[id * 2 + 1],
+        model.actuator_ctrlrange[adr * 2],
+        model.actuator_ctrlrange[adr * 2 + 1],
       ];
     }
-  }, [name, status, mjModelRef]);
+  }, [name, input, status, mjModelRef]);
 
   return useMemo<CtrlHandle>(() => ({
     read() {

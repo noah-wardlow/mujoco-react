@@ -10,6 +10,7 @@ export interface GenericIKOptions {
     maxIterations: number;
     damping: number;
     tolerance: number;
+    /** @deprecated Analytic Jacobians do not require perturbations. */
     epsilon: number;
     posWeight: number;
     rotWeight: number;
@@ -44,207 +45,213 @@ function resolveOptions(opts?: Partial<GenericIKOptions>): ResolvedGenericIKOpti
     };
 }
 
-/**
- * Generic Damped Least-Squares IK solver.
- * Uses finite-difference Jacobian via MuJoCo's mj_forward.
- * Works for any MuJoCo model — no robot-specific parameters.
- */
+/** Analytic damped least-squares IK in MuJoCo velocity coordinates. */
 export class GenericIK {
-    private mujoco: MujocoModule;
+    constructor(private mujoco: MujocoModule) {}
 
-    constructor(mujoco: MujocoModule) {
-        this.mujoco = mujoco;
-    }
-
-    /**
-     * Solve IK for a target 6-DOF pose.
-     * @param model       MuJoCo model
-     * @param data        MuJoCo data (qpos will be temporarily modified, then restored)
-     * @param siteId      Index of the end-effector site to control
-     * @param qposAdr     qpos addresses for scalar joints in solve order
-     * @param targetPos   Target position in world frame
-     * @param targetQuat  Target orientation in world frame
-     * @param currentQ    Current joint angles matching qposAdr order
-     * @param opts        Optional solver parameters
-     * @returns Joint angles array, or null if solver diverged
-     */
+    /** Scalar hinge/slide interface. Returns values in qposAdr order. */
     solve(
         model: MujocoModel,
         data: MujocoData,
         siteId: number,
         qposAdr: ArrayLike<number>,
-        targetPos: THREE.Vector3,
-        targetQuat: THREE.Quaternion,
+        targetPos: Pick<THREE.Vector3, 'x' | 'y' | 'z'>,
+        targetQuat: Pick<THREE.Quaternion, 'x' | 'y' | 'z' | 'w'>,
         currentQ: ArrayLike<number>,
-        opts?: Partial<GenericIKOptions>
+        opts?: Partial<GenericIKOptions>,
+    ): number[] | null {
+        if (currentQ.length !== qposAdr.length) throw new Error('IK currentQ must match qposAdr length');
+        const jointIds = Array.from(qposAdr, (adr) => {
+            const id = Array.from({ length: model.njnt }, (_, i) => i).find(
+                (i) => model.jnt_qposadr[i] === adr,
+            );
+            if (id === undefined || model.jnt_type[id] < 2) {
+                throw new Error(
+                    'Scalar IK requires hinge/slide qpos addresses; use solveJoints for ball/free joints',
+                );
+            }
+            return id;
+        });
+        const initial = new Float64Array(data.qpos);
+        for (let i = 0; i < qposAdr.length; i++) initial[qposAdr[i]] = currentQ[i];
+        const result = this.solveJoints(model, data, siteId, jointIds, targetPos, targetQuat, initial, opts);
+        return result ? Array.from(qposAdr, (adr) => result[adr]) : null;
+    }
+
+    /**
+     * Solve selected joint IDs, including ball/free joints. Initial and returned
+     * configurations have model.nq entries, with MuJoCo wxyz quaternions.
+     * Jacobian columns use nv/dof addresses; mj_integratePos updates quaternions.
+     * The caller's qpos is restored even if the solve throws.
+     */
+    solveJoints(
+        model: MujocoModel,
+        data: MujocoData,
+        siteId: number,
+        jointIds: ArrayLike<number>,
+        targetPos: Pick<THREE.Vector3, 'x' | 'y' | 'z'>,
+        targetQuat: Pick<THREE.Quaternion, 'x' | 'y' | 'z' | 'w'>,
+        currentQpos: ArrayLike<number> = data.qpos,
+        opts?: Partial<GenericIKOptions>,
     ): number[] | null {
         const o = resolveOptions(opts);
-        const n = qposAdr.length;
-
-        // Save full qpos so we can restore after solving
-        const savedQpos = new Float64Array(data.qpos.length);
-        savedQpos.set(data.qpos);
-
-        // Build target rotation matrix (3x3 row-major)
-        const R_target = quatToMat3(targetQuat);
-
-        // Working joint angles — start from current configuration
-        const q = new Float64Array(n);
-        for (let i = 0; i < n; i++) q[i] = currentQ[i];
-
-        // Pre-allocate work arrays
-        const J = new Float64Array(6 * n);       // 6×n Jacobian (row-major)
-        const JJt = new Float64Array(36);         // 6×6
-        const rhs = new Float64Array(6);          // right-hand side
-        const x = new Float64Array(6);            // solve result
-        const dq = new Float64Array(n);           // joint update
-        const baseSitePos = new Float64Array(3);
-        const baseSiteMat = new Float64Array(9);
-        const pertSitePos = new Float64Array(3);
-        const pertSiteMat = new Float64Array(9);
-
-        let bestQ: number[] | null = null;
-        let bestErr = Infinity;
-        // Stop early once the error stops improving. The solver always returns the
-        // best configuration it has seen, so when it stalls or diverges (an
-        // unreachable target, e.g. a near-singular wrist orientation) further
-        // iterations can't beat bestQ — they only burn (1 + n) mj_forward calls
-        // each and feed jitter into ctrl. This is what bounds the cost of dragging
-        // the target into an unreachable region.
-        const patience = 4;
-        let noImprove = 0;
-
-        if (n === 0) return null;
-
-        for (let iter = 0; iter < o.maxIterations; iter++) {
-            // Set joints and run FK
-            for (let i = 0; i < n; i++) data.qpos[qposAdr[i]] = q[i];
-            this.mujoco.mj_forward(model, data);
-
-            // Read current site pose
-            const sp = data.site_xpos;
-            const sm = data.site_xmat;
-            const off3 = siteId * 3;
-            const off9 = siteId * 9;
-            for (let i = 0; i < 3; i++) baseSitePos[i] = sp[off3 + i];
-            for (let i = 0; i < 9; i++) baseSiteMat[i] = sm[off9 + i];
-
-            // Compute 6D error
-            const posErr0 = targetPos.x - baseSitePos[0];
-            const posErr1 = targetPos.y - baseSitePos[1];
-            const posErr2 = targetPos.z - baseSitePos[2];
-            const rotErr = orientationError(baseSiteMat, R_target);
-
-            const error = [
-                posErr0 * o.posWeight,
-                posErr1 * o.posWeight,
-                posErr2 * o.posWeight,
-                rotErr[0] * o.rotWeight,
-                rotErr[1] * o.rotWeight,
-                rotErr[2] * o.rotWeight,
-            ];
-
-            const errNorm = Math.sqrt(
-                error[0] * error[0] + error[1] * error[1] + error[2] * error[2] +
-                error[3] * error[3] + error[4] * error[4] + error[5] * error[5]
-            );
-
-            // Track best solution
-            if (errNorm < bestErr - 1e-9) {
-                bestErr = errNorm;
-                bestQ = Array.from(q);
+        const targetRotation = new THREE.Quaternion(targetQuat.x, targetQuat.y, targetQuat.z, targetQuat.w);
+        if (!Number.isInteger(siteId) || siteId < 0 || siteId >= model.nsite)
+            throw new Error('Invalid IK site ID');
+        if (currentQpos.length !== model.nq || !Array.from(currentQpos).every(Number.isFinite))
+            throw new Error('IK configuration must contain nq finite values');
+        if (
+            ![
+                targetPos.x,
+                targetPos.y,
+                targetPos.z,
+                targetQuat.x,
+                targetQuat.y,
+                targetQuat.z,
+                targetQuat.w,
+            ].every(Number.isFinite) ||
+            targetRotation.lengthSq() === 0
+        )
+            throw new Error('IK target must be finite with a nonzero quaternion');
+        if (
+            !(o.damping > 0) ||
+            !(o.maxStepRad > 0) ||
+            !Number.isFinite(o.maxStepRad) ||
+            !Number.isInteger(o.maxIterations) ||
+            o.maxIterations < 1
+        )
+            throw new Error('Invalid IK solver options');
+        const ids = Array.from(jointIds);
+        if (
+            new Set(ids).size !== ids.length ||
+            ids.some((id) => !Number.isInteger(id) || id < 0 || id >= model.njnt)
+        )
+            throw new Error('IK joint IDs must be unique and valid');
+        const dofs = ids.flatMap((id) =>
+            Array.from(
+                { length: model.jnt_type[id] === 0 ? 6 : model.jnt_type[id] === 1 ? 3 : 1 },
+                (_, i) => model.jnt_dofadr[id] + i,
+            ),
+        );
+        const n = dofs.length;
+        if (!n) return null;
+        const savedQpos = new Float64Array(data.qpos);
+        const buffers: { delete(): void }[] = [];
+        try {
+            const alloc = (size: number) => {
+                const b = new this.mujoco.DoubleBuffer(size);
+                buffers.push(b);
+                return b;
+            };
+            const jacp = alloc(3 * model.nv),
+                jacr = alloc(3 * model.nv),
+                qbuffer = alloc(model.nq);
+            qbuffer.GetView().set(currentQpos);
+            const target = quatToMat3(targetRotation.normalize());
+            const J = new Float64Array(6 * n),
+                JJt = new Float64Array(36),
+                rhs = new Float64Array(6),
+                x = new Float64Array(6);
+            const velocity = new Array<number>(model.nv).fill(0);
+            let best: number[] | null = null,
+                bestErr = Infinity,
                 noImprove = 0;
-            } else {
-                noImprove++;
-            }
-
-            // Converged
-            if (errNorm < o.tolerance) break;
-
-            // Stalled or diverging — bestQ can no longer improve, so stop.
-            if (noImprove >= patience) break;
-
-            // Compute Jacobian via finite differences
-            for (let j = 0; j < n; j++) {
-                const adr = qposAdr[j];
-                const saved = data.qpos[adr];
-                data.qpos[adr] = q[j] + o.epsilon;
-                this.mujoco.mj_forward(model, data);
-
-                for (let i = 0; i < 3; i++) pertSitePos[i] = sp[off3 + i];
-                for (let i = 0; i < 9; i++) pertSiteMat[i] = sm[off9 + i];
-
-                // Position Jacobian columns (rows 0-2)
-                J[0 * n + j] = ((pertSitePos[0] - baseSitePos[0]) / o.epsilon) * o.posWeight;
-                J[1 * n + j] = ((pertSitePos[1] - baseSitePos[1]) / o.epsilon) * o.posWeight;
-                J[2 * n + j] = ((pertSitePos[2] - baseSitePos[2]) / o.epsilon) * o.posWeight;
-
-                // Orientation Jacobian columns (rows 3-5)
-                // δR = R_perturbed * R_base^T, then extract angular velocity
-                const dRot = angularDelta(baseSiteMat, pertSiteMat);
-                J[3 * n + j] = (dRot[0] / o.epsilon) * o.rotWeight;
-                J[4 * n + j] = (dRot[1] / o.epsilon) * o.rotWeight;
-                J[5 * n + j] = (dRot[2] / o.epsilon) * o.rotWeight;
-
-                // Restore joint
-                data.qpos[adr] = saved;
-            }
-
-            // Restore base FK state for next iteration
-            for (let i = 0; i < n; i++) data.qpos[qposAdr[i]] = q[i];
-
-            // Damped least squares: Δq = Jᵀ (J Jᵀ + λI)⁻¹ error
-            // 1. Compute JJᵀ (6×6)
-            for (let r = 0; r < 6; r++) {
-                for (let c = 0; c < 6; c++) {
-                    let sum = 0;
-                    for (let k = 0; k < n; k++) {
-                        sum += J[r * n + k] * J[c * n + k];
+            const clamp = () => {
+                const q = qbuffer.GetView();
+                ids.forEach((id, i) => {
+                    const adr = model.jnt_qposadr[id],
+                        type = model.jnt_type[id];
+                    if (type >= 2) {
+                        const limits =
+                            o.jointLimits?.[i] ??
+                            (model.jnt_limited[id]
+                                ? [model.jnt_range[2 * id], model.jnt_range[2 * id + 1]]
+                                : null);
+                        if (limits)
+                            q[adr] = Math.max(Math.min(...limits), Math.min(Math.max(...limits), q[adr]));
+                    } else {
+                        const offset = adr + (type === 0 ? 3 : 0);
+                        const quat = new THREE.Quaternion(
+                            q[offset + 1],
+                            q[offset + 2],
+                            q[offset + 3],
+                            q[offset],
+                        ).normalize();
+                        if (type === 1 && model.jnt_limited[id]) {
+                            if (quat.w < 0) {
+                                quat.x *= -1;
+                                quat.y *= -1;
+                                quat.z *= -1;
+                                quat.w *= -1;
+                            }
+                            const angle = 2 * Math.acos(Math.min(1, Math.max(-1, quat.w)));
+                            const limit = model.jnt_range[2 * id + 1];
+                            if (angle > limit)
+                                quat.identity().slerp(
+                                    new THREE.Quaternion(
+                                        q[offset + 1],
+                                        q[offset + 2],
+                                        q[offset + 3],
+                                        q[offset],
+                                    ).normalize(),
+                                    limit / angle,
+                                );
+                        }
+                        q.set([quat.w, quat.x, quat.y, quat.z], offset);
                     }
-                    JJt[r * 6 + c] = sum + (r === c ? o.damping : 0);
+                });
+            };
+            clamp();
+            for (let iter = 0; iter < o.maxIterations; iter++) {
+                data.qpos.set(qbuffer.GetView());
+                this.mujoco.mj_forward(model, data);
+                const pos = data.site_xpos.subarray(3 * siteId, 3 * siteId + 3);
+                const rot = orientationError(data.site_xmat.subarray(9 * siteId, 9 * siteId + 9), target);
+                const error = [
+                    (targetPos.x - pos[0]) * o.posWeight,
+                    (targetPos.y - pos[1]) * o.posWeight,
+                    (targetPos.z - pos[2]) * o.posWeight,
+                    ...rot.map((v) => v * o.rotWeight),
+                ];
+                const norm = Math.hypot(...error);
+                if (!Number.isFinite(norm)) break;
+                if (norm < bestErr - 1e-9) {
+                    bestErr = norm;
+                    best = Array.from(qbuffer.GetView());
+                    noImprove = 0;
+                } else noImprove++;
+                if (norm < o.tolerance || noImprove >= 4) break;
+                this.mujoco.mj_jacSite(model, data, jacp, jacr, siteId);
+                const jp = jacp.GetView(),
+                    jr = jacr.GetView();
+                for (let r = 0; r < 3; r++)
+                    for (let j = 0; j < n; j++) {
+                        J[r * n + j] = jp[r * model.nv + dofs[j]] * o.posWeight;
+                        J[(r + 3) * n + j] = jr[r * model.nv + dofs[j]] * o.rotWeight;
+                    }
+                for (let r = 0; r < 6; r++)
+                    for (let c = 0; c < 6; c++) {
+                        let sum = 0;
+                        for (let k = 0; k < n; k++) sum += J[r * n + k] * J[c * n + k];
+                        JJt[r * 6 + c] = sum + (r === c ? o.damping : 0);
+                    }
+                rhs.set(error);
+                solve6x6(JJt, rhs, x);
+                velocity.fill(0);
+                for (let j = 0; j < n; j++) {
+                    let step = 0;
+                    for (let r = 0; r < 6; r++) step += J[r * n + j] * x[r];
+                    velocity[dofs[j]] = Math.max(-o.maxStepRad, Math.min(o.maxStepRad, step));
                 }
+                this.mujoco.mj_integratePos(model, qbuffer, velocity, 1);
+                clamp();
             }
-
-            // 2. Solve (JJᵀ + λI) x = error
-            for (let i = 0; i < 6; i++) rhs[i] = error[i];
-            solve6x6(JJt, rhs, x);
-
-            // 3. Δq = Jᵀ x
-            for (let j = 0; j < n; j++) {
-                let sum = 0;
-                for (let r = 0; r < 6; r++) {
-                    sum += J[r * n + j] * x[r];
-                }
-                dq[j] = sum;
-            }
-
-            // Update joints: bound each step, then clamp to joint limits.
-            // Clamping inside the loop pins a saturated joint at its limit so
-            // subsequent iterations redistribute the remaining error to the
-            // unclamped joints (gradient projection), instead of returning an
-            // out-of-range solution for the caller to distort with a post-hoc
-            // per-joint clamp.
-            for (let i = 0; i < n; i++) {
-                let step = dq[i];
-                if (step > o.maxStepRad) step = o.maxStepRad;
-                else if (step < -o.maxStepRad) step = -o.maxStepRad;
-                let next = q[i] + step;
-                const limits = o.jointLimits?.[i];
-                if (limits) {
-                    const low = Math.min(limits[0], limits[1]);
-                    const high = Math.max(limits[0], limits[1]);
-                    if (next < low) next = low;
-                    else if (next > high) next = high;
-                }
-                q[i] = next;
-            }
+            return best;
+        } finally {
+            for (const buffer of buffers) buffer.delete();
+            data.qpos.set(savedQpos);
+            this.mujoco.mj_forward(model, data);
         }
-
-        // Restore original qpos
-        data.qpos.set(savedQpos);
-        this.mujoco.mj_forward(model, data);
-
-        return bestQ;
     }
 }
 
@@ -253,13 +260,28 @@ export class GenericIK {
 /** Convert THREE.Quaternion to 3x3 rotation matrix (row-major Float64Array) */
 function quatToMat3(q: THREE.Quaternion): Float64Array {
     const m = new Float64Array(9);
-    const x = q.x, y = q.y, z = q.z, w = q.w;
-    const xx = x * x, yy = y * y, zz = z * z;
-    const xy = x * y, xz = x * z, yz = y * z;
-    const wx = w * x, wy = w * y, wz = w * z;
-    m[0] = 1 - 2 * (yy + zz); m[1] = 2 * (xy - wz);     m[2] = 2 * (xz + wy);
-    m[3] = 2 * (xy + wz);     m[4] = 1 - 2 * (xx + zz); m[5] = 2 * (yz - wx);
-    m[6] = 2 * (xz - wy);     m[7] = 2 * (yz + wx);     m[8] = 1 - 2 * (xx + yy);
+    const x = q.x,
+        y = q.y,
+        z = q.z,
+        w = q.w;
+    const xx = x * x,
+        yy = y * y,
+        zz = z * z;
+    const xy = x * y,
+        xz = x * z,
+        yz = y * z;
+    const wx = w * x,
+        wy = w * y,
+        wz = w * z;
+    m[0] = 1 - 2 * (yy + zz);
+    m[1] = 2 * (xy - wz);
+    m[2] = 2 * (xz + wy);
+    m[3] = 2 * (xy + wz);
+    m[4] = 1 - 2 * (xx + zz);
+    m[5] = 2 * (yz - wx);
+    m[6] = 2 * (xz - wy);
+    m[7] = 2 * (yz + wx);
+    m[8] = 1 - 2 * (xx + yy);
     return m;
 }
 
@@ -294,48 +316,34 @@ function orientationError(R_cur: Float64Array, R_tgt: Float64Array): [number, nu
         return [0, 0, 0];
     }
 
-    // Near π — degenerate, use small-angle approx of the skew-symmetric part
-    if (angle > Math.PI - 1e-6) {
-        return [
-            0.5 * (Re[7] - Re[5]),
-            0.5 * (Re[2] - Re[6]),
-            0.5 * (Re[3] - Re[1]),
-        ];
+    // Quaternion extraction is well-conditioned at pi, where the skew vanishes.
+    if (angle > Math.PI - 1e-4) {
+        const matrix = new THREE.Matrix4().set(
+            Re[0],
+            Re[1],
+            Re[2],
+            0,
+            Re[3],
+            Re[4],
+            Re[5],
+            0,
+            Re[6],
+            Re[7],
+            Re[8],
+            0,
+            0,
+            0,
+            0,
+            1,
+        );
+        const q = new THREE.Quaternion().setFromRotationMatrix(matrix).normalize();
+        const scale = (angle / Math.hypot(q.x, q.y, q.z)) * (q.w < 0 ? -1 : 1);
+        return [q.x * scale, q.y * scale, q.z * scale];
     }
 
     // General case: axis = skew(R_err) / (2 sin(angle)), scaled by angle
     const s = angle / (2 * Math.sin(angle));
-    return [
-        s * (Re[7] - Re[5]),
-        s * (Re[2] - Re[6]),
-        s * (Re[3] - Re[1]),
-    ];
-}
-
-/**
- * Compute angular velocity vector from R_base to R_perturbed.
- * Returns the axis-angle of R_perturbed * R_base^T.
- * (Small angle: the rotation caused by the perturbation.)
- */
-function angularDelta(R_base: Float64Array, R_pert: Float64Array): [number, number, number] {
-    // δR = R_pert * R_base^T
-    // Small angle approx: ω ≈ 0.5 * [δR[7]-δR[5], δR[2]-δR[6], δR[3]-δR[1]]
-    // This is fine because the perturbation epsilon is tiny.
-    const dR = new Float64Array(9);
-    for (let i = 0; i < 3; i++) {
-        for (let j = 0; j < 3; j++) {
-            let s = 0;
-            for (let k = 0; k < 3; k++) {
-                s += R_pert[i * 3 + k] * R_base[j * 3 + k];
-            }
-            dR[i * 3 + j] = s;
-        }
-    }
-    return [
-        0.5 * (dR[7] - dR[5]),
-        0.5 * (dR[2] - dR[6]),
-        0.5 * (dR[3] - dR[1]),
-    ];
+    return [s * (Re[7] - Re[5]), s * (Re[2] - Re[6]), s * (Re[3] - Re[1])];
 }
 
 /**
@@ -355,15 +363,22 @@ function solve6x6(A: Float64Array, b: Float64Array, x: Float64Array): void {
         let maxRow = col;
         for (let row = col + 1; row < N; row++) {
             const val = Math.abs(a[row * N + col]);
-            if (val > maxVal) { maxVal = val; maxRow = row; }
+            if (val > maxVal) {
+                maxVal = val;
+                maxRow = row;
+            }
         }
 
         // Swap rows
         if (maxRow !== col) {
             for (let k = 0; k < N; k++) {
-                const tmp = a[col * N + k]; a[col * N + k] = a[maxRow * N + k]; a[maxRow * N + k] = tmp;
+                const tmp = a[col * N + k];
+                a[col * N + k] = a[maxRow * N + k];
+                a[maxRow * N + k] = tmp;
             }
-            const tmp = r[col]; r[col] = r[maxRow]; r[maxRow] = tmp;
+            const tmp = r[col];
+            r[col] = r[maxRow];
+            r[maxRow] = tmp;
         }
 
         const pivot = a[col * N + col];

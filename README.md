@@ -10,6 +10,20 @@ Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper a
 
 **[Demo](https://mujoco-react-example.pages.dev)** | **[Docs](https://dadd.mintlify.app)** | **[npm](https://www.npmjs.com/package/mujoco-react)** | **[Example Source](https://github.com/noah-wardlow/mujoco-react-example)** | **[llms.txt](https://dadd.mintlify.app/llms.txt)**
 
+## MuJoCo 3.15 and analytic IK
+
+The engine dependency is pinned to `@mujoco/mujoco@3.15.0` so upstream minor releases
+cannot silently change model behavior.
+
+- `GenericIK` uses `mj_jacSite`; `solveJoints()` supports ball/free joints through `mj_integratePos` (see [IK docs](docs/api/ik-control.mdx)). Existing scalar solve calls remain supported; `epsilon` is ignored.
+- Actuator IDs and control addresses are distinct. `useActuators()` / `getActuators()` expose `ctrlAdr`, `ctrlCount`, and per-input `ranges`. Use `api.setCtrl('pid_servo', [position, velocity, feedforward])` or `useCtrl(name, inputIndex)` for multi-input actuators. Scalar hooks/groups reject ambiguous multi-input commands; low-level policy vectors remain flat control vectors.
+- `<MujocoProvider threadCount={2} ...>` initializes an engine thread pool for each simulation when using the opt-in threaded build. This parallelizes engine work; the main `mj_step` call still runs on the UI thread.
+- `<MujocoCanvas integrator="discrete">` and `<MujocoPhysics integrator="discrete">` support the new integrator without changing MJCF defaults when omitted.
+- Snapshots include MuJoCo integration state, including mocap, history, applied forces, and warmstart. They belong to the loaded model; save again after a scene reload. Legacy snapshots remain accepted. Experimental IPC flex contact is not exactly replayable because MuJoCo does not expose all of its state.
+- `FlexRenderer` draws indexed 2D surfaces and 3D boundary surfaces, plus 1D lines.
+
+Review [upstream migration notes](https://mujoco.readthedocs.io/en/3.15.0/changelog.html): actuator damping and flex integration have changed since 3.9. Scalar `data.ctrl[actuator.id]` consumers should use `data.ctrl[actuator.ctrlAdr]`; multi-input controls occupy `ctrlCount` consecutive entries. `homeJoints` is limited to scalar-input models; use MJCF initial poses/keyframes and explicit controls for multi-input models.
+
 ## Install
 
 ```bash
@@ -742,6 +756,7 @@ Loads the MuJoCo WASM module. Wrap your entire app in this.
 | `wasmUrl` | `string?` | Custom WASM URL override |
 | `mtWasmUrl` | `string?` | Custom multi-threaded WASM URL override |
 | `threadedLoader` | `(options?) => Promise<unknown>` | Optional loader imported from `@mujoco/mujoco/mt` |
+| `threadCount` | `number` | Engine worker count; requires threaded WASM; default 0 |
 | `wasmVariant` | `"single" \| "threaded" \| "auto"` | MuJoCo WASM build. Defaults to `"single"` |
 | `timeout` | `number` | WASM load timeout in ms |
 | `onError` | `(error: Error) => void` | Called if WASM fails to load |

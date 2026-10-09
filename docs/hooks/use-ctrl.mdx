@@ -87,3 +87,10 @@ interface CtrlHandle {
 - For setting multiple actuators at once, use `api.setCtrl({ name: value, ... })`
 - The actuator index is resolved once on mount
 - The `name` parameter accepts `string` by default, or a generated union type if you use [`mujocoReact()`](/guides/type-safe-names)
+
+Actuator IDs identify metadata; control addresses index `data.ctrl`. New actuator
+metadata includes `ctrlAdr`, `ctrlCount`, and `ranges`. A PID or orientation
+actuator can own multiple inputs. Write a complete vector with
+`api.setCtrl(name, values)` or access one input with `useCtrl(name, inputIndex)`.
+Calling scalar-only controls on a multi-input actuator without an input selector
+throws an actionable error.

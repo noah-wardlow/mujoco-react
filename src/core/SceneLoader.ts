@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { initializeDataThreads } from './engineState';
+
 import type {
   ActuatedJointInfo,
   ActuatorInfo,
@@ -54,7 +56,7 @@ export function findSiteByName(mjModel: MujocoModel, name: string): number {
  * Find an actuator by name in the MuJoCo model. Returns -1 if not found.
  */
 export function findActuatorByName(mjModel: MujocoModel, name: string): number {
-  for (let i = 0; i < mjModel.nu; i++) {
+  for (let i = 0; i < mjModel.nactuator; i++) {
     if (getName(mjModel, mjModel.name_actuatoradr[i]).includes(name)) return i;
   }
   return -1;
@@ -138,7 +140,7 @@ export function findTendonByName(mjModel: MujocoModel, name: string): number {
  * Returns -1 for non-joint transmissions and multi-DOF joints.
  */
 export function getActuatedScalarQposAdr(mjModel: MujocoModel, actuatorId: number): number {
-  if (actuatorId < 0 || actuatorId >= mjModel.nu) return -1;
+  if (actuatorId < 0 || actuatorId >= mjModel.nactuator) return -1;
 
   // mjTRN_JOINT=0, mjTRN_JOINTINPARENT=1. Other transmission types don't map ctrl to a single qpos.
   const trnType = mjModel.actuator_trntype?.[actuatorId];
@@ -166,7 +168,7 @@ function isScalarJoint(mjModel: MujocoModel, jointId: number): boolean {
 }
 
 function getActuatorJointId(mjModel: MujocoModel, actuatorId: number): number {
-  if (actuatorId < 0 || actuatorId >= mjModel.nu) return -1;
+  if (actuatorId < 0 || actuatorId >= mjModel.nactuator) return -1;
   const trnType = mjModel.actuator_trntype?.[actuatorId];
   if (trnType !== undefined && trnType !== 0 && trnType !== 1) return -1;
   const jointId = mjModel.actuator_trnid[2 * actuatorId];
@@ -189,15 +191,35 @@ function getJointInfo(mjModel: MujocoModel, jointId: number): JointInfo {
   };
 }
 
-function getActuatorInfo(mjModel: MujocoModel, actuatorId: number): ActuatorInfo {
-  const hasRange = mjModel.actuator_ctrlrange[2 * actuatorId] < mjModel.actuator_ctrlrange[2 * actuatorId + 1];
-  return {
-    id: actuatorId,
-    name: getName(mjModel, mjModel.name_actuatoradr[actuatorId]),
-    range: hasRange
-      ? [mjModel.actuator_ctrlrange[2 * actuatorId], mjModel.actuator_ctrlrange[2 * actuatorId + 1]]
-      : unlimitedRange(),
-  };
+export function getActuatorInfo(mjModel: MujocoModel, actuatorId: number): ActuatorInfo {
+  const ctrlAdr = mjModel.actuator_ctrladr[actuatorId];
+  const ctrlCount = mjModel.actuator_ctrlnum[actuatorId];
+  const ranges = Array.from({ length: ctrlCount }, (_, input): [number, number] => {
+    const adr = ctrlAdr + input;
+    const lo = mjModel.actuator_ctrlrange[2 * adr], hi = mjModel.actuator_ctrlrange[2 * adr + 1];
+    return lo < hi ? [lo, hi] : [-Infinity, Infinity];
+  });
+  return { id: actuatorId, name: getName(mjModel, mjModel.name_actuatoradr[actuatorId]),
+    ctrlAdr, ctrlCount, ranges, range: ranges[0] ?? [-Infinity, Infinity] };
+}
+
+/** Resolve one input; scalar-only callers reject ambiguous multi-input actuators. */
+export function getActuatorControlAddress(model: MujocoModel, id: number, input?: number): number {
+  if (id < 0) return -1;
+  const count = model.actuator_ctrlnum[id];
+  if (input === undefined && count !== 1) throw new Error('This actuator requires an explicit input index or a complete control vector');
+  const index = input ?? 0;
+  if (!Number.isInteger(index) || index < 0 || index >= count) throw new Error('Actuator input index out of range');
+  return model.actuator_ctrladr[id] + index;
+}
+
+export function writeActuatorControl(model: MujocoModel, data: MujocoData, id: number, value: number | readonly number[]): void {
+  if (id < 0) return;
+  const values = typeof value === 'number' ? [value] : value;
+  if (values.length !== model.actuator_ctrlnum[id] || !values.every(Number.isFinite)) {
+    throw new Error('Actuator control must contain one finite value per input');
+  }
+  data.ctrl.set(values, model.actuator_ctrladr[id]);
 }
 
 function includesResourceName(names: readonly string[], name: string): boolean {
@@ -251,7 +273,7 @@ function orderedActuatorIdsFromSelector(
       .filter((id) => id >= 0 && getActuatorJointId(mjModel, id) >= 0);
   }
   const ids: number[] = [];
-  for (let i = 0; i < mjModel.nu; i++) {
+  for (let i = 0; i < mjModel.nactuator; i++) {
     if (getActuatorJointId(mjModel, i) < 0) continue;
     const info = getActuatorInfo(mjModel, i);
     if (matchesSelector(info, selector)) ids.push(i);
@@ -295,9 +317,9 @@ function unique(values: number[]): number[] {
 }
 
 function findActuatorForJoint(mjModel: MujocoModel, jointId: number, preferredActuatorIds?: number[]): number {
-  const search = preferredActuatorIds ?? Array.from({ length: mjModel.nu }, (_, i) => i);
+  const search = preferredActuatorIds ?? Array.from({ length: mjModel.nactuator }, (_, i) => i);
   for (const actuatorId of search) {
-    if (getActuatorJointId(mjModel, actuatorId) === jointId) return actuatorId;
+    if (mjModel.actuator_ctrlnum[actuatorId] === 1 && getActuatorJointId(mjModel, actuatorId) === jointId) return actuatorId;
   }
   return -1;
 }
@@ -325,12 +347,12 @@ function buildControlGroup(
     if (actuatorId >= 0) {
       const actuator = getActuatorInfo(mjModel, actuatorId);
       actuators.push(actuator);
-      ctrlAdr.push(actuatorId);
+      ctrlAdr.push(getActuatorControlAddress(mjModel, actuatorId));
       joints.push({
         ...joint,
         actuatorId,
         actuatorName: actuator.name,
-        ctrlAdr: actuatorId,
+        ctrlAdr: getActuatorControlAddress(mjModel, actuatorId),
         ctrlRange: actuator.range,
       });
     } else {
@@ -372,15 +394,15 @@ function buildControlGroup(
 
 export function getActuatedJoints(mjModel: MujocoModel): ActuatedJointInfo[] {
   const result: ActuatedJointInfo[] = [];
-  for (let actuatorId = 0; actuatorId < mjModel.nu; actuatorId++) {
+  for (let actuatorId = 0; actuatorId < mjModel.nactuator; actuatorId++) {
     const jointId = getActuatorJointId(mjModel, actuatorId);
-    if (jointId < 0) continue;
+    if (jointId < 0 || mjModel.actuator_ctrlnum[actuatorId] !== 1) continue;
     const actuator = getActuatorInfo(mjModel, actuatorId);
     result.push({
       ...getJointInfo(mjModel, jointId),
       actuatorId,
       actuatorName: actuator.name,
-      ctrlAdr: actuatorId,
+      ctrlAdr: getActuatorControlAddress(mjModel, actuatorId),
       ctrlRange: actuator.range,
     });
   }
@@ -388,8 +410,8 @@ export function getActuatedJoints(mjModel: MujocoModel): ActuatedJointInfo[] {
 }
 
 export function getControlMap(mjModel: MujocoModel): ControlGroupInfo {
-  const actuatorIds = Array.from({ length: mjModel.nu }, (_, i) => i)
-    .filter((id) => getActuatorJointId(mjModel, id) >= 0);
+  const actuatorIds = Array.from({ length: mjModel.nactuator }, (_, i) => i)
+    .filter((id) => mjModel.actuator_ctrlnum[id] === 1 && getActuatorJointId(mjModel, id) >= 0);
   const jointIds = actuatorIds.map((id) => getActuatorJointId(mjModel, id));
   return buildControlGroup(mjModel, jointIds, actuatorIds) ?? createContiguousControlGroup(mjModel, 0);
 }
@@ -400,6 +422,7 @@ export function resolveControlGroup(
 ): ControlGroupInfo | null {
   if (selector.actuators) {
     const actuatorIds = orderedActuatorIdsFromSelector(mjModel, selector.actuators);
+    for (const id of actuatorIds) getActuatorControlAddress(mjModel, id);
     const jointIds = actuatorIds.map((id) => getActuatorJointId(mjModel, id));
     return buildControlGroup(mjModel, jointIds, actuatorIds);
   }
@@ -422,6 +445,9 @@ export function resolveControlGroup(
 }
 
 export function createContiguousControlGroup(mjModel: MujocoModel, count: number): ControlGroupInfo {
+  if (count > 0 && (mjModel.nactuator !== mjModel.nu || Array.from(mjModel.actuator_ctrlnum).some((n) => n !== 1))) {
+    throw new Error('Legacy numJoints control groups require scalar-input actuators; use named controls');
+  }
   const n = Math.max(0, Math.min(count, mjModel.nq, mjModel.nu));
   const joints: ControlJointInfo[] = [];
   const actuators: ActuatorInfo[] = [];
@@ -837,14 +863,18 @@ async function loadSceneFromFiles(
   onProgress?.('Loading model...');
   const mjModel = loadModelFromPath(mujoco, `/working/${config.sceneFile}`);
   const mjData = new mujoco.MjData(mjModel);
-  applyInitialPose(mjModel, mjData, config);
-  mujoco.mj_forward(mjModel, mjData);
+  try {
+    initializeDataThreads(mujoco, mjData);
+    applyInitialPose(mjModel, mjData, config);
+    mujoco.mj_forward(mjModel, mjData);
 
-  return { mjModel, mjData };
+    return { mjModel, mjData };
+  } catch (error) { mjData.delete(); mjModel.delete(); throw error; }
 }
 
 function applyInitialPose(mjModel: MujocoModel, mjData: MujocoData, config: SceneConfig) {
   if (!config.homeJoints) return;
+  if (config.homeJoints.length && (mjModel.nactuator !== mjModel.nu || Array.from(mjModel.actuator_ctrlnum).some((n) => n !== 1))) throw new Error('homeJoints requires scalar-input actuators; use a keyframe for multi-input models');
   const homeCount = Math.min(config.homeJoints.length, Math.max(mjModel.nu, mjModel.nq));
   for (let i = 0; i < homeCount; i++) {
     if (i < mjModel.nu) mjData.ctrl[i] = config.homeJoints[i];
@@ -946,14 +976,17 @@ export async function loadScene(
   onProgress?.('Loading model...');
   const mjModel = loadModelFromPath(mujoco, `/working/${config.sceneFile}`);
   const mjData = new mujoco.MjData(mjModel);
+  try {
+    initializeDataThreads(mujoco, mjData);
 
-  // 6. Set initial pose — set both ctrl and qpos so robot starts at home.
-  //    If homeJoints is not provided, keep raw MuJoCo defaults.
-  applyInitialPose(mjModel, mjData, config);
+    // 6. Set initial pose — set both ctrl and qpos so robot starts at home.
+    //    If homeJoints is not provided, keep raw MuJoCo defaults.
+    applyInitialPose(mjModel, mjData, config);
 
-  mujoco.mj_forward(mjModel, mjData);
+    mujoco.mj_forward(mjModel, mjData);
 
-  return { mjModel, mjData };
+    return { mjModel, mjData };
+  } catch (error) { mjData.delete(); mjModel.delete(); throw error; }
 }
 
 /**

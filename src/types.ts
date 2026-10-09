@@ -207,6 +207,7 @@ export interface MujocoModel {
   ngeom: number;
   nsite: number;
   nu: number;
+  nactuator: number;
   njnt: number;
   nq: number;
   nv: number;
@@ -299,6 +300,9 @@ export interface MujocoModel {
   site_bodyid: Int32Array;
 
   // Actuator
+  actuator_ctrladr: Int32Array;
+  actuator_ctrlnum: Int32Array;
+  actuator_ctrllimited: Uint8Array;
   actuator_trnid: Int32Array;
   actuator_ctrlrange: Float64Array;
   actuator_trntype: Int32Array;
@@ -350,9 +354,14 @@ export interface MujocoModel {
   // Flex
   flex_vertadr: Int32Array;
   flex_vertnum: Int32Array;
-  flex_faceadr: Int32Array;
-  flex_facenum: Int32Array;
-  flex_face: Int32Array;
+  flex_dim: Int32Array;
+  flex_elemadr: Int32Array;
+  flex_elemnum: Int32Array;
+  flex_elemdataadr: Int32Array;
+  flex_elem: Int32Array;
+  flex_shelldataadr: Int32Array;
+  flex_shellnum: Int32Array;
+  flex_shell: Int32Array;
   flex_rgba: Float32Array;
 
   // Model options
@@ -404,7 +413,22 @@ export interface MujocoData {
 /**
  * Minimal interface for the MuJoCo WASM Module.
  */
+export interface MujocoBuffer {
+  GetView(): Float64Array;
+  delete(): void;
+}
+
 export interface MujocoModule {
+  DoubleBuffer: new (size: number) => MujocoBuffer;
+  mj_jacSite(model: MujocoModel, data: MujocoData, jacp: MujocoBuffer | null, jacr: MujocoBuffer | null, site: number): void;
+  mj_integratePos(model: MujocoModel, qpos: MujocoBuffer, velocity: number[], dt: number): void;
+  mj_stateSize(model: MujocoModel, signature: number): number;
+  mj_getState(model: MujocoModel, data: MujocoData, state: MujocoBuffer, signature: number): void;
+  mj_setState(model: MujocoModel, data: MujocoData, state: number[], signature: number): void;
+  mjtState: { mjSTATE_INTEGRATION: { value: number } };
+  mj_resetCtrl(model: MujocoModel, data: MujocoData): void;
+  mj_actuatorInputName(model: MujocoModel, id: number, input: number): string;
+  mju_threadpool(data: MujocoData, threads: number): void;
   MjModel: {
     from_xml_path?: (path: string) => MujocoModel;
     from_xml_string?: (xml: string, vfs?: unknown) => MujocoModel;
@@ -584,6 +608,8 @@ export interface SceneMarker {
 export interface PhysicsConfig {
   gravity?: [number, number, number];
   timestep?: number;
+  /** Override the MJCF integrator. Omit to preserve model settings. */
+  integrator?: MujocoIntegrator;
   substeps?: number;
   paused?: boolean;
   speed?: number;
@@ -657,6 +683,8 @@ export type PhysicsStepCallback = (input: PhysicsStepInput) => void;
 // ---- State Management (spec 4.1) ----
 
 export interface StateSnapshot {
+  /** Complete engine integration state. Absent on legacy snapshots. */
+  integration?: { signature: number; values: Float64Array; model: MujocoModel };
   time: number;
   qpos: Float64Array;
   qvel: Float64Array;
@@ -704,8 +732,14 @@ export interface SiteInfo {
 export interface ActuatorInfo {
   id: number;
   name: string;
+  /** Range of the first input; use ranges for multi-input actuators. */
   range: [number, number];
+  ctrlAdr: number;
+  ctrlCount: number;
+  ranges: [number, number][];
 }
+
+export type ActuatorControlValue = number | readonly number[];
 
 export interface ActuatedJointInfo extends JointInfo {
   actuatorId: number;
@@ -827,6 +861,8 @@ export interface ImagePointProjectionResult extends RayHit {
 }
 
 // ---- Model Options (spec 5.3) ----
+
+export type MujocoIntegrator = 'Euler' | 'RK4' | 'implicit' | 'implicitfast' | 'discrete';
 
 export interface ModelOptions {
   timestep: number;
@@ -1442,7 +1478,7 @@ export interface MujocoSimAPI {
   getQvel(): Float64Array;
 
   // Actuator / control (spec 3.1)
-  setCtrl(nameOrValues: Actuators | Record<Actuators, number>, value?: number): void;
+  setCtrl(nameOrValues: Actuators | Record<Actuators, ActuatorControlValue>, value?: ActuatorControlValue): void;
   getCtrl(): Float64Array;
   getControlMap(): ControlGroupInfo;
   getActuatedJoints(): ActuatedJointInfo[];
@@ -1841,6 +1877,8 @@ export type MujocoCanvasProps = Omit<CanvasProps, 'onError'> & {
   // Declarative physics config (spec 1.1)
   gravity?: [number, number, number];
   timestep?: number;
+  /** Override the MJCF integrator. Omit to preserve model settings. */
+  integrator?: MujocoIntegrator;
   substeps?: number;
   paused?: boolean;
   speed?: number;

@@ -18,6 +18,7 @@ const snapshot = api.saveState();
 
 ```tsx
 interface StateSnapshot {
+  integration?: { signature: number; values: Float64Array; model: MujocoModel };
   time: number;
   qpos: Float64Array;
   qvel: Float64Array;
@@ -140,3 +141,11 @@ function CheckpointControls() {
   );
 }
 ```
+
+New snapshots include the full `mjSTATE_INTEGRATION` vector: mocap poses, external
+forces, solver warmstart, history, equality activation, and plugin state. Restore
+requires the same loaded model; snapshots are in-memory objects, not portable
+serialized assets. Legacy fields remain editable and are applied after the packed
+state. Legacy snapshots without `integration` restore only their explicit fields.
+MuJoCo’s experimental IPC flex contact retains additional private state, so exact
+replay of IPC contact is unsupported.

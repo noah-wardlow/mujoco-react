@@ -120,3 +120,9 @@ const apiRef = useRef<MujocoSimAPI>(null);
 - Children can use all mujoco-react hooks (`useMujoco`, `useBeforePhysicsStep`, etc.)
 - Components placed outside `<MujocoPhysics>` but inside `<Canvas>` won't have access to physics hooks
 - Renders nothing while WASM is loading or if loading fails (call `onError` to handle failures)
+
+### Integrator override
+
+`integrator` accepts `"Euler"`, `"RK4"`, `"implicit"`, `"implicitfast"`, or `"discrete"`.
+Omit it to keep the MJCF setting. `discrete` integrates stiffness and constraints
+implicitly; verify controller tuning and use a compatible solver (CG or Newton).

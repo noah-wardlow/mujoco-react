@@ -313,6 +313,7 @@ export type {
   GeomInfo,
   SiteInfo,
   ActuatorInfo,
+  ActuatorControlValue,
   SensorInfo,
   CameraInfo,
   // Contacts
@@ -324,6 +325,7 @@ export type {
   ImagePointProjectionResult,
   // Model options
   ModelOptions,
+  MujocoIntegrator,
   // Trajectory
   TrajectoryFrame,
   TrajectoryData,

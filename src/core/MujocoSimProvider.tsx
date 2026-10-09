@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { captureSimulationState, restoreSimulationState } from './engineState';
+import { getActuatorInfo, writeActuatorControl } from './SceneLoader';
+import type { ActuatorControlValue, MujocoIntegrator } from '../types';
+
 import { useFrame, useThree } from '@react-three/fiber';
 import {
   createContext,
@@ -544,6 +548,7 @@ interface MujocoSimProviderProps {
   // Declarative physics config props
   gravity?: [number, number, number];
   timestep?: number;
+  integrator?: MujocoIntegrator;
   substeps?: number;
   paused?: boolean;
   speed?: number;
@@ -563,6 +568,7 @@ export function MujocoSimProvider({
   onSelection,
   gravity,
   timestep,
+  integrator,
   substeps,
   paused,
   speed,
@@ -627,6 +633,16 @@ export function MujocoSimProvider({
     model.opt.gravity[2] = gravity[2];
   }, [gravity]);
 
+  const integratorRef = useRef(integrator);
+  integratorRef.current = integrator;
+  const applyIntegrator = (model: MujocoModel) => {
+    const value = integratorRef.current;
+    if (value !== undefined) model.opt.integrator = { Euler: 0, RK4: 1, implicit: 2, implicitfast: 3, discrete: 4 }[value];
+  };
+  useEffect(() => {
+    if (mjModelRef.current) applyIntegrator(mjModelRef.current);
+  }, [integrator]);
+
   // Sync timestep prop
   useEffect(() => {
     if (timestep === undefined) return;
@@ -683,12 +699,13 @@ export function MujocoSimProvider({
       try {
         const result = await loadScene(mujoco, buildMergedConfig(config));
         if (disposed) {
-          result.mjModel.delete();
           result.mjData.delete();
+          result.mjModel.delete();
           return;
         }
 
         mujocoRef.current = mujoco;
+        applyIntegrator(result.mjModel);
         mjModelRef.current = result.mjModel;
         mjDataRef.current = result.mjData;
         physicsAccumulatorRef.current = 0;
@@ -717,8 +734,8 @@ export function MujocoSimProvider({
 
     return () => {
       disposed = true;
-      mjModelRef.current?.delete();
       mjDataRef.current?.delete();
+      mjModelRef.current?.delete();
       mjModelRef.current = null;
       mjDataRef.current = null;
       physicsAccumulatorRef.current = 0;
@@ -927,27 +944,16 @@ export function MujocoSimProvider({
   const saveState = useCallback((): StateSnapshot => {
     const data = mjDataRef.current;
     if (!data) return { time: 0, qpos: new Float64Array(0), qvel: new Float64Array(0), ctrl: new Float64Array(0), act: new Float64Array(0), qfrc_applied: new Float64Array(0) };
-    return {
-      time: data.time,
-      qpos: new Float64Array(data.qpos),
-      qvel: new Float64Array(data.qvel),
-      ctrl: new Float64Array(data.ctrl),
-      act: new Float64Array(data.act),
-      qfrc_applied: new Float64Array(data.qfrc_applied),
-    };
+    return captureSimulationState(mujocoRef.current, mjModelRef.current!, data);
   }, []);
 
   const restoreState = useCallback((snapshot: StateSnapshot) => {
     const model = mjModelRef.current;
     const data = mjDataRef.current;
     if (!model || !data) return;
-    data.time = snapshot.time;
-    data.qpos.set(snapshot.qpos);
-    data.qvel.set(snapshot.qvel);
-    data.ctrl.set(snapshot.ctrl);
-    if (snapshot.act.length > 0) data.act.set(snapshot.act);
-    data.qfrc_applied.set(snapshot.qfrc_applied);
-    mujocoRef.current.mj_forward(model, data);
+    restoreSimulationState(mujocoRef.current, model, data, snapshot);
+    physicsAccumulatorRef.current = 0;
+    interpolationStateRef.current.valid = false;
   }, [mujoco]);
 
   const setQpos = useCallback((values: Float64Array | number[]) => {
@@ -974,18 +980,18 @@ export function MujocoSimProvider({
     return mjDataRef.current ? new Float64Array(mjDataRef.current.qvel) : new Float64Array(0);
   }, []);
 
-  const setCtrl = useCallback((nameOrValues: string | Record<string, number>, value?: number) => {
+  const setCtrl = useCallback((nameOrValues: string | Record<string, ActuatorControlValue>, value?: ActuatorControlValue) => {
     const model = mjModelRef.current;
     const data = mjDataRef.current;
     if (!model || !data) return;
 
     if (typeof nameOrValues === 'string') {
       const id = findActuatorByName(model, nameOrValues);
-      if (id >= 0 && value !== undefined) data.ctrl[id] = value;
+      if (value !== undefined) writeActuatorControl(model, data, id, value);
     } else {
       for (const [name, val] of Object.entries(nameOrValues)) {
         const id = findActuatorByName(model, name);
-        if (id >= 0) data.ctrl[id] = val;
+        writeActuatorControl(model, data, id, val);
       }
     }
   }, []);
@@ -1152,17 +1158,7 @@ export function MujocoSimProvider({
   const getActuatorsApi = useCallback((): ActuatorInfo[] => {
     const model = mjModelRef.current;
     if (!model) return [];
-    const result: ActuatorInfo[] = [];
-    for (let i = 0; i < model.nu; i++) {
-      const hasRange = model.actuator_ctrlrange[2 * i] < model.actuator_ctrlrange[2 * i + 1];
-      result.push({
-        id: i,
-        name: getName(model, model.name_actuatoradr[i]),
-        range: hasRange
-          ? [model.actuator_ctrlrange[2 * i], model.actuator_ctrlrange[2 * i + 1]]
-          : [-Infinity, Infinity],
-      });
-    }
+    const result = Array.from({ length: model.nactuator }, (_, id) => getActuatorInfo(model, id));
     return result;
   }, []);
 
@@ -1466,8 +1462,8 @@ export function MujocoSimProvider({
   const loadSceneApi = useCallback(async (newConfig: SceneConfig): Promise<void> => {
     const gen = ++loadGenRef.current;
     try {
-      mjModelRef.current?.delete();
       mjDataRef.current?.delete();
+      mjModelRef.current?.delete();
       mjModelRef.current = null;
       mjDataRef.current = null;
       setStatus('loading');
@@ -1475,12 +1471,13 @@ export function MujocoSimProvider({
       const result = await loadScene(mujoco, buildMergedConfig(newConfig));
 
       if (gen !== loadGenRef.current) {
-        result.mjModel.delete();
         result.mjData.delete();
+        result.mjModel.delete();
         return;
       }
 
-      mjModelRef.current = result.mjModel;
+      applyIntegrator(result.mjModel);
+        mjModelRef.current = result.mjModel;
       mjDataRef.current = result.mjData;
       physicsAccumulatorRef.current = 0;
       interpolationStateRef.current.valid = false;

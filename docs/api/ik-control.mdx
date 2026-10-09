@@ -152,11 +152,36 @@ const ik = useIkController({ siteName: ModelSites.franka.tcp, ikSolveFn: myIK })
 
 ## Built-in Solver Details
 
-The default solver uses **Damped Least-Squares** (DLS) with finite-difference Jacobian:
+The default solver uses **Damped Least-Squares** (DLS) with MuJoCo’s analytic `mj_jacSite` Jacobian:
 
 - **Max iterations**: 50 per frame (configurable)
 - **Damping**: 0.01 (configurable)
 - **Position weight**: 1.0
 - **Rotation weight**: 0.3
 - **Tolerance**: 1e-3
-- **Method**: Finite-difference Jacobian + pseudoinverse
+- **Method**: Analytic Jacobian + damped least squares
+
+## Ball and free joints
+
+`GenericIK.solve()` and `useIkController` keep the scalar hinge/slide interface.
+Use `GenericIK.solveJoints()` for spherical (ball) or free joints:
+
+```tsx
+const solver = new GenericIK(mujoco);
+const qpos = solver.solveJoints(
+  model, data, siteId, jointIds, targetPosition, targetQuaternion, data.qpos,
+);
+if (qpos) api.setQpos(qpos);
+```
+
+`jointIds` are MuJoCo joint IDs. Input and output configurations contain `model.nq`
+values, including **wxyz** quaternions; the THREE target uses **xyzw**.
+The Jacobian has `model.nv` columns. The solver selects `jnt_dofadr` columns and
+uses `mj_integratePos` for manifold-correct quaternion updates. It respects model
+joint limits (ball limits bound the rotation angle), restores live qpos even on
+failure, and returns the best solution for unreachable targets. It does not
+perform collision avoidance. Apply the returned pose explicitly or map it to
+appropriate actuator inputs; a ball quaternion is not three scalar commands.
+
+The `epsilon` option is deprecated and ignored. `maxStepRad` bounds each velocity
+coordinate update; scalar slide-joint updates use model length units.
