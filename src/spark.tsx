@@ -373,7 +373,7 @@ export function SparkSplatEnvironment({
 }: SparkSplatEnvironmentProps) {
   const groupRef = useRef<THREE.Group>(null);
   const sparkRef = useRef<SparkRendererInstance | null>(null);
-  const captureSparkRef = useRef<SparkCaptureRenderer | null>(null);
+  const captureSparkRef = useRef(new Map<'snapshot' | 'preview', SparkCaptureRenderer>());
   const meshRef = useRef<SparkSplatMeshInstance | null>(null);
   const hiddenMeshesRef = useRef<THREE.Mesh[]>([]);
   const onStatusChangeRef = useRef(onStatusChange);
@@ -434,8 +434,10 @@ export function SparkSplatEnvironment({
     }
 
     function disposeCaptureSpark() {
-      safelyDisposeSparkResource(captureSparkRef.current?.renderer);
-      captureSparkRef.current = null;
+      for (const capture of captureSparkRef.current.values()) {
+        safelyDisposeSparkResource(capture.renderer);
+      }
+      captureSparkRef.current.clear();
     }
 
     async function loadSplat() {
@@ -465,25 +467,32 @@ export function SparkSplatEnvironment({
           ...resolvedRenderTuning,
         });
         spark.userData[CAMERA_FRAME_CAPTURE_RENDER_USER_DATA_KEY] = async ({
+          withCaptureState,
+          renderMode,
           scene,
           camera,
           width,
           height,
         }: CameraFrameCaptureRenderInput): Promise<CameraFrameCaptureRenderResult> => {
-          let captureSpark = captureSparkRef.current;
+          let captureSpark = captureSparkRef.current.get(renderMode);
           if (
             !captureSpark ||
             captureSpark.width !== width ||
             captureSpark.height !== height
           ) {
-            disposeCaptureSpark();
+            safelyDisposeSparkResource(captureSpark?.renderer);
             captureSpark = {
               renderer: new sparkModule.SparkRenderer({
                 renderer: gl,
-                autoUpdate: false,
-                lodSplatScale: resolvedCaptureTuning.lodSplatScale,
-                lodRenderScale: resolvedCaptureTuning.lodRenderScale,
-                minSortIntervalMs: resolvedCaptureTuning.minSortIntervalMs,
+                // Preview uses Spark's change detection and background sorting;
+                // forced update() regenerates even an unchanged static scene.
+                autoUpdate: renderMode === 'preview',
+                preUpdate: false,
+                ...(renderMode === 'preview' ? resolvedRenderTuning : {
+                  lodSplatScale: resolvedCaptureTuning.lodSplatScale,
+                  lodRenderScale: resolvedCaptureTuning.lodRenderScale,
+                  minSortIntervalMs: resolvedCaptureTuning.minSortIntervalMs,
+                }),
                 target: {
                   width,
                   height,
@@ -492,7 +501,7 @@ export function SparkSplatEnvironment({
               width,
               height,
             };
-            captureSparkRef.current = captureSpark;
+            captureSparkRef.current.set(renderMode, captureSpark);
           }
 
           const captureRenderer = captureSpark.renderer;
@@ -503,11 +512,11 @@ export function SparkSplatEnvironment({
           let pixels: Uint8Array | undefined;
           for (let attempt = 0; attempt < maxWarmupFrames; attempt += 1) {
             captureRenderer.renderSize.set(width, height);
-            await captureRenderer.update({ scene, camera });
-            pixels = await captureRenderer.renderReadTarget({
-              scene,
-              camera,
-            });
+            if (renderMode === 'snapshot') {
+              await captureRenderer.update({ scene, camera });
+            }
+            withCaptureState(() => captureRenderer.renderTarget({ scene, camera }));
+            pixels = await captureRenderer.readTarget();
             if (
               captureRenderer.activeSplats > 0 &&
               !isMostlyBlankCapture(pixels, resolvedCaptureTuning)

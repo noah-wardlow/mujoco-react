@@ -88,7 +88,7 @@ export function useCameraStream(
 
     inFlightRef.current = true;
     session
-      .captureAsync(api.resolveCameraCaptureOptions(opts))
+      .captureAsync(api.resolveCameraCaptureOptions({ ...opts, renderMode: opts.renderMode ?? 'preview' }))
       .then((frame) => {
         const canvas = canvasRef.current;
         if (!mountedRef.current || !canvas) return;

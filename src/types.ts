@@ -1677,6 +1677,11 @@ export interface CameraFrameRenderIsolationOptions {
 }
 
 export interface CameraFrameCaptureOptions {
+  /** Snapshot (default) waits for splat preparation. Preview reuses the latest
+   * sorted splats while updating in the background for responsive live motion.
+   * useCameraStream defaults to preview; policy/dataset captures stay snapshot.
+   */
+  renderMode?: 'snapshot' | 'preview';
   /** Existing Three camera to clone before applying pose overrides. */
   camera?: THREE.Camera;
   /** Named MuJoCo `<camera>` to render from when available in the loaded model. */

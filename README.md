@@ -1434,3 +1434,8 @@ Apache-2.0
 ## Contacts and plasticity
 
 Use MJCF speculative contacts for fast rigid objects and yielding springs for permanent deformation. The existing model/data interface exposes enable flags and plastic state; full snapshots preserve plastic history. See the [guide](docs/guides/engine-features.mdx) and [interactive demos](https://mujoco-react-example.pages.dev/?demo=speculative).
+
+Live splat camera streams use background sorting and reuse prepared splats, so
+robot motion does not force a splat rebuild on every preview frame. IK gizmos
+remain visible in the main view and excluded from captures. One-off and policy
+captures keep snapshot behavior; `renderMode: 'snapshot'` opts a stream into it.

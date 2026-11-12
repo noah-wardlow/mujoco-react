@@ -78,6 +78,12 @@ export const CAPTURE_EXCLUDE_KEY =
   'mujoco.capture.exclude';
 
 export type CameraFrameCaptureRenderInput = {
+  renderMode: 'snapshot' | 'preview';
+  /** Apply capture visibility/visual overrides only for a synchronous render.
+   * Async adapters must wrap each render after awaiting preparation, and await
+   * readback outside this scope so the interactive viewport stays untouched.
+   */
+  withCaptureState: (render: () => void) => void;
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.Camera;
@@ -688,29 +694,17 @@ export function createCameraFrameCaptureSession(
     return captureOptions;
   }
 
-  function renderCaptureToTarget(
-    captureOptions: CameraFrameCaptureOptions,
-    readback: () => void
-  ) {
+  function withCaptureState(captureOptions: CameraFrameCaptureOptions, render: () => void) {
     const previousState = saveRendererState(sessionRenderer);
-    const previousSceneState = applyCaptureVisualOverrides(
-      sessionRenderer,
-      scene,
-      captureOptions
-    );
+    const previousSceneState = applyCaptureVisualOverrides(sessionRenderer, scene, captureOptions);
     const hidden = [
       ...hideExcludedCaptureObjects(scene),
       ...hideCaptureGeomGroups(scene, captureOptions),
     ];
-
-    runCapturePreRenderHooks(scene);
-    scene.updateMatrixWorld(true);
     try {
+      runCapturePreRenderHooks(scene);
+      scene.updateMatrixWorld(true);
       sessionRenderer.xr.enabled = false;
-      sessionRenderer.setRenderTarget(target);
-      sessionRenderer.setViewport(0, 0, width, height);
-      sessionRenderer.setScissor(0, 0, width, height);
-      sessionRenderer.setScissorTest(false);
       if (captureOptions.background !== undefined) {
         sessionRenderer.setClearColor(
           new THREE.Color(captureOptions.background),
@@ -719,14 +713,27 @@ export function createCameraFrameCaptureSession(
       } else if (captureOptions.backgroundAlpha !== undefined) {
         sessionRenderer.setClearColor(previousState.clearColor, captureOptions.backgroundAlpha);
       }
-      sessionRenderer.clear();
-      sessionRenderer.render(scene, camera);
-      readback();
+      render();
     } finally {
       restoreObjectVisibility(hidden);
       if (previousSceneState) restoreSceneVisualState(scene, previousSceneState);
       restoreRendererState(sessionRenderer, previousState);
     }
+  }
+
+  function renderCaptureToTarget(
+    captureOptions: CameraFrameCaptureOptions,
+    readback: () => void
+  ) {
+    withCaptureState(captureOptions, () => {
+      sessionRenderer.setRenderTarget(target);
+      sessionRenderer.setViewport(0, 0, width, height);
+      sessionRenderer.setScissor(0, 0, width, height);
+      sessionRenderer.setScissorTest(false);
+      sessionRenderer.clear();
+      sessionRenderer.render(scene, camera);
+      readback();
+    });
   }
 
   function renderPreparedCapture(captureOptions: CameraFrameCaptureOptions) {
@@ -802,63 +809,35 @@ export function createCameraFrameCaptureSession(
     scene.updateMatrixWorld(true);
     const captureRenderer = getCaptureRenderer(scene);
     if (captureRenderer) {
-      const previousState = saveRendererState(sessionRenderer);
-      const previousSceneState = applyCaptureVisualOverrides(
-        sessionRenderer,
-        scene,
-        captureOptions
-      );
-      const hidden = [
-        ...hideExcludedCaptureObjects(scene),
-        ...hideCaptureGeomGroups(scene, captureOptions),
-      ];
-      try {
-        sessionRenderer.xr.enabled = false;
-        if (captureOptions.background !== undefined) {
-          sessionRenderer.setClearColor(
-            new THREE.Color(captureOptions.background),
-            captureOptions.backgroundAlpha ?? previousState.clearAlpha
-          );
-        } else if (captureOptions.backgroundAlpha !== undefined) {
-          sessionRenderer.setClearColor(previousState.clearColor, captureOptions.backgroundAlpha);
-        }
-        const captureResult = await captureRenderer({
+      let pending: ReturnType<CameraFrameCaptureRender>;
+      const renderWithCaptureState = (render: () => void) => withCaptureState(captureOptions, render);
+      // Preserve synchronous adapters while restoring shared state before any
+      // asynchronous preparation/readback yields to the viewer's next frame.
+      renderWithCaptureState(() => {
+        pending = captureRenderer({
           renderer: sessionRenderer,
           scene,
           camera,
           target,
           width,
           height,
+          withCaptureState: renderWithCaptureState,
+          renderMode: captureOptions.renderMode ?? 'snapshot',
         });
-        if (captureResult) {
-          const captureWidth = captureResult.width ?? width;
-          const captureHeight = captureResult.height ?? height;
-          if (captureWidth !== width || captureHeight !== height) {
-            throw new Error(
-              'Camera frame capture renderer returned unexpected dimensions.'
-            );
-          }
-          readPixelsToCanvas(
-            captureResult.pixels,
-            drawContext,
-            imageData,
-            width,
-            height,
-            captureResult.flipY ?? true,
-            captureResult.flipX ?? captureOptions.flipX ?? false
-          );
-          return {
-            canvas,
-            camera,
-            width,
-            height,
-            source: getCameraFrameCaptureSource(captureOptions),
-          };
+      });
+      const captureResult = await pending;
+      if (captureResult) {
+        const captureWidth = captureResult.width ?? width;
+        const captureHeight = captureResult.height ?? height;
+        if (captureWidth !== width || captureHeight !== height) {
+          throw new Error('Camera frame capture renderer returned unexpected dimensions.');
         }
-      } finally {
-        restoreObjectVisibility(hidden);
-        if (previousSceneState) restoreSceneVisualState(scene, previousSceneState);
-        restoreRendererState(sessionRenderer, previousState);
+        readPixelsToCanvas(
+          captureResult.pixels, drawContext, imageData, width, height,
+          captureResult.flipY ?? true,
+          captureResult.flipX ?? captureOptions.flipX ?? false
+        );
+        return { canvas, camera, width, height, source: getCameraFrameCaptureSource(captureOptions) };
       }
     }
     let readback: Promise<unknown> | undefined;

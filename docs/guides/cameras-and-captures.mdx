@@ -128,6 +128,11 @@ turned into three different outputs. Pick the output by what consumes it.
 | **DOM stream** — `useCameraStream`, default 10 FPS | Separate HTML canvas | Offscreen render and GPU readback, no encode |
 | **Tensor** — a `Float32Array` | Browser policy inference (ONNX) and recording | Renders offscreen, no encode |
 
+Live splat-camera streams keep IK gizmos visible in the interactive viewport.
+Capture-only visibility and visual overrides apply during the offscreen render;
+GPU readback and splat preparation do not leave shared scene objects hidden.
+Gizmos remain excluded from the captured camera image.
+
 The snapshot helpers (`captureCameraFrame`, `useCameraFrameCapture`,
 `usePolicyCameraFrames`, `recordMountedCameraFrameSequence`) all produce a data
 URL or `Blob` — they encode a PNG/JPEG on every call. That is the right tool for
@@ -167,7 +172,14 @@ function WristStream({ canvasRef }) {
 `useCameraStream` renders offscreen and blits into the canvas, so it composites
 normally in the DOM (including inside opaque panels) and does **not** take over
 the render loop. It uses the async capture path, so Gaussian-splat environments
-render through their dedicated capture renderer. GPU readback and conversion remain costly. The default cap is 10 FPS; pass `fps` to change it or `paused` to freeze it.
+render through their dedicated capture renderer. Streams default to
+`renderMode: 'preview'`: Spark reuses prepared splats, checks for scene/camera
+changes, and sorts in the background instead of blocking robot motion on a
+forced splat update each frame. LoD refinement and view changes can still cause
+splat work. One-off and policy captures default to `renderMode: 'snapshot'`,
+which waits for preparation; pass that mode explicitly for a stream that needs
+snapshot behavior. Preview and snapshot renderers are cached separately.
+GPU readback and conversion remain costly. The default cap is 10 FPS; pass `fps` to change it or `paused` to freeze it.
 
 For a transparent picture-in-picture overlay on a full-bleed canvas, use
 `<CameraView>` / `useCameraViewport`, which render the camera into a
