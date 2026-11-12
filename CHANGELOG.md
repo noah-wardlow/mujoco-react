@@ -1,3 +1,10 @@
+## [12.1.1](https://github.com/noah-wardlow/mujoco-react/compare/v12.1.0...v12.1.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* rebuild viewer contacts when disposing a worker runtime ([e494bf7](https://github.com/noah-wardlow/mujoco-react/commit/e494bf77705c34975cf7560cecd16b32ff24f65a))
+
 # [12.1.0](https://github.com/noah-wardlow/mujoco-react/compare/v12.0.0...v12.1.0) (2026-11-12)
 
 
