@@ -1,3 +1,17 @@
+# [12.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v11.0.0...v12.0.0) (2026-11-12)
+
+
+### Features
+
+* support MuJoCo 4 contacts and plasticity ([9b16262](https://github.com/noah-wardlow/mujoco-react/commit/9b16262c7a19e9efd36e4d0549449f0ae6601ab7))
+
+
+### BREAKING CHANGES
+
+* Upgrade the pinned engine from MuJoCo 3.15.0 to 4.0.1. Review upstream model migrations for tendon wrapping, RK4, flex elasticity, removed composites and cable plugins. Regenerate snapshots after upgrading.
+
+Co-Authored-By: OpenAI Codex <noreply@openai.com>
+
 # [11.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v10.9.0...v11.0.0) (2026-10-09)
 
 
