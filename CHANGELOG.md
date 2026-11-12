@@ -1,3 +1,10 @@
+# [12.1.0](https://github.com/noah-wardlow/mujoco-react/compare/v12.0.0...v12.1.0) (2026-11-12)
+
+
+### Features
+
+* add worker simulation runtime and bounded rendering ([b58902f](https://github.com/noah-wardlow/mujoco-react/commit/b58902f4d4364e39e456b19f9619f163c157054d))
+
 # [12.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v11.0.0...v12.0.0) (2026-11-12)
 
 
