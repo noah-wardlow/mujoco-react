@@ -32,6 +32,7 @@
             "group": "Guides",
             "pages": [
               "guides/graspable-objects",
+              "guides/engine-features",
               "guides/cameras-and-captures",
               "guides/perception-projection",
               "guides/click-to-select"

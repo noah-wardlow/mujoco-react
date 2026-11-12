@@ -82,7 +82,7 @@
     }
   },
   "dependencies": {
-    "@mujoco/mujoco": "3.15.0"
+    "@mujoco/mujoco": "4.0.1"
   },
   "devDependencies": {
     "@react-three/drei": "^10.7.7",

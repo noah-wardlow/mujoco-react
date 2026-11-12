@@ -1,0 +1,47 @@
+---
+title: "Contacts and plasticity"
+description: "Prevent tunneling and simulate permanent spring deformation"
+---
+
+## Speculative contacts
+
+Enable swept collision prediction in MJCF for fast rigid objects:
+
+```xml
+<option timestep="0.02">
+  <flag speculative="enable" />
+</option>
+```
+
+Load the model with the usual `MujocoCanvas` configuration. No extra React prop is
+needed. Speculative contacts use pre-step velocities; validate your timestep for
+chains of impacts. The [interactive demo](https://mujoco-react-example.pages.dev/?demo=speculative)
+compares enabled and disabled behavior for a fast sphere and thin wall.
+
+Advanced callers can change the flag through the existing model interface:
+
+```ts
+const flag = mujoco.mjtEnableBit.mjENBL_SPECULATIVE.value;
+model.opt.enableflags |= flag;
+// Disable while preserving other flags:
+model.opt.enableflags &= ~flag;
+```
+
+## Plastic springs
+
+A yielding spring keeps a permanent rest offset after a large displacement:
+
+```xml
+<joint type="slide" axis="1 0 0" stiffness="50" damping="5" springyield="0.1" />
+```
+
+`model.nplastic` gives the plastic state length; `model.jnt_plasticadr` locates a
+joint's state, and `data.plastic` exposes the offsets. `api.saveState()` and
+`api.restoreState()` preserve this state automatically through the engine's full
+integration state. `api.reset()` clears it. Legacy snapshots without integration
+state cannot preserve plastic history.
+
+The [spring comparison](https://mujoco-react-example.pages.dev/?demo=plastic)
+displaces elastic and plastic springs together and provides save, restore, and
+reset controls. Existing `FlexRenderer` supports flex surfaces; per-element flex
+materials and specialized rod cross-section rendering are not implemented here.

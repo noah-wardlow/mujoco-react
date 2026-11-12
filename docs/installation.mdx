@@ -19,7 +19,13 @@ npm install mujoco-react @react-three/fiber @react-three/drei three
 | `three` | `>=0.180` | 3D rendering |
 | `react` | `>=18` | React |
 
-`@mujoco/mujoco` is installed by `mujoco-react` as the underlying MuJoCo WASM engine.
+`@mujoco/mujoco` is installed by `mujoco-react` as the underlying MuJoCo WASM engine. The engine is pinned to an exact version so dependency updates cannot silently change simulation behavior.
+
+### Engine compatibility
+
+This library uses MuJoCo 4.0.1. When upgrading from the previous engine, review the [upstream migration notes](https://github.com/google-deepmind/mujoco/releases/tag/4.0.0). Existing models can behave differently: tendon wrapping, ball/free-joint RK4 integration, and flex elasticity have changed. Cable plugins and composite elements must migrate to flexcomp; flex edge stiffness/damping cannot be used with the discrete integrator. Recheck model trajectories and regenerate snapshots after upgrading.
+
+The React interface and default single-threaded WASM setup are unchanged. Threaded WASM remains opt-in.
 
 ### TypeScript
 

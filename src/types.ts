@@ -364,11 +364,16 @@ export interface MujocoModel {
   flex_shell: Int32Array;
   flex_rgba: Float32Array;
 
+  /** Number of stateful plastic deformation coordinates. */
+  nplastic: number;
+  jnt_plasticadr: Int32Array;
+
   // Model options
   opt: {
     timestep: number;
     gravity: Float64Array;
     integrator: number;
+    enableflags: number;
     [key: string]: unknown;
   };
 
@@ -383,6 +388,8 @@ export interface MujocoData {
   time: number;
   qpos: Float64Array;
   qvel: Float64Array;
+  /** Plastic rest offsets, included in full integration snapshots. */
+  plastic: Float64Array;
   ctrl: Float64Array;
   act: Float64Array;
   xpos: Float64Array;
@@ -419,6 +426,7 @@ export interface MujocoBuffer {
 }
 
 export interface MujocoModule {
+  mjtEnableBit: { mjENBL_SPECULATIVE: { value: number } };
   DoubleBuffer: new (size: number) => MujocoBuffer;
   mj_jacSite(model: MujocoModel, data: MujocoData, jacp: MujocoBuffer | null, jacr: MujocoBuffer | null, site: number): void;
   mj_integratePos(model: MujocoModel, qpos: MujocoBuffer, velocity: number[], dt: number): void;

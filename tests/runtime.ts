@@ -281,3 +281,38 @@ test('3D flex uses only boundary triangles and 1D flex uses line elements', () =
     }
   }
 });
+
+
+test('speculative contacts stop a fast sphere at a thin wall', () => {
+  function travel(enabled: boolean) {
+    const { model, data, close } = fixture(`<mujoco><option timestep=".02" gravity="0 0 0"><flag speculative="${enabled ? 'enable' : 'disable'}"/></option><worldbody><geom type="box" size=".01 .3 .3" pos="0 0 .4"/><body pos="-.5 0 .4"><joint type="slide" axis="1 0 0"/><geom size=".04" mass="1"/></body></worldbody></mujoco>`);
+    try {
+      assert.equal(Boolean(model.opt.enableflags & module.mjtEnableBit.mjENBL_SPECULATIVE.value), enabled);
+      data.qvel[0] = 40;
+      for (let i = 0; i < 5; i++) module.mj_step(model, data);
+      return data.qpos[0];
+    } finally { close(); }
+  }
+  assert.ok(travel(true) < .5, 'sphere stays on the near side of the wall');
+  assert.ok(travel(false) > 1, 'same timestep tunnels without speculative contacts');
+});
+
+test('snapshots preserve yielded spring plastic state and subsequent motion', () => {
+  const { model, data, close } = fixture(`<mujoco><option gravity="0 0 0"/><worldbody><body><joint type="slide" stiffness="50" springyield=".1" damping="2"/><geom size=".1" mass="1"/></body></worldbody></mujoco>`);
+  try {
+    assert.equal(model.nplastic, 1);
+    data.qpos[0] = .5;
+    for (let i = 0; i < 100; i++) module.mj_step(model, data);
+    const plastic = Array.from(data.plastic);
+    assert.ok(plastic[0] > .3, 'spring yielded permanently');
+    const saved = captureSimulationState(module, model, data);
+    for (let i = 0; i < 20; i++) module.mj_step(model, data);
+    const expected = Array.from(data.qpos);
+    module.mj_resetData(model, data);
+    assert.equal(data.plastic[0], 0);
+    restoreSimulationState(module, model, data, saved);
+    assert.deepEqual(Array.from(data.plastic), plastic);
+    for (let i = 0; i < 20; i++) module.mj_step(model, data);
+    assert.deepEqual(Array.from(data.qpos), expected);
+  } finally { close(); }
+});
