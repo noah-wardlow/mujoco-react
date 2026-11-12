@@ -124,7 +124,8 @@ turned into three different outputs. Pick the output by what consumes it.
 | Output | Use it for | Cost |
 | --- | --- | --- |
 | **Snapshot** — `dataUrl`/`Blob` | One-off PNG/JPEG: download, thumbnail, single dataset frame | Encodes PNG every call |
-| **Live stream** — a `<canvas>` updated every frame | On-screen camera preview panes | Renders offscreen, no encode |
+| **GPU viewport** — `CameraView` | Live previews | Extra render, no readback or encoding |
+| **DOM stream** — `useCameraStream`, default 10 FPS | Separate HTML canvas | Offscreen render and GPU readback, no encode |
 | **Tensor** — a `Float32Array` | Browser policy inference (ONNX) and recording | Renders offscreen, no encode |
 
 The snapshot helpers (`captureCameraFrame`, `useCameraFrameCapture`,
@@ -136,8 +137,7 @@ pixels straight off the GPU.
 
 ## Live Camera Streams
 
-To show a live camera feed on screen, render the scene from a MuJoCo camera into
-a `<canvas>` every frame — no PNG round-trip.
+Prefer `<CameraView>` or `useCameraViewport` for live feeds: they render directly on the GPU. For synchronized VLA observations, use [runtime.observe](/guides/simulation-runtime).
 
 For a camera tile embedded in HTML UI (a panel, sidebar, or overlay), use
 `useCameraStream`. Put the `<canvas>` anywhere in the DOM and call the hook
@@ -167,9 +167,7 @@ function WristStream({ canvasRef }) {
 `useCameraStream` renders offscreen and blits into the canvas, so it composites
 normally in the DOM (including inside opaque panels) and does **not** take over
 the render loop. It uses the async capture path, so Gaussian-splat environments
-render through their dedicated capture renderer — streaming a splat scene at full
-rate does not disturb the main view's splat sort. Pass `fps` to cap the update
-rate, or `paused` to freeze it.
+render through their dedicated capture renderer. GPU readback and conversion remain costly. The default cap is 10 FPS; pass `fps` to change it or `paused` to freeze it.
 
 For a transparent picture-in-picture overlay on a full-bleed canvas, use
 `<CameraView>` / `useCameraViewport`, which render the camera into a

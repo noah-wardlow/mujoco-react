@@ -144,3 +144,7 @@ const apiRef = useRef<MujocoSimAPI>(null);
 `integrator` accepts `"Euler"`, `"RK4"`, `"implicit"`, `"implicitfast"`, or `"discrete"`.
 Omit it to keep the MJCF setting. `discrete` integrates stiffness and constraints
 implicitly; verify controller tuning and use a compatible solver (CG or Newton).
+
+## Physics budget and model lifetime
+
+`physicsBudgetMs` defaults to 8 ms, with a hard limit of 100 steps per frame. Individual native steps cannot be interrupted. Overload slows the viewer instead of accumulating catch-up work. Equivalent inline config values retain the model; changing model inputs reloads it. For heavy physics or VLA inference, use [the worker runtime](/guides/simulation-runtime).

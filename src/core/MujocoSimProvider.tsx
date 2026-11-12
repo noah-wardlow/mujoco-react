@@ -7,6 +7,10 @@ import { captureSimulationState, restoreSimulationState } from './engineState';
 import { getActuatorInfo, writeActuatorControl } from './SceneLoader';
 import type { ActuatorControlValue, MujocoIntegrator } from '../types';
 
+import { sceneIdentity } from './sceneIdentity';
+import { runStepBudget, type PhysicsPerformance } from './stepBudget';
+import { attachSimulationRuntime, assertMainThreadOwnership, isWorkerOwned, closeModelRuntime, runtimeContacts } from '../runtime/client';
+import type { RuntimeOptions } from '../runtime/types';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
   createContext,
@@ -514,11 +518,12 @@ export function useMujoco(): UseMujocoResult {
 }
 
 export function useBeforePhysicsStep(callback: PhysicsStepCallback) {
-  const { beforeStepCallbacks } = useMujocoContext();
+  const { beforeStepCallbacks, mjModelRef } = useMujocoContext();
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
 
   useEffect(() => {
+    assertMainThreadOwnership(mjModelRef.current);
     const wrapped: PhysicsStepCallback = (input) => callbackRef.current(input);
     beforeStepCallbacks.current.add(wrapped);
     return () => { beforeStepCallbacks.current.delete(wrapped); };
@@ -526,11 +531,12 @@ export function useBeforePhysicsStep(callback: PhysicsStepCallback) {
 }
 
 export function useAfterPhysicsStep(callback: PhysicsStepCallback) {
-  const { afterStepCallbacks } = useMujocoContext();
+  const { afterStepCallbacks, mjModelRef } = useMujocoContext();
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
 
   useEffect(() => {
+    assertMainThreadOwnership(mjModelRef.current);
     const wrapped: PhysicsStepCallback = (input) => callbackRef.current(input);
     afterStepCallbacks.current.add(wrapped);
     return () => { afterStepCallbacks.current.delete(wrapped); };
@@ -550,6 +556,7 @@ interface MujocoSimProviderProps {
   timestep?: number;
   integrator?: MujocoIntegrator;
   substeps?: number;
+  physicsBudgetMs?: number;
   paused?: boolean;
   speed?: number;
   interpolate?: boolean;
@@ -570,6 +577,7 @@ export function MujocoSimProvider({
   timestep,
   integrator,
   substeps,
+  physicsBudgetMs = 8,
   paused,
   speed,
   interpolate,
@@ -577,7 +585,22 @@ export function MujocoSimProvider({
   hiddenBodies,
   children,
 }: MujocoSimProviderProps) {
-  const { gl, camera, scene } = useThree();
+  const { gl, camera, scene, invalidate } = useThree();
+  const modelIdentity = sceneIdentity(config);
+  const performanceRef = useRef<PhysicsPerformance>({ steps: 0, physicsMs: 0, realTimeFactor: 0, backlogSteps: 0, budgetExceeded: false });
+  const displayWaiters = useRef(new Set<() => void>());
+  useFrame(() => {
+    if (displayWaiters.current.size) {
+      const waiters = [...displayWaiters.current];
+      displayWaiters.current.clear();
+      queueMicrotask(() => { scene.updateMatrixWorld(true); for (const ready of waiters) ready(); });
+    }
+  }, 0);
+  const waitForDisplay = () => new Promise<void>((resolve, reject) => {
+    const ready = () => { clearTimeout(timer); resolve(); };
+    const timer = setTimeout(() => { displayWaiters.current.delete(ready); reject(new Error('Canvas did not produce an observation frame within 5 seconds')); }, 5000);
+    displayWaiters.current.add(ready); invalidate();
+  });
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   // --- Refs ---
@@ -618,8 +641,8 @@ export function MujocoSimProvider({
 
   configRef.current = config;
   mujocoRef.current = mujoco;
-  pausedRef.current = paused ?? false;
-  speedRef.current = speed ?? 1;
+  useEffect(() => { pausedRef.current = paused ?? false; }, [paused]);
+  useEffect(() => { speedRef.current = speed ?? 1; }, [speed]);
   substepsRef.current = substeps ?? 1;
   interpolateRef.current = interpolate ?? false;
 
@@ -628,10 +651,11 @@ export function MujocoSimProvider({
     if (!gravity) return;
     const model = mjModelRef.current;
     if (!model?.opt?.gravity) return;
+    assertMainThreadOwnership(model);
     model.opt.gravity[0] = gravity[0];
     model.opt.gravity[1] = gravity[1];
     model.opt.gravity[2] = gravity[2];
-  }, [gravity]);
+  }, [gravity?.[0], gravity?.[1], gravity?.[2]]);
 
   const integratorRef = useRef(integrator);
   integratorRef.current = integrator;
@@ -640,7 +664,7 @@ export function MujocoSimProvider({
     if (value !== undefined) model.opt.integrator = { Euler: 0, RK4: 1, implicit: 2, implicitfast: 3, discrete: 4 }[value];
   };
   useEffect(() => {
-    if (mjModelRef.current) applyIntegrator(mjModelRef.current);
+    if (mjModelRef.current) { assertMainThreadOwnership(mjModelRef.current); applyIntegrator(mjModelRef.current); }
   }, [integrator]);
 
   // Sync timestep prop
@@ -648,6 +672,7 @@ export function MujocoSimProvider({
     if (timestep === undefined) return;
     const model = mjModelRef.current;
     if (!model?.opt) return;
+    assertMainThreadOwnership(model);
     model.opt.timestep = timestep;
   }, [timestep]);
 
@@ -694,6 +719,7 @@ export function MujocoSimProvider({
   // --- Load scene on mount ---
   useEffect(() => {
     let disposed = false;
+    setStatus('loading');
 
     (async () => {
       try {
@@ -734,6 +760,7 @@ export function MujocoSimProvider({
 
     return () => {
       disposed = true;
+      closeModelRuntime(mjModelRef.current);
       mjDataRef.current?.delete();
       mjModelRef.current?.delete();
       mjModelRef.current = null;
@@ -742,7 +769,7 @@ export function MujocoSimProvider({
       interpolationStateRef.current.valid = false;
       try { mujoco.FS.unmount('/working'); } catch { /* ignore */ }
     };
-  }, [mujoco, config]);
+  }, [mujoco, modelIdentity]);
 
   // Fire onReady and assign external ref when status changes to ready
   useEffect(() => {
@@ -766,77 +793,40 @@ export function MujocoSimProvider({
     const data = mjDataRef.current;
     if (!model || !data) return;
 
-    // Check single-step mode
-    const shouldStep = !pausedRef.current || stepsToRunRef.current > 0;
-    if (!shouldStep) return;
-
-    // Zero generalized applied forces
-    for (let i = 0; i < model.nv; i++) {
-      data.qfrc_applied[i] = 0;
-    }
-
-    // Before-step callbacks
-    for (const cb of beforeStepCallbacks.current) {
-      cb({ model, data });
-    }
-
-    const numSubsteps = substepsRef.current;
-    if (!interpolateRef.current) {
-      // Step physics with substeps
-      if (stepsToRunRef.current > 0) {
-        for (let s = 0; s < stepsToRunRef.current; s++) {
-          mujocoRef.current.mj_step(model, data);
-        }
-        stepsToRunRef.current = 0;
-      } else {
-        const startSimTime = data.time;
-        const clampedDelta = Math.min(delta, 1 / 15); // cap to avoid spiral of death
-        const frameTime = clampedDelta * speedRef.current;
-        while (data.time - startSimTime < frameTime) {
-          for (let s = 0; s < numSubsteps; s++) {
-            mujocoRef.current.mj_step(model, data);
-          }
-        }
-      }
-    } else if (stepsToRunRef.current > 0) {
+    if (isWorkerOwned(model)) { interpolationStateRef.current.valid = false; return; }
+    const queued = stepsToRunRef.current > 0;
+    if (pausedRef.current && !queued) return;
+    const startTime = data.time;
+    const dt = model.opt.timestep;
+    if (!Number.isFinite(dt) || dt <= 0) return;
+    const substeps = Math.max(1, Math.floor(substepsRef.current));
+    const frameTime = Math.max(0, Math.min(delta, 1 / 15) * speedRef.current);
+    if (!queued && interpolateRef.current) physicsAccumulatorRef.current += frameTime;
+    const desired = queued ? stepsToRunRef.current : interpolateRef.current
+      ? Math.floor(physicsAccumulatorRef.current / (dt * substeps)) * substeps
+      : Math.ceil(frameTime / (dt * substeps)) * substeps;
+    for (let i = 0; i < model.nv; i++) data.qfrc_applied[i] = 0;
+    for (const cb of beforeStepCallbacks.current) cb({ model, data });
+    if (interpolateRef.current) {
       ensureInterpolationBuffers(model);
-      copyBodyPose(data, interpolationStateRef.current.previousXpos, interpolationStateRef.current.previousXquat);
-      for (let s = 0; s < stepsToRunRef.current; s++) {
-        mujocoRef.current.mj_step(model, data);
-      }
+      if (!interpolationStateRef.current.valid) copyBodyPose(data, interpolationStateRef.current.previousXpos, interpolationStateRef.current.previousXquat);
+    }
+    const measured = runStepBudget(desired, () => {
+      if (interpolateRef.current) copyBodyPose(data, interpolationStateRef.current.previousXpos, interpolationStateRef.current.previousXquat);
+      mujocoRef.current.mj_step(model, data);
+    }, physicsBudgetMs);
+    if (queued) stepsToRunRef.current -= measured.steps;
+    // Viewer overload slows simulation; it never accumulates an unbounded catch-up debt.
+    performanceRef.current = { ...measured, backlogSteps: Math.max(0, desired - measured.steps),
+      realTimeFactor: (data.time - startTime) / Math.max(delta, .000001) };
+    if (interpolateRef.current) {
       copyBodyPose(data, interpolationStateRef.current.currentXpos, interpolationStateRef.current.currentXquat);
-      interpolationStateRef.current.alpha = 1;
+      if (!queued) {
+        physicsAccumulatorRef.current -= measured.steps * dt;
+        if (measured.budgetExceeded) physicsAccumulatorRef.current %= dt * substeps;
+      } else physicsAccumulatorRef.current = 0;
+      interpolationStateRef.current.alpha = queued ? 1 : Math.min(1, physicsAccumulatorRef.current / dt);
       interpolationStateRef.current.valid = true;
-      stepsToRunRef.current = 0;
-    } else {
-      ensureInterpolationBuffers(model);
-      const clampedDelta = Math.min(delta, 1 / 15); // cap to avoid spiral of death
-      physicsAccumulatorRef.current += clampedDelta * speedRef.current;
-      const stepDt = Math.max((model.opt?.timestep ?? 0.002) * Math.max(1, numSubsteps), 1e-6);
-      let stepped = false;
-
-      while (physicsAccumulatorRef.current >= stepDt) {
-        copyBodyPose(data, interpolationStateRef.current.previousXpos, interpolationStateRef.current.previousXquat);
-        for (let s = 0; s < numSubsteps; s++) {
-          mujocoRef.current.mj_step(model, data);
-        }
-        copyBodyPose(data, interpolationStateRef.current.currentXpos, interpolationStateRef.current.currentXquat);
-        physicsAccumulatorRef.current -= stepDt;
-        stepped = true;
-      }
-
-      if (!interpolationStateRef.current.valid) {
-        copyBodyPose(data, interpolationStateRef.current.previousXpos, interpolationStateRef.current.previousXquat);
-        copyBodyPose(data, interpolationStateRef.current.currentXpos, interpolationStateRef.current.currentXquat);
-      }
-
-      interpolationStateRef.current.alpha = Math.min(Math.max(physicsAccumulatorRef.current / stepDt, 0), 1);
-      interpolationStateRef.current.valid = true;
-
-      if (!stepped) {
-        onStepRef.current?.({ time: data.time, model, data });
-        return;
-      }
     }
 
     // After-step callbacks
@@ -906,6 +896,7 @@ export function MujocoSimProvider({
   }, []);
 
   const step = useCallback((n = 1) => {
+    if (!Number.isSafeInteger(n) || n <= 0) throw new Error('Step count must be a positive safe integer');
     stepsToRunRef.current = n;
   }, []);
 
@@ -1384,6 +1375,7 @@ export function MujocoSimProvider({
     const data = mjDataRef.current;
     if (!model || !data) return null;
 
+    assertMainThreadOwnership(model);
     _rayPnt[0] = origin.x; _rayPnt[1] = origin.y; _rayPnt[2] = origin.z;
     const dir = direction.clone().normalize();
     _rayVec[0] = dir.x; _rayVec[1] = dir.y; _rayVec[2] = dir.z;
@@ -1462,6 +1454,7 @@ export function MujocoSimProvider({
   const loadSceneApi = useCallback(async (newConfig: SceneConfig): Promise<void> => {
     const gen = ++loadGenRef.current;
     try {
+      closeModelRuntime(mjModelRef.current);
       mjDataRef.current?.delete();
       mjModelRef.current?.delete();
       mjModelRef.current = null;
@@ -1640,6 +1633,7 @@ export function MujocoSimProvider({
           throw new Error('MuJoCo scene is not ready for camera sequence stepping.');
         }
 
+        let sliceStarted = performance.now();
         for (let stepIndex = 0; stepIndex < steps; stepIndex += 1) {
           for (let i = 0; i < model.nv; i += 1) {
             data.qfrc_applied[i] = 0;
@@ -1659,6 +1653,11 @@ export function MujocoSimProvider({
             cb({ model, data });
           }
           onStepRef.current?.({ time: data.time, model, data });
+          if (performance.now() - sliceStarted >= 8) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+            throwIfCameraSequenceAborted(options.signal);
+            sliceStarted = performance.now();
+          }
           await options.onAfterStep?.({
             frameIndex,
             stepIndex,
@@ -1890,8 +1889,15 @@ export function MujocoSimProvider({
   }, []);
 
   // --- Assemble API ---
-  const api = useMemo<MujocoSimAPI>(
-    () => ({
+  const api: MujocoSimAPI = useMemo<MujocoSimAPI>(
+    () => guardRuntimeOwnership({
+      createRuntime: (options?: RuntimeOptions) => {
+        if (beforeStepCallbacks.current.size || afterStepCallbacks.current.size) {
+          return Promise.reject(new Error('Unmount physics callbacks/controllers before creating a worker runtime; use runtime.advance({controls}) for policy actions.'));
+        }
+        return attachSimulationRuntime(mujocoRef.current, apiRef.current, waitForDisplay, invalidate, options);
+      },
+      getPerformance: () => ({ ...performanceRef.current }),
       get status() { return status; },
       get config() { return configRef.current; },
       reset,
@@ -1918,7 +1924,7 @@ export function MujocoSimProvider({
       setExternalForce,
       applyGeneralizedForce,
       getSensorData,
-      getContacts,
+      getContacts: () => { const model = mjModelRef.current; return model && isWorkerOwned(model) ? runtimeContacts(model)! : getContacts(); },
       getBodies,
       getJoints,
       getGeoms,
@@ -1954,7 +1960,7 @@ export function MujocoSimProvider({
       setGeomSize,
       mjModelRef,
       mjDataRef,
-    }),
+    }, () => mjModelRef.current),
     [
       status, reset, setSpeed, togglePause, setPaused, step,
       getTime, getTimestep, applyKeyframe, saveState, restoreState,
@@ -1975,7 +1981,7 @@ export function MujocoSimProvider({
       setBodyMass, setGeomFriction, setGeomSize,
     ]
   );
-  const apiRef = useRef(api);
+  const apiRef = useRef<MujocoSimAPI>(api);
   apiRef.current = api;
 
   const contextValue = useMemo<MujocoSimContextValue>(
@@ -2010,4 +2016,20 @@ export function MujocoSimProvider({
       <CameraViewportProvider>{children}</CameraViewportProvider>
     </MujocoSimContext.Provider>
   );
+}
+
+
+const runtimeMutators = new Set<PropertyKey>([
+  'reset', 'setSpeed', 'togglePause', 'setPaused', 'step', 'applyKeyframe', 'saveState', 'restoreState',
+  'setQpos', 'setQvel', 'setCtrl', 'applyForce', 'applyTorque', 'setExternalForce', 'applyGeneralizedForce',
+  'setGravity', 'setTimestep', 'setBodyMass', 'setGeomFriction', 'setGeomSize',
+  'loadScene', 'loadFromFiles', 'addBody', 'removeBody', 'recompile', 'recordCameraSequence',
+]);
+function guardRuntimeOwnership(api: MujocoSimAPI, model: () => MujocoModel | null): MujocoSimAPI {
+  for (const key of runtimeMutators) {
+    const record = api as unknown as Record<PropertyKey, (...args: unknown[]) => unknown>;
+    const method = record[key];
+    record[key] = (...args) => { assertMainThreadOwnership(model()); return method(...args); };
+  }
+  return api;
 }

@@ -1,0 +1,61 @@
+---
+title: "Worker simulation and VLA loops"
+description: "Run exact physics steps off the UI thread, capture synchronized observations, and keep work bounded"
+icon: "gauge-high"
+---
+
+Use `await api.createRuntime()` after the scene is ready when driving MuJoCo as a simulator. The runtime owns physics in a dedicated worker. React and Three.js render a display mirror; they do not run a second physics simulation.
+
+```ts
+const runtime = await api.createRuntime();
+const controller = new AbortController();
+try {
+  const observation = await runtime.observe({
+    streams: [{ key: 'front', cameraName: 'front_camera', width: 224, height: 224 }],
+  });
+  // Your inference adapter maps observation to the model's control inputs.
+  const controls = await infer(observation, controller.signal);
+  await runtime.advance({ steps: 25, controls, signal: controller.signal });
+} finally {
+  await runtime.dispose();
+}
+```
+
+`infer` is application code. The library does not choose a policy, calibrate actions, or add IK/task logic. For a rollout, repeat the awaited observe → infer → advance sequence; check your abort signal after inference and before applying actions. Controls contain **all control inputs** (`api.getCtrl().length`), which can differ from the actuator count for multi-input actuators. Omit controls to retain the previous values.
+
+## Operations and ownership
+
+| Operation | Contract |
+| --- | --- |
+| `advance({ steps, controls?, signal? })` | Resolves after exactly the requested positive integer number of physics steps; returns copied state. An abort rejects with `AbortError` after publishing the last completed step. |
+| `observe(cameras?)` | Returns copied `time`, `qpos`, `qvel`, `ctrl`, `sensors`, and `contacts`. Optional camera images are captured after the display catches up to this state. Physics stays fixed during capture. |
+| `saveState()` / `restoreState(snapshot)` | Full integration state, including actuator, mocap, warmstart, and plastic state. Snapshots belong to the runtime that created them. |
+| `cancel()` | Stops the active batch cooperatively and waits for it to settle. Cannot interrupt an individual native step. |
+| `reset()` | Cancels active work and restores the state from runtime creation. Does not invoke the viewer's `onReset` callback. |
+| `dispose()` | Cancels work, terminates the worker, and returns ownership to the paused viewer. Call `api.setPaused(false)` to resume it. Model unmount also terminates the worker. |
+
+Only one operation may be in flight. Overlapping advance/observe/save/restore calls reject immediately; no command queue grows behind inference. Reset and cancellation can interrupt an advance. Pose updates are acknowledged, allowing at most one unacknowledged preview message. `runtime.state` and `runtime.metrics` are copied snapshots; sample them at HUD frequency instead of setting React state every physics step.
+
+Creation pauses the viewer. Synchronous mutation and native raycast methods reject while the worker owns physics. Unmount `usePolicy`, IK, drag, force, and before/after-step controllers before creating a runtime; such callbacks cannot be serialized into a worker. Change model options before creation or after disposal. The raw `mjDataRef` is a display mirror: do not mutate it or use it as authoritative policy state. Ordinary visual components, flex surfaces, lights, and orbit controls can stay mounted. Use `runtime.observe()` for authoritative contacts and sensors; progress previews may be older than the latest worker step.
+
+With Vite, use the `mujocoReact` plugin; it excludes the library from dependency prebundling so worker URLs resolve in development. Without the plugin, set `optimizeDeps: { exclude: ['mujoco-react'] }` yourself.
+
+A runtime uses the packaged official single-threaded engine in a dedicated worker. This does not require SharedArrayBuffer or cross-origin isolation. A custom threaded provider loader is not inherited by the worker. For bundlers that cannot discover the default worker, pass `createWorker: () => new Worker(new URL('mujoco-react/physics.worker', import.meta.url), { type: 'module' })` using your bundler's worker syntax. The worker requires WASM asset handling equivalent to Vite's `?url` support. Worker boot errors reject explicitly; there is no main-thread fallback.
+
+## Preview without readback
+
+Use `<CameraView>` or `useCameraViewport` for live previews. They render into GPU scissor regions and perform no pixel readback or PNG encoding. CSS sizes are logical pixels, including on high-DPI displays. Their managed render loop is incompatible with a second compositor such as EffectComposer.
+
+Use `runtime.observe({ streams })` only at policy observation boundaries. The normal asynchronous image path uses asynchronous GPU readback; PNG/JPEG encoding and pixel conversion still cost CPU time. Splat adapters can have their own capture costs. `useCameraStream` is for a separate DOM canvas that must composite over opaque HTML; it reads back pixels and defaults to **10 FPS**, with one capture in flight and an `onError` callback. Tensor captures remain synchronous; avoiding PNG does not eliminate GPU readback.
+
+Camera capture sessions reject overlapping captures and defer resource disposal until an active asynchronous readback completes. Keep camera resolution appropriate to the trained policy.
+
+## Bound and measure the viewer
+
+The ordinary viewer remains available for interactive controllers. `physicsBudgetMs` defaults to **8 ms**, with at most **100 steps per animation frame**. A single native step can exceed the budget; use a worker for expensive scenes. Under overload the viewer drops wall-clock catch-up debt and slows simulation. Explicit `api.step(n)` work continues across frames; it is a scheduled request, not an awaited completion signal. Use `runtime.advance()` for deterministic sequencing.
+
+`api.getPerformance()` reports the latest viewer frame's steps, physics time, real-time factor, backlog steps, and budget flag. `runtime.metrics` reports the last completed batch's steps, physics time, wall time, real-time factor, capture time, and current busy state. Real-time factor is simulated seconds divided by elapsed seconds; it is separate from render FPS. Snapshot/capture overhead and worker yields are included in batch wall time but not in `physicsMs`.
+
+Model lifetime follows the values of scene inputs, not the identity of an inline config object. Equivalent URL, scene, patches, objects, and home-joint values retain the model. Callback replacements do not recompile it. New browser `File` objects or changed model inputs reload the scene and dispose the old runtime. Use an explicit load API to refetch changed server content at the same URL.
+
+Try the [worker example](https://mujoco-react-example.pages.dev/?demo=runtime) for exact steps, cancellation, snapshot replay, three GPU previews, and explicit observations. The example reports UI animation callbacks and completed simulation throughput separately; it does not claim learned-policy task success.

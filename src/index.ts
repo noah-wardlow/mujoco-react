@@ -470,3 +470,6 @@ export {
 // Re-export MuJoCo types for convenience
 export type { MujocoModule, MujocoModel, MujocoData, MujocoContact, MujocoContactArray } from './types';
 export { getContact } from './types';
+
+export type { SimulationRuntime, RuntimeOptions, RuntimeState, RuntimeSnapshot, RuntimeMetrics, AdvanceOptions, WorkerPort } from './runtime/types';
+export type { PhysicsPerformance } from './core/stepBudget';

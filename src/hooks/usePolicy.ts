@@ -5,7 +5,7 @@
  * usePolicy — policy decimation loop hook (spec 10.1)
  */
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useBeforePhysicsStep } from '../core/MujocoSimProvider';
 import type { PolicyAPI, PolicyConfig, PolicyInferenceOutput, PolicyVector } from '../types';
 
@@ -39,8 +39,11 @@ function enqueuePolicyActions(
   queue: PendingPolicyAction[],
   actions: PolicyVector[],
   observation: PolicyVector,
-  strategy: PolicyConfig['queueStrategy']
+  strategy: PolicyConfig['queueStrategy'],
+  limit = 256
 ) {
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('maxQueuedActions must be a positive safe integer');
+  if ((strategy === 'replace' ? 0 : queue.length) + actions.length > limit) throw new Error(`Policy action queue exceeds maxQueuedActions (${limit})`);
   if (strategy === 'replace') {
     queue.splice(0, queue.length);
   }
@@ -73,7 +76,6 @@ export function usePolicy(config: PolicyConfig): PolicyAPI {
   const clearQueue = useCallback(() => {
     epochRef.current += 1;
     actionQueueRef.current.splice(0, actionQueueRef.current.length);
-    inFlightRef.current = false;
     lastErrorRef.current = null;
   }, []);
 
@@ -83,6 +85,11 @@ export function usePolicy(config: PolicyConfig): PolicyAPI {
     lastObservationRef.current = null;
     lastActionRef.current = null;
   }, [clearQueue]);
+
+  useEffect(() => {
+    isRunningRef.current = configRef.current.enabled ?? true;
+    return () => { epochRef.current++; isRunningRef.current = false; };
+  }, []);
 
   useBeforePhysicsStep(({ model, data }) => {
     if (!isRunningRef.current) return;
@@ -126,7 +133,8 @@ export function usePolicy(config: PolicyConfig): PolicyAPI {
               actionQueueRef.current,
               toPolicyActions(output),
               observation,
-              cfg.queueStrategy ?? 'append'
+              cfg.queueStrategy ?? 'append',
+              cfg.maxQueuedActions
             );
             lastErrorRef.current = null;
           })
@@ -136,7 +144,6 @@ export function usePolicy(config: PolicyConfig): PolicyAPI {
             cfg.onError?.(error);
           })
           .finally(() => {
-            if (epoch !== epochRef.current) return;
             inFlightRef.current = false;
           });
       } else {
@@ -146,7 +153,8 @@ export function usePolicy(config: PolicyConfig): PolicyAPI {
             actionQueueRef.current,
             actions,
             observation,
-            cfg.queueStrategy ?? 'append'
+            cfg.queueStrategy ?? 'append',
+              cfg.maxQueuedActions
           );
         } else {
           const [action, ...queuedActions] = actions;
@@ -155,7 +163,8 @@ export function usePolicy(config: PolicyConfig): PolicyAPI {
             actionQueueRef.current,
             queuedActions,
             observation,
-            cfg.queueStrategy ?? 'append'
+            cfg.queueStrategy ?? 'append',
+              cfg.maxQueuedActions
           );
           // Apply action. If `infer` is omitted, this preserves the legacy inline-controller path.
           cfg.onAction({ action, observation, model, data });

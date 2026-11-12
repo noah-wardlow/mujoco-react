@@ -4,8 +4,7 @@ description: "Framework-agnostic policy loop for local, remote, and chunked infe
 icon: "brain"
 ---
 
-Run a policy inference loop at a fixed frequency, independent of the physics or
-render rate. `usePolicy` works with synchronous browser models, remote HTTP
+Schedule policy inference at a requested simulation-time frequency from the viewer physics callback. Its actual cadence is bounded by the viewer update rate. For expensive simulations and deterministic VLA loops, use [the worker runtime](/guides/simulation-runtime). `usePolicy` works with synchronous browser models, remote HTTP
 policies, and receding-horizon policies that return chunks of future actions.
 
 The hook only schedules policy inference and applies the returned actions. It
@@ -21,6 +20,7 @@ usePolicy(config: {
   enabled?: boolean;
   prefetchThreshold?: number;
   queueStrategy?: "append" | "replace";
+  maxQueuedActions?: number; // default 256; overflow throws/reports onError
   clearQueueOnStop?: boolean;
   onObservation: (input: { model: MujocoModel; data: MujocoData }) => PolicyVector;
   infer?: (input: {
@@ -289,3 +289,5 @@ function TFPolicy() {
 - Use `applyPolicyActionToControls` for the common case of writing an action
   vector to `data.ctrl`; it clamps to `model.actuator_ctrlrange` and skips
   non-finite entries by default.
+
+Only one asynchronous inference is active, including after queue reset. Reset discards stale results but waits for the underlying request to settle before another inference can start. The action queue is bounded to `maxQueuedActions` (default 256); overflow fails explicitly. This hook requires main-thread physics and cannot be mounted alongside a worker runtime.

@@ -126,3 +126,7 @@ If you see a Franka Panda robot in your browser, everything is working.
 for each simulation data instance. It requires the threaded build and cross-origin
 isolation. Loading the MT build alone does not request a simulation thread pool.
 Benchmark your scene before increasing the count; small scenes can be slower.
+
+## Worker runtime in Vite
+
+The `mujocoReact` plugin preserves worker asset URLs by excluding `mujoco-react` from dependency prebundling. If you omit the plugin, add `optimizeDeps: { exclude: ["mujoco-react"] }` to Vite config before using `api.createRuntime()`. See [worker simulation](/guides/simulation-runtime).

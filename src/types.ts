@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { SimulationRuntime, RuntimeOptions } from './runtime/types';
+import type { PhysicsPerformance } from './core/stepBudget';
 import type React from 'react';
 import type { ReactNode } from 'react';
 import type { CanvasProps, ThreeElements } from '@react-three/fiber';
@@ -618,6 +620,8 @@ export interface PhysicsConfig {
   timestep?: number;
   /** Override the MJCF integrator. Omit to preserve model settings. */
   integrator?: MujocoIntegrator;
+  /** Main-thread physics time budget per frame. Default 8 ms; at most 100 steps. */
+  physicsBudgetMs?: number;
   substeps?: number;
   paused?: boolean;
   speed?: number;
@@ -956,6 +960,8 @@ export interface PolicyConfig {
    * - replace is useful for receding-horizon policies where a fresh chunk should supersede stale queued actions.
    */
   queueStrategy?: 'append' | 'replace';
+  /** Maximum buffered actions; overflow fails explicitly. Default: 256. */
+  maxQueuedActions?: number;
   /**
    * Clear queued actions and ignore in-flight async results when `stop()` is called.
    * Defaults to false so callers can choose pause/resume behavior explicitly.
@@ -1463,6 +1469,9 @@ export interface BodyProps {
 // ---- Public API (spec: full surface) ----
 
 export interface MujocoSimAPI {
+  /** Dedicated worker owner for exact stepping and policy observations. */
+  createRuntime(options?: RuntimeOptions): Promise<SimulationRuntime>;
+  getPerformance(): PhysicsPerformance;
   // State
   readonly status: 'loading' | 'ready' | 'error';
   readonly config: SceneConfig;
@@ -1887,6 +1896,8 @@ export type MujocoCanvasProps = Omit<CanvasProps, 'onError'> & {
   timestep?: number;
   /** Override the MJCF integrator. Omit to preserve model settings. */
   integrator?: MujocoIntegrator;
+  /** Main-thread physics time budget per frame. Default 8 ms; at most 100 steps. */
+  physicsBudgetMs?: number;
   substeps?: number;
   paused?: boolean;
   speed?: number;

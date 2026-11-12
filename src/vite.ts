@@ -92,8 +92,13 @@ export function mujocoReact(options: MujocoReactPluginOptions) {
       // warning is expected, not a failure. Raise the limit so consumers don't
       // see it. Vite merges plugin config on top of user config, so only set a
       // default when the consumer hasn't specified their own limit.
-      if (userConfig.build?.chunkSizeWarningLimit !== undefined) return;
-      return { build: { chunkSizeWarningLimit: 4000 } };
+      return {
+        // Keep the worker URL relative to its real package file in dev. Vite's
+        // dependency prebundler otherwise relocates it into .vite/deps.
+        optimizeDeps: { exclude: ['mujoco-react'] },
+        ...(userConfig.build?.chunkSizeWarningLimit === undefined
+          ? { build: { chunkSizeWarningLimit: 4000 } } : {}),
+      };
     },
     configResolved(config: ViteConfig) {
       root = config.root;

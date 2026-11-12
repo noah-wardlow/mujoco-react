@@ -29,6 +29,7 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
       timestep,
       integrator,
       substeps,
+      physicsBudgetMs,
       paused,
       speed,
       interpolate,
@@ -74,6 +75,7 @@ export const MujocoCanvas = forwardRef<MujocoSimAPI, MujocoCanvasProps>(
           timestep={timestep}
           integrator={integrator}
           substeps={substeps}
+          physicsBudgetMs={physicsBudgetMs}
           paused={paused}
           speed={speed}
           interpolate={interpolate}

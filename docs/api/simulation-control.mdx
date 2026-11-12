@@ -6,6 +6,8 @@ icon: "gauge-high"
 
 Methods for controlling the simulation lifecycle and timing. Access via `ref` on `MujocoCanvas` or `useMujoco().api` inside R3F.
 
+For awaited exact steps and VLA workloads, see [Worker simulation](/guides/simulation-runtime). `api.createRuntime()` transfers physics ownership to a worker; synchronous mutation methods then reject until it is disposed.
+
 ## reset()
 
 Reset the simulation to its initial state.
@@ -52,7 +54,7 @@ api.step(10);  // Advance 10 steps
   Number of physics steps to advance.
 </ParamField>
 
-Has no effect if the simulation is not paused.
+Schedules work across animation frames within `physicsBudgetMs` (default 8 ms, at most 100 steps per frame). The count must be a positive safe integer. This method returns immediately; use `runtime.advance()` when the next operation must await completion.
 
 ## setSpeed(multiplier)
 
@@ -87,3 +89,7 @@ const dt = api.getTimestep(); // e.g., 0.002
 ```
 
 **Returns:** `number` — timestep in seconds.
+
+## getPerformance()
+
+Returns the latest viewer frame’s `{ steps, physicsMs, realTimeFactor, backlogSteps, budgetExceeded }`. Worker runs expose separate `runtime.metrics`. See [the performance contract](/guides/simulation-runtime).

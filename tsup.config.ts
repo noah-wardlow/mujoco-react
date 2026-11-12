@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/vite.ts', 'src/spark.tsx', 'src/onnx.ts'],
+  entry: ['src/index.ts', 'src/vite.ts', 'src/spark.tsx', 'src/onnx.ts', 'src/physics.worker.ts'],
   format: ['esm'],
   dts: true,
   sourcemap: true,

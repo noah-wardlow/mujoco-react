@@ -16,6 +16,19 @@ Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper a
 npm install mujoco-react three @react-three/fiber @react-three/drei
 ```
 
+## Running policies and simulation workloads
+
+Use `const runtime = await api.createRuntime()` after `onReady`, then await
+`runtime.observe()` and `runtime.advance({ steps, controls })`. Physics runs in a
+dedicated worker; commands reject when busy instead of accumulating. The runtime
+supports cancellation, reset, full snapshots, synchronized camera observations,
+and separate physics/capture timing. Use `<CameraView>` for GPU-only previews.
+
+The viewer has an 8 ms / 100-step per-frame budget. Equivalent inline scene
+configs preserve the loaded model. See the [simulation runtime guide](https://dadd.mintlify.app/guides/simulation-runtime)
+for ownership, VLA loops, bundling, and performance limits, or try the
+[worker demo](https://mujoco-react-example.pages.dev/?demo=runtime).
+
 ## Vite Plugin and Type-Safe Names
 
 Use the Vite plugin to generate declaration merging for actuator, sensor, body, joint, site, geom, and keyframe names:
@@ -35,6 +48,10 @@ export default defineConfig({
   ],
 });
 ```
+
+The plugin also preserves worker asset URLs in Vite development by excluding
+`mujoco-react` from dependency prebundling. Without it, set
+`optimizeDeps: { exclude: ["mujoco-react"] }` when using the worker runtime.
 
 The plugin writes `src/mujoco-register.gen.ts` during dev and build. Commit that generated file. Vite auto-loads it, so app code imports generated values from `mujoco-react`, not from the generated file:
 
@@ -1153,8 +1170,8 @@ const frame = await apiRef.current?.captureCameraFrame({
 ```
 
 **Live streams.** `useCameraStream(canvasRef, options)` renders a camera into a
-DOM `<canvas>` every frame (offscreen render → blit: no PNG round-trip, no render-
-loop takeover, splat scenes stream safely). Call it inside `<MujocoCanvas>`; the
+DOM `<canvas>` at 10 FPS by default (offscreen render → GPU readback → blit).
+It avoids PNG encoding but still pays readback and pixel-conversion costs. Call it inside `<MujocoCanvas>`; the
 canvas can live anywhere in your DOM:
 
 ```tsx
@@ -1167,8 +1184,8 @@ function WristStream({ canvasRef }) {
 For a transparent picture-in-picture overlay, use `<CameraView>` (or
 `useCameraViewport` to track your own element). It scissors into the main canvas —
 cheaper, but it takes over the render loop while mounted (incompatible with
-postprocessing, occluded by opaque DOM), so prefer `useCameraStream` for panel
-tiles:
+postprocessing, occluded by opaque DOM), so use `useCameraStream` only when HTML compositing requires a separate canvas.
+Prefer GPU viewports for live simulation previews:
 
 ```tsx
 <MujocoCanvas config={config}>

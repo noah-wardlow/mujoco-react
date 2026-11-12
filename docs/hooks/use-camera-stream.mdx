@@ -5,13 +5,11 @@ icon: "video"
 ---
 
 Render the live scene from a MuJoCo camera, site, or body into a DOM `<canvas>`
-every frame. Each frame is rendered offscreen and blitted into the canvas, so it
+at up to 10 FPS by default. Each frame is rendered offscreen and blitted into the canvas, so it
 composites normally in the DOM — including inside opaque panels — and does **not**
 take over the render loop.
 
-This is the right tool for on-screen camera preview tiles (a wrist-cam pane, a
-scene-cam pane, a debug inset). It avoids the PNG encode/decode round-trip of the
-snapshot helpers, so it can run at full frame rate.
+Use `<CameraView>` / `useCameraViewport` for live previews without GPU readback. Use this hook when a separate DOM canvas is required for HTML compositing. It avoids PNG encoding but still reads pixels from the GPU and converts them on the CPU.
 
 <Tip>
   For the distinction between snapshots, live streams, and policy tensors, and
@@ -24,8 +22,9 @@ snapshot helpers, so it can run at full frame rate.
 useCameraStream(
   canvasRef: RefObject<HTMLCanvasElement | null>,
   options: CameraFrameCaptureOptions & {
-    fps?: number     // optional cap on updates per second
+    fps?: number     // positive finite cap, default 10
     paused?: boolean // freeze updates without unmounting
+    onError?: (error: Error) => void // otherwise logs capture failures
   }
 ): void
 ```
@@ -67,8 +66,7 @@ export function App({ config }) {
 ## Notes
 
 - Uses the async capture path, so Gaussian-splat (Spark) environments render
-  through their dedicated capture renderer. Streaming a splat scene at full rate
-  does not disturb the main view's splat sort.
+  through their dedicated capture renderer. Capture uses a dedicated splat renderer; its cost still depends on scene complexity.
 - One capture is in flight at a time, so the stream self-limits to capture speed.
   Pass `fps` to cap it further, or `paused` to freeze the feed.
 - Unlike `<CameraView>` / `useCameraViewport`, this does not take over the render

@@ -34,6 +34,7 @@ export interface MujocoPhysicsProps {
   integrator?: MujocoIntegrator;
   /** mj_step calls per frame. */
   substeps?: number;
+  physicsBudgetMs?: number;
   /** Declarative pause. */
   paused?: boolean;
   /** Simulation speed multiplier. */

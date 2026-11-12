@@ -2,16 +2,9 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  *
- * Stream a live MuJoCo camera into a DOM `<canvas>`. Each frame the scene is
- * rendered offscreen from the selected camera and blitted into the canvas, so
- * it composites normally in the DOM (works inside opaque panels) and does NOT
- * take over the render loop. Prefer this over `useCameraViewport` for camera
- * tiles embedded in HTML UI; use `useCameraViewport` for transparent overlays
- * on a full-bleed canvas.
- *
- * Uses the async capture path so Gaussian-splat environments render through
- * their dedicated capture renderer — streaming a splat scene at full rate does
- * not disturb the main view's splat sort.
+ * Readback stream for DOM compositing/encoding. For interactive camera previews,
+ * use CameraView/useCameraViewport: they render on the GPU with no readback.
+ * This path defaults to 10 FPS and permits only one capture in flight.
  */
 
 import { useEffect, useRef } from 'react';
@@ -23,12 +16,12 @@ import type { CameraFrameCaptureOptions } from '../types';
 
 export interface CameraStreamOptions extends CameraFrameCaptureOptions {
   /**
-   * Optional cap on updates per second. Omit to stream as fast as captures
-   * complete (one capture is in flight at a time regardless).
+   * Readback rate, default 10 FPS. Must be positive and finite.
    */
   fps?: number;
   /** Pause updates without unmounting. */
   paused?: boolean;
+  onError?: (error: Error) => void;
 }
 
 function streamSignature(options: CameraStreamOptions): string {
@@ -77,10 +70,10 @@ export function useCameraStream(
     const opts = optionsRef.current;
     if (opts.paused) return;
 
-    if (opts.fps && opts.fps > 0) {
-      elapsedRef.current += delta;
-      if (elapsedRef.current < 1 / opts.fps) return;
-    }
+    const fps = opts.fps ?? 10;
+    if (!Number.isFinite(fps) || fps <= 0) throw new Error('Camera stream fps must be positive and finite');
+    elapsedRef.current += delta;
+    if (elapsedRef.current < 1 / fps) return;
     // One capture in flight at a time — naturally rate-limits to capture speed.
     if (inFlightRef.current) return;
     elapsedRef.current = 0;
@@ -107,7 +100,11 @@ export function useCameraStream(
         }
         ctx.drawImage(frame.canvas, 0, 0);
       })
-      .catch(() => {})
+      .catch(error => {
+        const failure = error instanceof Error ? error : new Error(String(error));
+        if (optionsRef.current.onError) optionsRef.current.onError(failure);
+        else console.error('Camera stream capture failed', failure);
+      })
       .finally(() => {
         inFlightRef.current = false;
       });

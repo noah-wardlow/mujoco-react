@@ -354,9 +354,10 @@ function readRenderTargetToCanvas(
   width: number,
   height: number,
   outputColorSpace: string,
-  flipX = false
+  flipX = false,
+  readback = true
 ) {
-  renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
+  if (readback) renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
 
   const rowBytes = width * 4;
   const encodeSrgb = outputColorSpace === THREE.SRGBColorSpace;
@@ -646,6 +647,16 @@ export function createCameraFrameCaptureSession(
 
   const pixels = new Uint8Array(width * height * 4);
   const imageData = drawContext.createImageData(width, height);
+  let inFlight = false, disposed = false;
+  function assertAvailable() {
+    if (disposed) throw new Error('Camera capture session is disposed');
+    if (inFlight) throw new Error('Camera capture session is busy; await the current capture');
+  }
+  function releaseResources() {
+    target.dispose();
+    if (isolatedRenderer && !isolatedRenderer.cached) isolatedRenderer.renderer.dispose();
+  }
+
 
   function resolveCaptureOptions(nextOptions: CameraFrameCaptureOptions = {}) {
     const captureOptions = { ...options, ...nextOptions };
@@ -743,10 +754,12 @@ export function createCameraFrameCaptureSession(
   }
 
   function capture(nextOptions: CameraFrameCaptureOptions = {}) {
+    assertAvailable();
     return renderPreparedCapture(resolveCaptureOptions(nextOptions));
   }
 
   function capturePixels(nextOptions: CameraFrameCaptureOptions = {}): CameraFramePixelsResult {
+    assertAvailable();
     const captureOptions = resolveCaptureOptions(nextOptions);
     renderCaptureToTarget(captureOptions, () => {
       sessionRenderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
@@ -777,6 +790,13 @@ export function createCameraFrameCaptureSession(
   }
 
   async function captureAsync(nextOptions: CameraFrameCaptureOptions = {}) {
+    assertAvailable();
+    inFlight = true;
+    try { return await captureAsyncInternal(nextOptions); }
+    finally { inFlight = false; if (disposed) releaseResources(); }
+  }
+
+  async function captureAsyncInternal(nextOptions: CameraFrameCaptureOptions = {}) {
     const captureOptions = resolveCaptureOptions(nextOptions);
     runCapturePreRenderHooks(scene);
     scene.updateMatrixWorld(true);
@@ -841,7 +861,14 @@ export function createCameraFrameCaptureSession(
         restoreRendererState(sessionRenderer, previousState);
       }
     }
-    return renderPreparedCapture(captureOptions);
+    let readback: Promise<unknown> | undefined;
+    renderCaptureToTarget(captureOptions, () => {
+      readback = sessionRenderer.readRenderTargetPixelsAsync(target, 0, 0, width, height, pixels);
+    });
+    await readback;
+    readRenderTargetToCanvas(sessionRenderer, target, canvas, drawContext, pixels, imageData,
+      width, height, sessionRenderer.outputColorSpace, captureOptions.flipX ?? false, false);
+    return { canvas, camera, width, height, source: getCameraFrameCaptureSource(captureOptions) };
   }
 
   return {
@@ -891,10 +918,9 @@ export function createCameraFrameCaptureSession(
       return { ...result, blob, type };
     },
     dispose() {
-      target.dispose();
-      if (isolatedRenderer && !isolatedRenderer.cached) {
-        isolatedRenderer.renderer.dispose();
-      }
+      if (disposed) return;
+      disposed = true;
+      if (!inFlight) releaseResources();
     },
   };
 }

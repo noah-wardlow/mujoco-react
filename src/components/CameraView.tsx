@@ -86,8 +86,11 @@ function CameraViewportRenderer({
   const mujoco = useMujoco();
 
   useFrame(() => {
-    const drawWidth = gl.domElement.width;
-    const drawHeight = gl.domElement.height;
+    // WebGLRenderer applies its pixel ratio in setViewport/setScissor. Pass
+    // logical pixels here; drawing-buffer dimensions would apply DPR twice.
+    const dpr = gl.getPixelRatio();
+    const drawWidth = gl.domElement.width / dpr;
+    const drawHeight = gl.domElement.height / dpr;
 
     // We own the render now: draw the main scene full-frame first.
     gl.setScissorTest(false);
@@ -97,7 +100,6 @@ function CameraViewportRenderer({
     const api = mujoco.api;
     if (!api || viewportsRef.current.size === 0) return;
 
-    const dpr = gl.getPixelRatio();
     const canvasRect = gl.domElement.getBoundingClientRect();
 
     for (const descriptor of viewportsRef.current.values()) {
@@ -112,12 +114,12 @@ function CameraViewportRenderer({
         rect.left > canvasRect.right;
       if (isOffscreen) continue;
 
-      const width = Math.floor(rect.width * dpr);
-      const height = Math.floor(rect.height * dpr);
+      const width = rect.width;
+      const height = rect.height;
       if (width <= 0 || height <= 0) continue;
 
-      const left = Math.floor((rect.left - canvasRect.left) * dpr);
-      const bottom = Math.floor((canvasRect.bottom - rect.bottom) * dpr);
+      const left = rect.left - canvasRect.left;
+      const bottom = canvasRect.bottom - rect.bottom;
 
       let resolved: CameraFrameCaptureOptions;
       try {
