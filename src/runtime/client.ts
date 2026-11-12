@@ -29,7 +29,7 @@ export class RuntimeClient implements SimulationRuntime {
   constructor(
     private worker: WorkerPort,
     private apply: (display: DisplayState) => void,
-    private release: () => void,
+    private release: (restoreViewer: boolean) => void,
     private capture?: (options: PolicyCameraFrameCaptureOptions) => ReturnType<typeof capturePolicyCameraFrames>,
   ) {
     worker.onmessage = event => {
@@ -132,12 +132,12 @@ export class RuntimeClient implements SimulationRuntime {
     return this.exclusive(async () => { await this.request({ kind: 'reset' }); return this.state; });
   }
   async dispose() { await this.cancel(); this.close(); }
-  close(error = new Error('Simulation runtime disposed')) {
+  close(error = new Error('Simulation runtime disposed'), restoreViewer = true) {
     if (this.closed) return;
     this.closed = true; this.generation++;
     this.worker.terminate();
     this.pending?.reject(error); this.pending = null;
-    this.release();
+    this.release(restoreViewer);
   }
 }
 
@@ -172,15 +172,25 @@ export async function attachSimulationRuntime(
     data.time = display.time;
     invalidate();
   };
-  const client = new RuntimeClient(worker, apply, () => {
+  const client = new RuntimeClient(worker, apply, restoreViewer => {
     // Revert partial display frames to the last acknowledged complete state.
-    if (api.mjModelRef.current === model && complete) apply(complete);
-    owners.delete(model);
+    try {
+      if (api.mjModelRef.current === model && complete) {
+        apply(complete);
+        // Native contact/constraint structures cannot be mirrored as typed arrays.
+        // Rebuild once when returning ownership, never on progress frames or unmount.
+        if (restoreViewer) {
+          module.mj_forward(model, data);
+          const state = complete.integration!;
+          module.mj_setState(model, data, Array.from(state.values), state.signature);
+        }
+      }
+    } finally { owners.delete(model); }
   }, async cameras => {
     await waitForDisplay();
     return capturePolicyCameraFrames(api, cameras);
   });
-  owners.set(model, { close: () => client.close(), contacts: () => client.state.contacts });
+  owners.set(model, { close: () => client.close(undefined, false), contacts: () => client.state.contacts });
   try { await client.initialize({ model: binary, state: initialState }); return client; }
   catch (error) { client.close(); throw error; }
 }

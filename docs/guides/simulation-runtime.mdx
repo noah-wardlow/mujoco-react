@@ -32,7 +32,7 @@ try {
 | `saveState()` / `restoreState(snapshot)` | Full integration state, including actuator, mocap, warmstart, and plastic state. Snapshots belong to the runtime that created them. |
 | `cancel()` | Stops the active batch cooperatively and waits for it to settle. Cannot interrupt an individual native step. |
 | `reset()` | Cancels active work and restores the state from runtime creation. Does not invoke the viewer's `onReset` callback. |
-| `dispose()` | Cancels work, terminates the worker, and returns ownership to the paused viewer. Call `api.setPaused(false)` to resume it. Model unmount also terminates the worker. |
+| `dispose()` | Cancels work, terminates the worker, and returns ownership to the paused viewer. Rebuilds native viewer contacts once, then call `api.setPaused(false)` to resume it. Model unmount terminates the worker without that rebuild. |
 
 Only one operation may be in flight. Overlapping advance/observe/save/restore calls reject immediately; no command queue grows behind inference. Reset and cancellation can interrupt an advance. Pose updates are acknowledged, allowing at most one unacknowledged preview message. `runtime.state` and `runtime.metrics` are copied snapshots; sample them at HUD frequency instead of setting React state every physics step.
 

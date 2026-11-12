@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Worker } from 'node:worker_threads';
 import loadMujoco from '@mujoco/mujoco';
-import { RuntimeClient } from '../src/runtime/client';
+import { captureSimulationState } from '../src/core/engineState';
+import type { MujocoSimAPI, MujocoModule, MujocoModel, MujocoData } from '../src/types';
+import { RuntimeClient, attachSimulationRuntime, closeModelRuntime } from '../src/runtime/client';
 import { runStepBudget } from '../src/core/stepBudget';
 import { sceneIdentity } from '../src/core/sceneIdentity';
 import type { WorkerPort } from '../src/runtime/types';
@@ -114,4 +116,27 @@ test('completed contact observations preserve the subsequent warmstarted traject
     await f.client.restoreState(saved);
     assert.deepEqual((await f.client.advance({ steps: 100 })).qpos, result.qpos);
   } finally { await f.close(); }
+});
+
+
+test('disposing worker ownership rebuilds native viewer contacts; unmount skips reconstruction', async () => {
+  const model = mj.MjModel.from_xml_string(`<mujoco><worldbody><geom type="plane" size="2 2 .1"/><body pos="0 0 .3"><freejoint/><geom size=".1"/></body></worldbody></mujoco>`);
+  const data = new mj.MjData(model);
+  mj.mj_forward(model, data);
+  const module = mj as unknown as MujocoModule;
+  const m = model as unknown as MujocoModel, d = data as unknown as MujocoData;
+  const api = { mjModelRef: { current: m }, mjDataRef: { current: d }, setPaused: () => {},
+    saveState: () => captureSimulationState(module, m, d) } as unknown as MujocoSimAPI;
+  let runtime = await attachSimulationRuntime(module, api, async () => {}, () => {}, { createWorker: port });
+  try {
+    assert.equal(data.ncon, 0);
+    await runtime.advance({ steps: 500 });
+    assert.ok(runtime.state.contacts.length > 0);
+    assert.equal(data.ncon, 0, 'viewer native contacts are not recomputed while worker owns physics');
+    await runtime.dispose();
+    assert.ok(data.ncon > 0, 'native contacts are immediately available after disposal');
+    runtime = await attachSimulationRuntime(module, api, async () => {}, () => {}, { createWorker: port });
+    closeModelRuntime(m);
+    await assert.rejects(runtime.advance({ steps: 1 }), /disposed/);
+  } finally { await runtime.dispose(); data.delete(); model.delete(); }
 });
