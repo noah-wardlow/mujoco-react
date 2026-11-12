@@ -1,3 +1,10 @@
+## [12.1.2](https://github.com/noah-wardlow/mujoco-react/compare/v12.1.1...v12.1.2) (2026-11-12)
+
+
+### Bug Fixes
+
+* keep splat camera previews responsive and gizmos visible ([e04a172](https://github.com/noah-wardlow/mujoco-react/commit/e04a172bbb9189c231ec30396b343148dec6afb4))
+
 ## [12.1.1](https://github.com/noah-wardlow/mujoco-react/compare/v12.1.0...v12.1.1) (2026-11-12)
 
 
