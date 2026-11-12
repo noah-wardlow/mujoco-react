@@ -16,19 +16,6 @@ Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper a
 npm install mujoco-react three @react-three/fiber @react-three/drei
 ```
 
-## Running policies and simulation workloads
-
-Use `const runtime = await api.createRuntime()` after `onReady`, then await
-`runtime.observe()` and `runtime.advance({ steps, controls })`. Physics runs in a
-dedicated worker; commands reject when busy instead of accumulating. The runtime
-supports cancellation, reset, full snapshots, synchronized camera observations,
-and separate physics/capture timing. Use `<CameraView>` for GPU-only previews.
-
-The viewer has an 8 ms / 100-step per-frame budget. Equivalent inline scene
-configs preserve the loaded model. See the [simulation runtime guide](https://dadd.mintlify.app/guides/simulation-runtime)
-for ownership, VLA loops, bundling, and performance limits, or try the
-[worker demo](https://mujoco-react-example.pages.dev/?demo=runtime).
-
 ## Vite Plugin and Type-Safe Names
 
 Use the Vite plugin to generate declaration merging for actuator, sensor, body, joint, site, geom, and keyframe names:
