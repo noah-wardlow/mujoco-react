@@ -303,7 +303,7 @@ const capture = useCameraFrameCapture({
   mujocoCameraCompatibility: true,
 });
 const frame = await capture.captureRGBD();
-// frame.rgb: Uint8Array, sRGB RGB bytes, top-left origin
+// frame.rgb: Uint8Array, native classic RGB bytes, top-left origin
 // frame.depth: Float32Array, meters along camera -Z, Infinity for background
 ```
 

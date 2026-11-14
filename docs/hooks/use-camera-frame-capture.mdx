@@ -144,7 +144,7 @@ const capture = useCameraFrameCapture({
   mujocoCameraCompatibility: true,
 });
 const frame = await capture.captureRGBD();
-// frame.rgb: Uint8Array, interleaved sRGB [R,G,B], top-left origin
+// frame.rgb: Uint8Array, native classic [R,G,B], top-left origin
 // frame.depth: Float32Array, matching row-major pixels, meters along camera -Z
 const centerDepth = frame.depth[128 * frame.width + 128];
 ```

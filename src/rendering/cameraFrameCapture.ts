@@ -38,7 +38,7 @@ export interface CameraFramePixelsResult {
 
 /** An owned, aligned RGB-D observation from one render. Scene units must be meters. */
 export interface CameraRGBDResult {
-  /** Interleaved RGB bytes, row-major, top-left origin. sRGB by default. */
+  /** Interleaved RGB bytes, row-major, top-left origin. Encoding follows appearance. */
   rgb: Uint8Array;
   /** Transfer function for RGB bytes. Missing on older observations means sRGB. */
   rgbColorSpace?: 'srgb' | 'linear-srgb';
