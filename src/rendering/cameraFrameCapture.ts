@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+import { linearByteToSrgbByte } from './captureColor';
 import { createMetricDepthReader } from './metricDepth';
 import type {
   CameraFrameCaptureBlobResult,
@@ -429,14 +430,6 @@ function readRenderTargetToCanvas(
   return canvas;
 }
 
-function linearByteToSrgbByte(value: number) {
-  const normalized = value / 255;
-  const encoded =
-    normalized <= 0.0031308
-      ? normalized * 12.92
-      : 1.055 * Math.pow(normalized, 1 / 2.4) - 0.055;
-  return Math.min(255, Math.max(0, Math.round(encoded * 255)));
-}
 
 function readPixelsToCanvas(
   pixels: Uint8Array,

@@ -91,3 +91,12 @@ test('async camera adapters restore viewer state during preparation and readback
     globalThis.document = previousDocument;
   }
 });
+
+test('byte capture color transfer matches Three for all 256 linear input values', async () => {
+  const { linearByteToSrgbByte } = await import('../src/rendering/captureColor');
+  const output = new THREE.Color();
+  for (let value = 0; value < 256; value++) {
+    new THREE.Color(value / 255, value / 255, value / 255).getRGB(output, THREE.SRGBColorSpace);
+    assert.equal(linearByteToSrgbByte(value), Math.round(output.r * 255));
+  }
+});
