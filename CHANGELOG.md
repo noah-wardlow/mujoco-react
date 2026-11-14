@@ -1,3 +1,10 @@
+## [12.2.1](https://github.com/noah-wardlow/mujoco-react/compare/v12.2.0...v12.2.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* reduce RGB-D capture color conversion overhead ([7cb0dd4](https://github.com/noah-wardlow/mujoco-react/commit/7cb0dd45eb773fab034dee6f56407a004186eab6))
+
 # [12.2.0](https://github.com/noah-wardlow/mujoco-react/compare/v12.1.2...v12.2.0) (2026-11-14)
 
 
