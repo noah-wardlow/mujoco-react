@@ -1680,6 +1680,9 @@ export interface CameraFrameRenderIsolationOptions {
 }
 
 export interface CameraFrameCaptureOptions {
+  /** RGB-D byte transfer function. Defaults to sRGB. Linear readback preserves
+   * unencoded target bytes, as used by MuJoCo's classic offscreen renderer. */
+  rgbColorSpace?: 'srgb' | 'linear-srgb';
   /** Snapshot (default) waits for splat preparation. Preview reuses the latest
    * sorted splats while updating in the background for responsive live motion.
    * useCameraStream defaults to preview; policy/dataset captures stay snapshot.
@@ -1883,6 +1886,10 @@ export type MujocoMeshNormalSmoothing =
   };
 
 export interface MujocoRenderOptions {
+  /** Opt into classic MuJoCo material/lighting equations for native camera research.
+   * Standard PBR rendering remains the default. Classic currently excludes
+   * shadows, planar reflections, and non-spot/directional lights. */
+  appearance?: 'standard' | 'mujoco-classic';
   /**
    * Smooth mesh normals by welding duplicate vertices before recomputing normals.
    * Useful for faceted STL visuals; keep off for exact policy-render parity.

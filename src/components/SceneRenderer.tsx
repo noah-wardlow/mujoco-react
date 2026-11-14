@@ -23,9 +23,9 @@ export interface SceneRendererProps extends Omit<ThreeElements['group'], 'ref'> 
 
 function getRenderOptionsKey(renderOptions: MujocoRenderOptions | undefined) {
   const smoothing = renderOptions?.meshNormalSmoothing;
-  if (!smoothing) return 'default';
-  if (smoothing === true) return 'meshNormalSmoothing:true';
-  return `meshNormalSmoothing:${smoothing.tolerance ?? 'default'}`;
+  if (!smoothing) return renderOptions?.appearance ?? 'standard';
+  if (smoothing === true) return `${renderOptions?.appearance ?? 'standard'}:meshNormalSmoothing:true`;
+  return `${renderOptions?.appearance ?? 'standard'}:meshNormalSmoothing:${smoothing.tolerance ?? 'default'}`;
 }
 
 export function SceneRenderer({ renderOptions, ...props }: SceneRendererProps) {
@@ -78,24 +78,46 @@ export function SceneRenderer({ renderOptions, ...props }: SceneRendererProps) {
 
     // Create body groups with geometry
     const refs: (THREE.Group | null)[] = [];
-    for (let i = 0; i < model.nbody; i++) {
-      const bodyGroup = new THREE.Group();
-      bodyGroup.userData.bodyID = i;
-      const bodyName = getName(model, model.name_bodyadr[i]);
+    const dispose = () => {
+      for (const body of refs) {
+        body?.parent?.remove(body);
+        body?.traverse(object => {
+          const mesh = object as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          mesh.geometry.dispose();
+          for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) material.dispose();
+        });
+      }
+      geomBuilder.dispose();
+      prevModelRef.current = null;
+      prevRenderOptionsKeyRef.current = null;
+      prevHiddenVersionRef.current = null;
+      if (bodyRefs.current === refs) bodyRefs.current = [];
+    };
+    try {
+      for (let i = 0; i < model.nbody; i++) {
+        const bodyGroup = new THREE.Group();
+        refs.push(bodyGroup);
+        bodyGroup.userData.bodyID = i;
+        const bodyName = getName(model, model.name_bodyadr[i]);
 
-      if (!hiddenBodiesRef.current.has(bodyName)) {
-        for (let g = 0; g < model.ngeom; g++) {
-          if (model.geom_bodyid[g] === i) {
-            const mesh = geomBuilder.create(model, g);
-            if (mesh) bodyGroup.add(mesh);
+        if (!hiddenBodiesRef.current.has(bodyName)) {
+          for (let g = 0; g < model.ngeom; g++) {
+            if (model.geom_bodyid[g] === i) {
+              const mesh = geomBuilder.create(model, g, mjDataRef.current ?? undefined);
+              if (mesh) bodyGroup.add(mesh);
+            }
           }
         }
-      }
 
-      group.add(bodyGroup);
-      refs.push(bodyGroup);
+        group.add(bodyGroup);
+      }
+    } catch (error) {
+      dispose();
+      throw error;
     }
     bodyRefs.current = refs;
+    return dispose;
   }, [status, geomBuilder, mjModelRef, renderOptionsKey, hiddenBodiesRef, hiddenBodiesVersion]);
 
   const syncBodiesToData = useCallback(() => {

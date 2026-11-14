@@ -36,8 +36,10 @@ export interface CameraFramePixelsResult {
 
 /** An owned, aligned RGB-D observation from one render. Scene units must be meters. */
 export interface CameraRGBDResult {
-  /** Interleaved sRGB bytes (RGB), row-major, top-left origin. */
+  /** Interleaved RGB bytes, row-major, top-left origin. sRGB by default. */
   rgb: Uint8Array;
+  /** Transfer function for RGB bytes. Missing on older observations means sRGB. */
+  rgbColorSpace?: 'srgb' | 'linear-srgb';
   /** Positive camera-axis distance (-view Z) in meters, not Euclidean range.
    * Background / no depth-writing surface is +Infinity. Same pixel order as rgb. */
   depth: Float32Array;
@@ -826,6 +828,10 @@ export function createCameraFrameCaptureSession(
       target.depthTexture = new THREE.DepthTexture(width, height, THREE.UnsignedIntType);
       depthReader = createMetricDepthReader(width, height, target.depthTexture);
     }
+    const rgbColorSpace = nextOptions.rgbColorSpace ?? options.rgbColorSpace ?? 'srgb';
+    if (rgbColorSpace !== 'srgb' && rgbColorSpace !== 'linear-srgb') {
+      throw new Error('RGB-D capture requires srgb or linear-srgb RGB bytes');
+    }
     const rgb = new Uint8Array(width * height * 3);
     let depth!: Float32Array;
     renderCaptureToTarget(captureOptions, () => {
@@ -836,14 +842,14 @@ export function createCameraFrameCaptureSession(
           const src = ((height - y - 1) * width + sx) * 4;
           const dst = (y * width + x) * 3;
           for (let c = 0; c < 3; c++) {
-            rgb[dst + c] = linearByteToSrgbByte(pixels[src + c]);
+            rgb[dst + c] = rgbColorSpace === 'srgb' ? linearByteToSrgbByte(pixels[src + c]) : pixels[src + c];
           }
         }
       }
       depth = depthReader!.read(sessionRenderer, camera, captureOptions.flipX ?? false);
     });
     return {
-      rgb, depth, width, height,
+      rgb, rgbColorSpace, depth, width, height,
       source: getCameraFrameCaptureSource(captureOptions),
       origin: 'top-left', depthUnits: 'meters', depthConvention: 'camera-z',
       flipX: captureOptions.flipX ?? false,

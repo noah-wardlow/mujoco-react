@@ -6,9 +6,10 @@
 
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { createMujocoClassicMaterial, createClassicPlaneGeometry } from './mujocoClassicMaterial';
 import { CapsuleGeometry } from './CapsuleGeometry';
 import { getName } from '../core/SceneLoader';
-import { MujocoModel, MujocoModule, MujocoRenderOptions } from '../types';
+import { MujocoModel, MujocoModule, MujocoRenderOptions, MujocoData } from '../types';
 
 const DEFAULT_MESH_NORMAL_SMOOTHING_TOLERANCE = 1e-4;
 
@@ -93,7 +94,15 @@ export class GeomBuilder {
      * Creates a Three.js Object3D (usually a Mesh) for a specific geometry in the MuJoCo model.
      * Returns null if the geometry shouldn't be rendered (e.g., invisible collision triggers).
      */
-    create(mjModel: MujocoModel, g: number): THREE.Object3D | null {
+    dispose() {
+        for (const texture of this.textureCache.values()) texture.dispose();
+        this.textureCache.clear();
+    }
+
+    create(mjModel: MujocoModel, g: number, data?: MujocoData): THREE.Object3D | null {
+        const classic = this.renderOptions?.appearance === 'mujoco-classic';
+        if (classic && !data) throw new Error('Classic appearance requires live MuJoCo data');
+        if (classic && this.renderOptions?.meshNormalSmoothing) throw new Error('Classic appearance uses MuJoCo mesh normals; meshNormalSmoothing is not supported');
         // 1. Check if this geom is meant to be visible
         // Group 3 in MuJoCo is conventionally used for invisible 'helper' geoms.
         if (mjModel.geom_group[g] === 3) return null;
@@ -108,7 +117,7 @@ export class GeomBuilder {
         // Sometimes color is on the geom itself, sometimes it uses a shared material definition.
         const matId = mjModel.geom_matid[g];
         const color = new THREE.Color(0xffffff);
-        const map = this.getMaterialTexture(mjModel, matId);
+        const map = classic ? null : this.getMaterialTexture(mjModel, matId);
         let opacity = 1.0;
 
         if (matId >= 0) {
@@ -132,7 +141,7 @@ export class GeomBuilder {
 
         if (type === getVal(MG.mjGEOM_PLANE)) {
             // Planes are infinite in MuJoCo, but Three needs finite UVs for textured captures.
-            geo = new THREE.PlaneGeometry(size[0] * 2 || 5, size[1] * 2 || 5);
+            geo = classic ? createClassicPlaneGeometry(mjModel, g) : new THREE.PlaneGeometry(size[0] * 2 || 5, size[1] * 2 || 5);
         } else if (type === getVal(MG.mjGEOM_SPHERE)) {
             geo = new THREE.SphereGeometry(size[0], 24, 24);
         } else if (type === getVal(MG.mjGEOM_CAPSULE)) {
@@ -156,27 +165,37 @@ export class GeomBuilder {
             const fNum = mjModel.mesh_facenum[mId];
 
             const tAdr = mjModel.mesh_texcoordadr?.[mId] ?? -1;
-            if (map && tAdr >= 0 && mjModel.mesh_texcoord && mjModel.mesh_facetexcoord) {
+            if (classic || (map && tAdr >= 0 && mjModel.mesh_texcoord && mjModel.mesh_facetexcoord)) {
                 // Textured mesh. MuJoCo indexes texcoords per face corner
                 // (mesh_facetexcoord), independently of the vertex indices, so
                 // the geometry must be de-indexed to carry a 'uv' attribute.
                 const corners = fNum * 3;
                 const positions = new Float32Array(corners * 3);
-                const uvs = new Float32Array(corners * 2);
+                const hasUV = tAdr >= 0 && mjModel.mesh_texcoord && mjModel.mesh_facetexcoord;
+                const uvs = hasUV ? new Float32Array(corners * 2) : undefined;
+                const normalModel = mjModel as MujocoModel & { mesh_normaladr: Int32Array; mesh_facenormal: Int32Array };
+                const normals = classic ? new Float32Array(corners * 3) : undefined;
+                if (classic && (!normalModel.mesh_normaladr || !normalModel.mesh_facenormal)) throw new Error('Classic appearance requires MuJoCo mesh face normals');
                 for (let c = 0; c < corners; c++) {
                     const v = vAdr + mjModel.mesh_face[fAdr * 3 + c];
                     positions[c * 3] = mjModel.mesh_vert[v * 3];
                     positions[c * 3 + 1] = mjModel.mesh_vert[v * 3 + 1];
                     positions[c * 3 + 2] = mjModel.mesh_vert[v * 3 + 2];
-                    const t = tAdr + mjModel.mesh_facetexcoord[fAdr * 3 + c];
-                    uvs[c * 2] = mjModel.mesh_texcoord[t * 2];
-                    // MuJoCo stores V with image-top origin; flip back to GL convention.
-                    uvs[c * 2 + 1] = 1 - mjModel.mesh_texcoord[t * 2 + 1];
+                    if (uvs) {
+                        const t = tAdr + mjModel.mesh_facetexcoord![fAdr * 3 + c];
+                        uvs[c * 2] = mjModel.mesh_texcoord![t * 2];
+                        uvs[c * 2 + 1] = 1 - mjModel.mesh_texcoord![t * 2 + 1];
+                    }
+                    if (normals) {
+                        const n = normalModel.mesh_normaladr[mId] + normalModel.mesh_facenormal[fAdr * 3 + c];
+                        normals.set(mjModel.mesh_normal.subarray(n * 3, n * 3 + 3), c * 3);
+                    }
                 }
                 geo = new THREE.BufferGeometry();
                 geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-                geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-                geo.computeVertexNormals();
+                if (uvs) geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+                if (normals) geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+                else geo.computeVertexNormals();
             } else {
                 geo = new THREE.BufferGeometry();
                 // 'position' attribute = vertices
@@ -194,12 +213,12 @@ export class GeomBuilder {
         // 5. Construct the final Mesh
         if (geo) {
             const isPlane = type === getVal(MG.mjGEOM_PLANE);
-            const materialMap = isPlane && map ? map.clone() : map;
+            const materialMap = !classic && isPlane && map ? map.clone() : map;
             if (isPlane && materialMap) {
                 materialMap.repeat.multiplyScalar(2.5);
                 materialMap.needsUpdate = true;
             }
-            const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+            const mesh = new THREE.Mesh(geo, classic ? createMujocoClassicMaterial(mjModel, data!, g) : new THREE.MeshStandardMaterial({
                 color,
                 map: materialMap,
                 transparent: opacity < 1,
@@ -207,6 +226,7 @@ export class GeomBuilder {
                 roughness: 0.6,
                 metalness: 0
             }));
+            if (materialMap && materialMap !== map) mesh.material.addEventListener('dispose', () => materialMap.dispose());
             mesh.castShadow = type !== getVal(MG.mjGEOM_PLANE);
             mesh.receiveShadow = true;
 

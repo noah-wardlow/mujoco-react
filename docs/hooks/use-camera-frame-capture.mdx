@@ -280,6 +280,22 @@ example above, `result.frames.wrist`, `result.images.wrist`, and
 `result.images["observation.images.wrist"]` are populated even though the
 mounted MuJoCo camera is named `wrist_cam`.
 
+## Native classic RGB comparisons
+
+Use `<MujocoCanvas renderOptions={{ appearance: "mujoco-classic" }}>` with
+`captureRGBD({ rgbColorSpace: "linear-srgb" })` to read native display-code RGB
+bytes without an additional sRGB transfer. The result records `rgbColorSpace`.
+The default remains `"srgb"`. This option controls RGB-D readback; PNG/canvas
+capture keeps its existing encoding.
+
+The opt-in material profile follows MuJoCo's classic OpenGL lighting/material
+rules, compiled texture color spaces, mesh normals and finite-plane grids.
+It uses MJCF lights and the camera headlight, independently of Three.js lights.
+Current limits are eight spot/directional lights including the headlight,
+finite planes, and 2D/cube RGB textures. Shadows, planar reflections and mesh
+normal smoothing are excluded. This is an appearance comparison tool; image
+agreement alone does not establish closed-loop score or physics parity.
+
 ## Notes
 
 - Use `cameraName` for MuJoCo `<camera>` elements, or `siteName` / `bodyName`

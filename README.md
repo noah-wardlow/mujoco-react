@@ -318,6 +318,30 @@ reference objects and aligned RGB/depth previews.
 See [camera capture docs](docs/hooks/use-camera-frame-capture.mdx#metric-rgb-d-capture)
 for projection metadata, moving-camera sessions, and coordinate conventions.
 
+### Native classic appearance
+
+For comparisons with MuJoCo's classic OpenGL renderer, opt in per canvas:
+
+```tsx
+<MujocoCanvas config={config} renderOptions={{ appearance: "mujoco-classic" }}>
+  <Robot />
+</MujocoCanvas>
+// Capture the native display-code bytes without an additional sRGB transfer:
+const frame = api.captureCameraRGBD({
+  cameraName: "agentview", rgbColorSpace: "linear-srgb",
+});
+```
+
+This profile reads MJCF material emission, specular and shininess, compiled
+texture color spaces, mesh normals, model lights and the camera headlight.
+Three.js lights do not affect it. The standard appearance and sRGB RGB-D output
+remain the defaults. `frame.rgbColorSpace` records the selected readback.
+
+The classic profile currently supports finite planes, 2D/cube RGB textures and
+up to eight spot/directional lights including the headlight. It excludes shadows,
+planar reflections and mesh normal smoothing. It approximates the classic
+renderer; camera image agreement does not establish physics or policy score parity.
+
 ## WebSocket Control
 
 Stream actuator commands over a WebSocket and send simulation state back. Use a schema validator such as Zod at this boundary because socket messages are untrusted app input (`npm install zod` for this example):

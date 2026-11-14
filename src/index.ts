@@ -421,6 +421,7 @@ export type {
   CameraFrameSequenceSampleInput,
   CameraFrameSequenceStepInput,
   MujocoCanvasProps,
+  MujocoRenderOptions,
   MujocoContextValue,
   // Hook return types
   FrameCaptureAPI,
