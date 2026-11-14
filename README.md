@@ -143,173 +143,6 @@ Use it as a child of `<MujocoCanvas>`:
 </MujocoCanvas>
 ```
 
-## Gaussian Splat Environments
-
-Gaussian splats are visual context; MuJoCo XML remains the source of physics, contacts, and task fixtures. Use visual-only splats when you only need rendered environment context, and add collision proxy metadata when a workflow needs simplified contact geometry.
-
-Use `VisualScenarioEffects` when the same MuJoCo task should render under
-different camera exposure, fog/background, and deterministic material variants:
-
-```tsx
-import { ScenarioLighting, VisualScenarioEffects } from "mujoco-react";
-
-<MujocoCanvas config={sceneConfig}>
-  <VisualScenarioEffects
-    scenario={scenario}
-    materialFilter={({ object }) => object.name.startsWith("prop_")}
-  />
-  <ScenarioLighting preset={scenario.lighting} />
-</MujocoCanvas>;
-```
-
-Use the renderer-agnostic boundary from the main package. If your app stores
-visual scenarios as data, pass the scenario directly; the component resolves the
-splat asset and any paired MJCF collision proxy metadata for you. Visual-only
-splats are valid, and readiness tells you whether a collision proxy is required
-for your training/physics handoff.
-
-```tsx
-import { MujocoCanvas, SplatEnvironment, useSplatSceneConfig } from "mujoco-react";
-
-const splat = useSplatSceneConfig({ sceneConfig, scenario });
-
-<MujocoCanvas config={splat.sceneConfig}>
-  {splat.environment ? (
-    <SplatEnvironment environment={splat.environment} renderer="custom">
-      <MySplatRenderer src={splat.environment.splat.src} />
-    </SplatEnvironment>
-  ) : null}
-</MujocoCanvas>;
-```
-
-When a splat scenario includes paired MJCF collision proxy metadata, render a
-generic wireframe preview from that XML with `SplatCollisionProxyPreview`. The
-component parses MJCF primitives such as planes, boxes, spheres, capsules, and
-mesh placeholders from any fetchable proxy XML; the tabletop example is just one
-possible environment.
-
-```tsx
-import {
-  SplatCollisionProxyPreview,
-  SplatEnvironment,
-  useSplatCollisionProxyGeoms,
-  useSplatSceneConfig,
-} from "mujoco-react";
-
-const splat = useSplatSceneConfig({ sceneConfig, scenario });
-const proxy = splat.environment?.collisionProxy;
-
-<SplatEnvironment
-  environment={splat.environment}
-  collisionProxy={
-    proxy ? <SplatCollisionProxyPreview collisionProxy={proxy} /> : undefined
-  }
-/>;
-```
-
-Use `useSplatCollisionProxyGeoms()` when your app wants to inspect or style the
-proxy primitives itself:
-
-```tsx
-const proxyPreview = useSplatCollisionProxyGeoms({
-  collisionProxy: splat.environment?.collisionProxy,
-});
-
-proxyPreview.geoms.map((geom) => geom.type);
-```
-
-Use `splat.readiness` or `getSplatEnvironmentReadiness(scenario)` to gate
-authoring and import flows. The status distinguishes disabled scenarios,
-missing visual assets, missing collision proxies, unsupported renderer formats,
-and ready environments.
-
-Use `createSplatSceneConfig()` when the same scene composition needs to run
-outside React, such as codegen, import validation, backend handoff metadata, or
-tests:
-
-```tsx
-import { createSplatSceneConfig } from "mujoco-react";
-
-const splat = createSplatSceneConfig({
-  sceneConfig,
-  scenario,
-  renderer: "spark",
-});
-```
-
-Use `createVisualScenarioExecutionContext()` or
-`useVisualScenarioExecutionContext()` when recording rollouts or exporting
-LeRobot/HF Jobs handoff artifacts. It resolves the scenario seed, camera
-exposure/noise/blur/jitter, material randomization, splat source, collision
-proxy, and readiness into one serializable object.
-
-```tsx
-import { createVisualScenarioExecutionContext } from "mujoco-react";
-
-const visualContext = createVisualScenarioExecutionContext({
-  scenario,
-  renderer: "spark",
-  variantId,
-});
-
-writeEpisodeManifest({
-  task,
-  visualExecutionContext: visualContext,
-});
-```
-
-For MuJoCo + 3DGS composition, derive the optional collision environment from
-the same splat metadata and pass the resulting config to `<MujocoCanvas>`:
-
-```tsx
-const sceneConfig = withSplatEnvironment(
-  {
-    src: "/models/xlerobot/",
-    sceneFile: "xlerobot.xml",
-  },
-  kitchenScenario
-);
-```
-
-For first-class Spark rendering, install Spark and import the optional adapter:
-
-```bash
-npm install @sparkjsdev/spark
-```
-
-```tsx
-import {
-  SparkSplatEnvironment,
-  useSparkSplatEnvironment,
-} from "mujoco-react/spark";
-
-function Scene() {
-  const splat = useSparkSplatEnvironment({ sceneConfig, scenario });
-
-  return (
-    <MujocoCanvas config={splat.sceneConfig} gl={{ preserveDrawingBuffer: true }}>
-      {splat.environment ? (
-        <SparkSplatEnvironment hideGroundMeshes {...splat.props} />
-      ) : null}
-      <StatusBadge status={splat.lifecycle.status} error={splat.lifecycle.error} />
-    </MujocoCanvas>
-  );
-}
-```
-
-`SparkSplatEnvironment` currently renders `.spz` assets. Use the renderer-agnostic
-`SplatEnvironment` for `.ply`/`.splat` metadata or when wiring a different renderer.
-Tune live rendering and snapshots separately with `renderTuning` and
-`captureTuning`:
-
-```tsx
-<SparkSplatEnvironment
-  {...splat.props}
-  renderTuning={{ lodSplatScale: 0.75, minSortIntervalMs: 50 }}
-  captureTuning={{ lodSplatScale: 1.4, lodRenderScale: 0.45, maxWarmupFrames: 6 }}
-/>
-```
-
 ## Write Controllers
 
 ```tsx
@@ -456,6 +289,34 @@ function PolicyDriver() {
 ```
 
 Use `output: "float64"` when a downstream model expects double precision. Named resources are skipped when absent, so `obs.layout` is the source of truth for the current model.
+
+## Metric RGB-D Capture
+
+Capture aligned RGB and metric depth for browser robotics observations, including
+LIBERO. Use a camera name from your MJCF:
+
+```tsx
+const capture = useCameraFrameCapture({
+  cameraName: "agentview",
+  width: 256,
+  height: 256,
+  mujocoCameraCompatibility: true,
+});
+const frame = await capture.captureRGBD();
+// frame.rgb: Uint8Array, sRGB RGB bytes, top-left origin
+// frame.depth: Float32Array, meters along camera -Z, Infinity for background
+```
+
+Also available as `api.captureCameraRGBD(options)`, the standalone
+`captureCameraRGBD(renderer, scene, camera, options)`, and
+`session.captureRGBD(options)` on reusable camera capture sessions. One render
+produces both arrays; each result owns its buffers and camera matrix snapshots.
+Scene coordinates must be meters. Custom renderers, logarithmic depth, and
+reversed depth fail explicitly. The example app's `?demo=rgbd` route shows
+reference objects and aligned RGB/depth previews.
+
+See [camera capture docs](docs/hooks/use-camera-frame-capture.mdx#metric-rgb-d-capture)
+for projection metadata, moving-camera sessions, and coordinate conventions.
 
 ## WebSocket Control
 
@@ -1391,6 +1252,173 @@ function ClickSelectOverlay() {
 ```
 
 See [Click-to-Select](https://dadd.mintlify.app/guides/click-to-select) for the full implementation.
+
+## Gaussian Splat Environments
+
+Gaussian splats are visual context; MuJoCo XML remains the source of physics, contacts, and task fixtures. Use visual-only splats when you only need rendered environment context, and add collision proxy metadata when a workflow needs simplified contact geometry.
+
+Use `VisualScenarioEffects` when the same MuJoCo task should render under
+different camera exposure, fog/background, and deterministic material variants:
+
+```tsx
+import { ScenarioLighting, VisualScenarioEffects } from "mujoco-react";
+
+<MujocoCanvas config={sceneConfig}>
+  <VisualScenarioEffects
+    scenario={scenario}
+    materialFilter={({ object }) => object.name.startsWith("prop_")}
+  />
+  <ScenarioLighting preset={scenario.lighting} />
+</MujocoCanvas>;
+```
+
+Use the renderer-agnostic boundary from the main package. If your app stores
+visual scenarios as data, pass the scenario directly; the component resolves the
+splat asset and any paired MJCF collision proxy metadata for you. Visual-only
+splats are valid, and readiness tells you whether a collision proxy is required
+for your training/physics handoff.
+
+```tsx
+import { MujocoCanvas, SplatEnvironment, useSplatSceneConfig } from "mujoco-react";
+
+const splat = useSplatSceneConfig({ sceneConfig, scenario });
+
+<MujocoCanvas config={splat.sceneConfig}>
+  {splat.environment ? (
+    <SplatEnvironment environment={splat.environment} renderer="custom">
+      <MySplatRenderer src={splat.environment.splat.src} />
+    </SplatEnvironment>
+  ) : null}
+</MujocoCanvas>;
+```
+
+When a splat scenario includes paired MJCF collision proxy metadata, render a
+generic wireframe preview from that XML with `SplatCollisionProxyPreview`. The
+component parses MJCF primitives such as planes, boxes, spheres, capsules, and
+mesh placeholders from any fetchable proxy XML; the tabletop example is just one
+possible environment.
+
+```tsx
+import {
+  SplatCollisionProxyPreview,
+  SplatEnvironment,
+  useSplatCollisionProxyGeoms,
+  useSplatSceneConfig,
+} from "mujoco-react";
+
+const splat = useSplatSceneConfig({ sceneConfig, scenario });
+const proxy = splat.environment?.collisionProxy;
+
+<SplatEnvironment
+  environment={splat.environment}
+  collisionProxy={
+    proxy ? <SplatCollisionProxyPreview collisionProxy={proxy} /> : undefined
+  }
+/>;
+```
+
+Use `useSplatCollisionProxyGeoms()` when your app wants to inspect or style the
+proxy primitives itself:
+
+```tsx
+const proxyPreview = useSplatCollisionProxyGeoms({
+  collisionProxy: splat.environment?.collisionProxy,
+});
+
+proxyPreview.geoms.map((geom) => geom.type);
+```
+
+Use `splat.readiness` or `getSplatEnvironmentReadiness(scenario)` to gate
+authoring and import flows. The status distinguishes disabled scenarios,
+missing visual assets, missing collision proxies, unsupported renderer formats,
+and ready environments.
+
+Use `createSplatSceneConfig()` when the same scene composition needs to run
+outside React, such as codegen, import validation, backend handoff metadata, or
+tests:
+
+```tsx
+import { createSplatSceneConfig } from "mujoco-react";
+
+const splat = createSplatSceneConfig({
+  sceneConfig,
+  scenario,
+  renderer: "spark",
+});
+```
+
+Use `createVisualScenarioExecutionContext()` or
+`useVisualScenarioExecutionContext()` when recording rollouts or exporting
+LeRobot/HF Jobs handoff artifacts. It resolves the scenario seed, camera
+exposure/noise/blur/jitter, material randomization, splat source, collision
+proxy, and readiness into one serializable object.
+
+```tsx
+import { createVisualScenarioExecutionContext } from "mujoco-react";
+
+const visualContext = createVisualScenarioExecutionContext({
+  scenario,
+  renderer: "spark",
+  variantId,
+});
+
+writeEpisodeManifest({
+  task,
+  visualExecutionContext: visualContext,
+});
+```
+
+For MuJoCo + 3DGS composition, derive the optional collision environment from
+the same splat metadata and pass the resulting config to `<MujocoCanvas>`:
+
+```tsx
+const sceneConfig = withSplatEnvironment(
+  {
+    src: "/models/xlerobot/",
+    sceneFile: "xlerobot.xml",
+  },
+  kitchenScenario
+);
+```
+
+For first-class Spark rendering, install Spark and import the optional adapter:
+
+```bash
+npm install @sparkjsdev/spark
+```
+
+```tsx
+import {
+  SparkSplatEnvironment,
+  useSparkSplatEnvironment,
+} from "mujoco-react/spark";
+
+function Scene() {
+  const splat = useSparkSplatEnvironment({ sceneConfig, scenario });
+
+  return (
+    <MujocoCanvas config={splat.sceneConfig} gl={{ preserveDrawingBuffer: true }}>
+      {splat.environment ? (
+        <SparkSplatEnvironment hideGroundMeshes {...splat.props} />
+      ) : null}
+      <StatusBadge status={splat.lifecycle.status} error={splat.lifecycle.error} />
+    </MujocoCanvas>
+  );
+}
+```
+
+`SparkSplatEnvironment` currently renders `.spz` assets. Use the renderer-agnostic
+`SplatEnvironment` for `.ply`/`.splat` metadata or when wiring a different renderer.
+Tune live rendering and snapshots separately with `renderTuning` and
+`captureTuning`:
+
+```tsx
+<SparkSplatEnvironment
+  {...splat.props}
+  renderTuning={{ lodSplatScale: 0.75, minSortIntervalMs: 50 }}
+  captureTuning={{ lodSplatScale: 1.4, lodRenderScale: 0.45, maxWarmupFrames: 6 }}
+/>
+```
 
 ## useFrame Priority
 

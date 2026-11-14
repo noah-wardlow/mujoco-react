@@ -235,3 +235,14 @@ control, `createCameraFrameCaptureSession()` exposes `captureTensor()` and
 | Record a dataset of PNG/JPEG frames | `usePolicyCameraFramesFromMountedStreams` / `recordMountedCameraFrameSequence` |
 | Draw a synthetic pose in the viewport | `<Debug virtualCameras={[...]}>` |
 | Capture the visible browser viewport | `useFrameCapture` |
+
+## Metric RGB-D observations
+
+Use `useCameraFrameCapture().captureRGBD()` or `api.captureCameraRGBD()` for
+aligned sRGB bytes and float32 camera-axis depth in meters. Both use one render,
+top-left pixel order, and `Infinity` for background. For browser robotics
+observations such as LIBERO, select a named MJCF camera and enable
+`mujocoCameraCompatibility` to use its projection metadata.
+
+See [Metric RGB-D capture](/hooks/use-camera-frame-capture#metric-rgb-d-capture)
+for ownership, moving-camera sessions, coordinate conventions and failure modes.

@@ -59,6 +59,7 @@ useCameraFrameCapture(options?: {
   isCapturing: boolean
   capture: (options?: CameraFrameCaptureOptions) => Promise<CameraFrameCaptureResult>
   captureBlob: (options?: CameraFrameCaptureOptions) => Promise<CameraFrameCaptureBlobResult>
+  captureRGBD: (options?: CameraFrameCaptureOptions) => Promise<CameraRGBDResult>
   reset: () => void
 }
 ```
@@ -129,6 +130,71 @@ shadow maps, tone mapping, or output color space for one capture. Use
 `renderIsolation` when policy or training images should be rendered with an
 independent offscreen `WebGLRenderer` instead of inheriting viewer renderer
 state.
+
+## Metric RGB-D capture
+
+Use the same hook for aligned RGB and metric depth, including LIBERO camera
+observations:
+
+```tsx
+const capture = useCameraFrameCapture({
+  cameraName: "agentview", // Must exist in the loaded MJCF.
+  width: 256,
+  height: 256,
+  mujocoCameraCompatibility: true,
+});
+const frame = await capture.captureRGBD();
+// frame.rgb: Uint8Array, interleaved sRGB [R,G,B], top-left origin
+// frame.depth: Float32Array, matching row-major pixels, meters along camera -Z
+const centerDepth = frame.depth[128 * frame.width + 128];
+```
+
+The imperative equivalent is `api.captureCameraRGBD(options)` (synchronous).
+The standalone helper `captureCameraRGBD(renderer, scene, camera, options)`
+works outside a MuJoCo provider. For repeated observations, reuse a session:
+
+```ts
+const session = api.createCameraFrameCaptureSession({
+  cameraName: "agentview", width: 256, height: 256,
+  mujocoCameraCompatibility: true,
+});
+try {
+  // Re-resolve each observation for cameras attached to moving bodies.
+  const frame = session.captureRGBD(api.resolveCameraCaptureOptions({
+    cameraName: "agentview", width: 256, height: 256,
+    mujocoCameraCompatibility: true,
+  }));
+  consumeObservation(frame);
+} finally {
+  session.dispose();
+}
+```
+
+RGB and depth come from one render of the Three scene at the current simulation
+pose. Scene coordinates must use meters. Depth is positive axial distance,
+**not Euclidean range** or normalized OpenGL depth. Background and surfaces
+that do not write depth produce `Infinity`; transparent surfaces follow their
+material's `depthWrite` setting. Alpha-tested cutouts, occlusion, geom filters,
+and `CAPTURE_EXCLUDE_KEY` use the same render for both arrays.
+
+Both arrays and the column-major `projectionMatrix` / `cameraWorldMatrix`
+snapshots are owned by the result and survive subsequent captures and session
+disposal. Camera coordinates are +X right, +Y up, -Z forward. Pixel centers map
+to NDC using `2 * (x + 0.5) / width - 1` and
+`1 - 2 * (y + 0.5) / height`. Use the inverse projection for intrinsics, then
+the world matrix for world coordinates. `flipX` mirrors both arrays; undo the
+mirror before unprojecting with the supplied matrices.
+
+Perspective, orthographic, and asymmetric calibrated projection matrices are
+supported. Width/height stay fixed for a session. Readback is synchronous and
+can stall the GPU; sessions reuse render targets, while each observation owns
+its output arrays. Precision follows the GPU depth buffer and clipping planes.
+This captures the Three rendering of MuJoCo geometry; it does not promise
+pixel parity with MuJoCo's native renderer.
+
+Custom capture renderers (including Spark splats), logarithmic depth buffers,
+and reversed depth buffers throw explicit errors rather than returning
+misaligned depth. See the runnable example at `?demo=rgbd` in the example app.
 
 ## Policy Image Payloads
 

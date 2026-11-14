@@ -83,12 +83,29 @@ export function useCameraFrameCapture(
     [defaultOptions, mujoco.api]
   );
 
+  async function captureRGBD(options: CameraFrameCaptureOptions = {}) {
+    setStatus('capturing');
+    setError(null);
+    try {
+      if (!mujoco.api) throw new Error('MuJoCo scene is not ready for camera frame capture.');
+      const result = mujoco.api.captureCameraRGBD({ ...defaultOptions, ...options });
+      setStatus('captured');
+      return result;
+    } catch (nextError) {
+      const error = nextError instanceof Error ? nextError : new Error('Unable to capture RGB-D.');
+      setError(error);
+      setStatus('error');
+      throw error;
+    }
+  }
+
   return {
     status,
     error,
     isCapturing: status === 'capturing',
     capture,
     captureBlob,
+    captureRGBD,
     reset,
   };
 }

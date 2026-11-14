@@ -172,6 +172,7 @@ export {
   captureCameraFrame,
   captureCameraFrameBlob,
   captureCameraFrameTensor,
+  captureCameraRGBD,
   createCameraFrameCaptureSession,
   renderCameraFrameToCanvas,
 } from './rendering/cameraFrameCapture';
@@ -179,6 +180,7 @@ export type {
   CameraFrameCaptureSession,
   CameraFrameCaptureTensorOptions,
   CameraFramePixelsResult,
+  CameraRGBDResult,
   CameraFrameTensorResult,
 } from './rendering/cameraFrameCapture';
 export {

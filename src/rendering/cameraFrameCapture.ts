@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+import { createMetricDepthReader } from './metricDepth';
 import type {
   CameraFrameCaptureBlobResult,
   CameraFrameCaptureOptions,
@@ -30,6 +31,26 @@ export interface CameraFramePixelsResult {
   width: number;
   height: number;
   source: CameraFrameCaptureSource;
+}
+
+/** An owned, aligned RGB-D observation from one render. Scene units must be meters. */
+export interface CameraRGBDResult {
+  /** Interleaved sRGB bytes (RGB), row-major, top-left origin. */
+  rgb: Uint8Array;
+  /** Positive camera-axis distance (-view Z) in meters, not Euclidean range.
+   * Background / no depth-writing surface is +Infinity. Same pixel order as rgb. */
+  depth: Float32Array;
+  width: number;
+  height: number;
+  source: CameraFrameCaptureSource;
+  origin: 'top-left';
+  depthUnits: 'meters';
+  depthConvention: 'camera-z';
+  /** Horizontal mirroring applied to both arrays. Undo before unprojecting. */
+  flipX: boolean;
+  /** Owned column-major matrices. Camera coordinates: +X right, +Y up, -Z forward. */
+  projectionMatrix: number[];
+  cameraWorldMatrix: number[];
 }
 
 export interface CameraFrameTensorResult extends PolicyImageTensorResult {
@@ -67,6 +88,8 @@ export interface CameraFrameCaptureSession {
   capturePixels(options?: CameraFrameCaptureOptions): CameraFramePixelsResult;
   /** Render straight into a normalized policy image tensor (no canvas/PNG encode). */
   captureTensor(options?: CameraFrameCaptureTensorOptions): CameraFrameTensorResult;
+  /** Synchronous RGB + metric depth from one render. Returned arrays are owned. */
+  captureRGBD(options?: CameraFrameCaptureOptions): CameraRGBDResult;
   dispose(): void;
 }
 
@@ -306,6 +329,11 @@ export function createCaptureCamera(
     camera.far = options.far ?? camera.far;
     camera.updateProjectionMatrix();
   }
+  if (camera instanceof THREE.OrthographicCamera) {
+    camera.near = options.near ?? camera.near;
+    camera.far = options.far ?? camera.far;
+    camera.updateProjectionMatrix();
+  }
   applyProjectionMatrix(camera, options.projectionMatrix);
 
   applyCameraPose(camera, options, fallbackCamera);
@@ -341,6 +369,11 @@ export function prepareCaptureCamera(
   if (camera instanceof THREE.PerspectiveCamera) {
     camera.aspect = width / height;
     camera.fov = options.fov ?? camera.fov;
+    camera.near = options.near ?? camera.near;
+    camera.far = options.far ?? camera.far;
+    camera.updateProjectionMatrix();
+  }
+  if (camera instanceof THREE.OrthographicCamera) {
     camera.near = options.near ?? camera.near;
     camera.far = options.far ?? camera.far;
     camera.updateProjectionMatrix();
@@ -653,12 +686,14 @@ export function createCameraFrameCaptureSession(
 
   const pixels = new Uint8Array(width * height * 4);
   const imageData = drawContext.createImageData(width, height);
+  let depthReader: ReturnType<typeof createMetricDepthReader> | undefined;
   let inFlight = false, disposed = false;
   function assertAvailable() {
     if (disposed) throw new Error('Camera capture session is disposed');
     if (inFlight) throw new Error('Camera capture session is busy; await the current capture');
   }
   function releaseResources() {
+    depthReader?.dispose();
     target.dispose();
     if (isolatedRenderer && !isolatedRenderer.cached) isolatedRenderer.renderer.dispose();
   }
@@ -727,8 +762,7 @@ export function createCameraFrameCaptureSession(
   ) {
     withCaptureState(captureOptions, () => {
       sessionRenderer.setRenderTarget(target);
-      sessionRenderer.setViewport(0, 0, width, height);
-      sessionRenderer.setScissor(0, 0, width, height);
+      // The render target installs its pixel viewport; setters would apply DPR twice.
       sessionRenderer.setScissorTest(false);
       sessionRenderer.clear();
       sessionRenderer.render(scene, camera);
@@ -777,6 +811,51 @@ export function createCameraFrameCaptureSession(
       width,
       height,
       source: getCameraFrameCaptureSource(captureOptions),
+    };
+  }
+
+  function captureRGBD(nextOptions: CameraFrameCaptureOptions = {}): CameraRGBDResult {
+    assertAvailable();
+    const captureOptions = resolveCaptureOptions(nextOptions);
+    if (getCaptureRenderer(scene)) {
+      throw new Error('Metric RGB-D capture requires the standard Three renderer; custom capture renderers do not provide aligned depth.');
+    }
+    if (sessionRenderer.capabilities.logarithmicDepthBuffer || sessionRenderer.capabilities.reversedDepthBuffer) {
+      throw new Error('Metric RGB-D capture does not support logarithmic or reversed depth buffers.');
+    }
+    if (!camera.projectionMatrix.elements.every(Number.isFinite) ||
+        !Number.isFinite(camera.projectionMatrix.determinant()) || camera.projectionMatrix.determinant() === 0) {
+      throw new Error('Metric RGB-D capture requires a finite, invertible projection matrix.');
+    }
+    if (!depthReader) {
+      // Recreate the framebuffer if this session has already rendered RGB-only frames.
+      target.dispose();
+      target.depthTexture = new THREE.DepthTexture(width, height, THREE.UnsignedIntType);
+      depthReader = createMetricDepthReader(width, height, target.depthTexture);
+    }
+    const rgb = new Uint8Array(width * height * 3);
+    let depth!: Float32Array;
+    renderCaptureToTarget(captureOptions, () => {
+      sessionRenderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const sx = captureOptions.flipX ? width - x - 1 : x;
+          const src = ((height - y - 1) * width + sx) * 4;
+          const dst = (y * width + x) * 3;
+          for (let c = 0; c < 3; c++) {
+            rgb[dst + c] = linearByteToSrgbByte(pixels[src + c]);
+          }
+        }
+      }
+      depth = depthReader!.read(sessionRenderer, camera, captureOptions.flipX ?? false);
+    });
+    return {
+      rgb, depth, width, height,
+      source: getCameraFrameCaptureSource(captureOptions),
+      origin: 'top-left', depthUnits: 'meters', depthConvention: 'camera-z',
+      flipX: captureOptions.flipX ?? false,
+      projectionMatrix: camera.projectionMatrix.toArray(),
+      cameraWorldMatrix: camera.matrixWorld.toArray(),
     };
   }
 
@@ -857,6 +936,7 @@ export function createCameraFrameCaptureSession(
     captureAsync,
     capturePixels,
     captureTensor,
+    captureRGBD,
     captureDataUrl(nextOptions = {}) {
       const type = nextOptions.type ?? options.type ?? 'image/png';
       const result = capture(nextOptions);
@@ -987,6 +1067,20 @@ export function captureCameraFrameTensor(
   );
   try {
     return session.captureTensor(options);
+  } finally {
+    session.dispose();
+  }
+}
+/** One-shot aligned RGB-D observation. Use a session for repeated observations. */
+export function captureCameraRGBD(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  fallbackCamera: THREE.Camera,
+  options: CameraFrameCaptureOptions = {}
+): CameraRGBDResult {
+  const session = createCameraFrameCaptureSession(renderer, scene, fallbackCamera, options);
+  try {
+    return session.captureRGBD();
   } finally {
     session.dispose();
   }

@@ -13,6 +13,7 @@ import type {
   CameraFrameCaptureSession,
   CameraFrameCaptureTensorOptions,
   CameraFrameTensorResult,
+  CameraRGBDResult,
 } from './rendering/cameraFrameCapture';
 
 // ---- Register (type-safe named resources) ----
@@ -1548,6 +1549,8 @@ export interface MujocoSimAPI {
   captureFrameBlob(options?: MujocoFrameCaptureOptions): Promise<FrameCaptureBlobResult>;
   captureCameraFrame(options?: CameraFrameCaptureOptions): Promise<CameraFrameCaptureResult>;
   captureCameraFrameBlob(options?: CameraFrameCaptureOptions): Promise<CameraFrameCaptureBlobResult>;
+  /** Aligned sRGB + camera-axis depth in meters from one render. */
+  captureCameraRGBD(options?: CameraFrameCaptureOptions): CameraRGBDResult;
   /** Capture a camera frame straight into a policy image tensor (no canvas/PNG encode). */
   captureCameraFrameTensor(options?: CameraFrameCaptureTensorOptions): CameraFrameTensorResult;
   /**
@@ -1796,6 +1799,7 @@ export interface CameraFrameCaptureAPI {
   captureBlob: (
     options?: CameraFrameCaptureOptions
   ) => Promise<CameraFrameCaptureBlobResult>;
+  captureRGBD: (options?: CameraFrameCaptureOptions) => Promise<CameraRGBDResult>;
   reset: () => void;
 }
 
