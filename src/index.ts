@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export { MujocoAppearance } from './types';
+
 // Core
 export { MujocoProvider, useMujocoWasm } from './core/MujocoProvider';
 export type { MujocoLoader, MujocoLoaderOptions, MujocoProviderProps, MujocoWasmVariant } from './core/MujocoProvider';

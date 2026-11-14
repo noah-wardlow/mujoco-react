@@ -9,7 +9,7 @@ import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { createMujocoClassicMaterial, createClassicPlaneGeometry } from './mujocoClassicMaterial';
 import { CapsuleGeometry } from './CapsuleGeometry';
 import { getName } from '../core/SceneLoader';
-import { MujocoModel, MujocoModule, MujocoRenderOptions, MujocoData } from '../types';
+import { MujocoAppearance, MujocoModel, MujocoModule, MujocoRenderOptions, MujocoData } from '../types';
 
 const DEFAULT_MESH_NORMAL_SMOOTHING_TOLERANCE = 1e-4;
 
@@ -100,7 +100,7 @@ export class GeomBuilder {
     }
 
     create(mjModel: MujocoModel, g: number, data?: MujocoData): THREE.Object3D | null {
-        const classic = this.renderOptions?.appearance === 'mujoco-classic';
+        const classic = this.renderOptions?.appearance === MujocoAppearance.Classic;
         if (classic && !data) throw new Error('Classic appearance requires live MuJoCo data');
         if (classic && this.renderOptions?.meshNormalSmoothing) throw new Error('Classic appearance uses MuJoCo mesh normals; meshNormalSmoothing is not supported');
         // 1. Check if this geom is meant to be visible

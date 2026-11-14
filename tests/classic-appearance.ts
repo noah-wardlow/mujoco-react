@@ -4,6 +4,7 @@ import loadMujoco from '@mujoco/mujoco';
 import * as THREE from 'three';
 import {createClassicPlaneGeometry,createMujocoClassicMaterial} from '../src/rendering/mujocoClassicMaterial';
 import {GeomBuilder} from '../src/rendering/GeomBuilder';
+import {MujocoAppearance} from '../src/types';
 import type {MujocoData,MujocoModel,MujocoModule} from '../src/types';
 const mj=await loadMujoco();
 const xml=`<mujoco><asset>
@@ -51,7 +52,7 @@ test('classic cube material uses six native faces and linear classic upload sema
 test('classic finite plane grid preserves native extents; renderer profile remains opt-in',()=>{
  const f=fixture(),g=geom(f.native,'floor');
  const geometry=createClassicPlaneGeometry(f.m,g);
- const builder=new GeomBuilder(mj as unknown as MujocoModule,{appearance:'mujoco-classic'});
+ const builder=new GeomBuilder(mj as unknown as MujocoModule,{appearance:MujocoAppearance.Classic});
  try{
   const positions=geometry.getAttribute('position');let minX=Infinity,maxX=-Infinity;
   for(let i=0;i<positions.count;i++){minX=Math.min(minX,positions.getX(i));maxX=Math.max(maxX,positions.getX(i));}
@@ -61,4 +62,40 @@ test('classic finite plane grid preserves native extents; renderer profile remai
   const standard=new GeomBuilder(mj as unknown as MujocoModule).create(f.m,g) as THREE.Mesh;
   assert.equal((standard.material as THREE.Material).type,'MeshStandardMaterial');standard.geometry.dispose();(standard.material as THREE.Material).dispose();
  }finally{geometry.dispose();builder.dispose();f.data.delete();f.native.delete();}
+});
+
+test('camera defaults and scoped overrides share meshes, restore on failure and reuse owned alternatives', async()=>{
+ const {registerSceneAppearance,resolveCameraAppearance,withCameraAppearance}=await import('../src/rendering/sceneAppearance');
+ const f=fixture(),root=new THREE.Group(),scene=new THREE.Scene();scene.add(root);
+ const builder=new GeomBuilder(mj as unknown as MujocoModule);
+ const mesh=builder.create(f.m,geom(f.native,'inherited')) as THREE.Mesh;root.add(mesh);
+ const original={geometry:mesh.geometry,material:mesh.material},time=f.data.time,qpos=Array.from(f.data.qpos);
+ const dispose=registerSceneAppearance(root,mj as unknown as MujocoModule,f.m,f.d,MujocoAppearance.Standard);
+ try{
+  assert.equal(resolveCameraAppearance(scene),MujocoAppearance.Classic);
+  assert.equal(resolveCameraAppearance(new THREE.Scene()),MujocoAppearance.Standard);
+  assert.throws(()=>resolveCameraAppearance(new THREE.Scene(),MujocoAppearance.Classic),/managed MuJoCo/);
+  assert.throws(()=>resolveCameraAppearance(scene,'wrong' as any),/Camera appearance/);
+  let classic:THREE.Material|THREE.Material[]|undefined;
+  for(let i=0;i<3;i++) {
+   assert.throws(()=>withCameraAppearance(scene,MujocoAppearance.Classic,()=>{
+    assert.equal((mesh.material as THREE.Material).type,'ShaderMaterial');
+    if(classic)assert.equal(mesh.material,classic);classic=mesh.material;
+    withCameraAppearance(scene,MujocoAppearance.Standard,()=>assert.equal(mesh.material,original.material));
+    assert.equal(mesh.material,classic);
+    throw new Error('render failed');
+   }),/render failed/);
+   assert.equal(mesh.material,original.material);assert.equal(mesh.geometry,original.geometry);
+  }
+  assert.equal(f.data.time,time);assert.deepEqual(Array.from(f.data.qpos),qpos);
+  let disposed=0;(classic as THREE.Material).addEventListener('dispose',()=>disposed++);
+  dispose();dispose();assert.equal(disposed,1);
+ }finally{dispose();mesh.geometry.dispose();(mesh.material as THREE.Material).dispose();builder.dispose();f.data.delete();f.native.delete();}
+});
+
+test('classic infinite-plane visualization uses the same finite proxy extent as the viewer',()=>{
+ const f=fixture(),g=geom(f.native,'floor');f.m.geom_size[g*3]=0;f.m.geom_size[g*3+1]=0;
+ const geometry=createClassicPlaneGeometry(f.m,g);geometry.computeBoundingBox();
+ try{close(geometry.boundingBox!.min.x,-2.5);close(geometry.boundingBox!.max.y,2.5);}
+ finally{geometry.dispose();f.data.delete();f.native.delete();}
 });

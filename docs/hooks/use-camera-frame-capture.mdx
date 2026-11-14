@@ -280,21 +280,44 @@ example above, `result.frames.wrist`, `result.images.wrist`, and
 `result.images["observation.images.wrist"]` are populated even though the
 mounted MuJoCo camera is named `wrist_cam`.
 
-## Native classic RGB comparisons
+## Independent camera appearance
 
-Use `<MujocoCanvas renderOptions={{ appearance: "mujoco-classic" }}>` with
-`captureRGBD({ rgbColorSpace: "linear-srgb" })` to read native display-code RGB
-bytes without an additional sRGB transfer. The result records `rgbColorSpace`.
-The default remains `"srgb"`. This option controls RGB-D readback; PNG/canvas
-capture keeps its existing encoding.
+MuJoCo cameras default to classic rendering while the interactive viewer stays
+standard PBR. No appearance arguments are required. This applies to RGB-D,
+PNG/canvas captures, reusable sessions, live streams and `CameraView` viewports.
+Plain Three.js scenes without managed MuJoCo geometry retain standard rendering.
 
-The opt-in material profile follows MuJoCo's classic OpenGL lighting/material
-rules, compiled texture color spaces, mesh normals and finite-plane grids.
-It uses MJCF lights and the camera headlight, independently of Three.js lights.
-Current limits are eight spot/directional lights including the headlight,
-finite planes, and 2D/cube RGB textures. Shadows, planar reflections and mesh
-normal smoothing are excluded. This is an appearance comparison tool; image
-agreement alone does not establish closed-loop score or physics parity.
+```ts
+const frame = api.captureCameraRGBD({ cameraName: "agentview" });
+// appearance: MujocoAppearance.Classic; rgbColorSpace: "linear-srgb"
+```
+
+Import `MujocoAppearance` for optional overrides:
+
+```ts
+import { MujocoAppearance } from "mujoco-react";
+const frame = api.captureCameraRGBD({
+  cameraName: "agentview",
+  appearance: MujocoAppearance.Standard,
+});
+```
+
+Capture caches alternate geometry/materials and restores the viewer's originals
+before async readback yields, and on failure. It shares the same MuJoCo model,
+body transforms and physics state. Classic RGB-D defaults to native display-code
+bytes; standard defaults to sRGB. `rgbColorSpace` explicitly overrides RGB-D
+encoding. Results record `appearance` and `rgbColorSpace`.
+
+Classic follows MJCF materials, mesh normals, compiled texture color spaces,
+model lights and the camera headlight. It supports at most eight spot/directional
+lights including the headlight, and 2D/cube RGB textures. Shadows and planar
+reflections are excluded. Infinite planes retain the viewer's 5m visualization
+proxy rather than native infinite-horizon rendering.
+
+**Migration from 12.x:** MuJoCo camera captures previously used the viewer's
+appearance. Use `appearance: MujocoAppearance.Standard` for the former default
+PBR/sRGB camera output. Viewer appearance remains standard by default. Plain
+Three scenes are unchanged. Camera image agreement is not score parity.
 
 ## Notes
 

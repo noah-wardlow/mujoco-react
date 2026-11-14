@@ -6,6 +6,8 @@
  */
 
 import * as THREE from 'three';
+import { MujocoAppearance } from '../types';
+import { resolveCameraAppearance, withCameraAppearance } from './sceneAppearance';
 import { linearByteToSrgbByte } from './captureColor';
 import { createMetricDepthReader } from './metricDepth';
 import type {
@@ -40,6 +42,8 @@ export interface CameraRGBDResult {
   rgb: Uint8Array;
   /** Transfer function for RGB bytes. Missing on older observations means sRGB. */
   rgbColorSpace?: 'srgb' | 'linear-srgb';
+  /** Effective appearance used for this observation. */
+  appearance?: MujocoAppearance;
   /** Positive camera-axis distance (-view Z) in meters, not Euclidean range.
    * Background / no depth-writing surface is +Infinity. Same pixel order as rgb. */
   depth: Float32Array;
@@ -725,6 +729,7 @@ export function createCameraFrameCaptureSession(
   }
 
   function withCaptureState(captureOptions: CameraFrameCaptureOptions, render: () => void) {
+    const appearance = resolveCameraAppearance(scene, captureOptions.appearance);
     const previousState = saveRendererState(sessionRenderer);
     const previousSceneState = applyCaptureVisualOverrides(sessionRenderer, scene, captureOptions);
     const hidden = [
@@ -743,7 +748,7 @@ export function createCameraFrameCaptureSession(
       } else if (captureOptions.backgroundAlpha !== undefined) {
         sessionRenderer.setClearColor(previousState.clearColor, captureOptions.backgroundAlpha);
       }
-      render();
+      withCameraAppearance(scene, appearance, render);
     } finally {
       restoreObjectVisibility(hidden);
       if (previousSceneState) restoreSceneVisualState(scene, previousSceneState);
@@ -765,6 +770,12 @@ export function createCameraFrameCaptureSession(
     });
   }
 
+  function captureOutputColorSpace(captureOptions: CameraFrameCaptureOptions) {
+    // Classic native display-code bytes must not receive a second sRGB transfer.
+    return resolveCameraAppearance(scene, captureOptions.appearance) === MujocoAppearance.Classic
+      ? THREE.LinearSRGBColorSpace : sessionRenderer.outputColorSpace;
+  }
+
   function renderPreparedCapture(captureOptions: CameraFrameCaptureOptions) {
     renderCaptureToTarget(captureOptions, () => {
       readRenderTargetToCanvas(
@@ -776,7 +787,7 @@ export function createCameraFrameCaptureSession(
         imageData,
         width,
         height,
-        sessionRenderer.outputColorSpace,
+        captureOutputColorSpace(captureOptions),
         captureOptions.flipX ?? false
       );
     });
@@ -828,7 +839,8 @@ export function createCameraFrameCaptureSession(
       target.depthTexture = new THREE.DepthTexture(width, height, THREE.UnsignedIntType);
       depthReader = createMetricDepthReader(width, height, target.depthTexture);
     }
-    const rgbColorSpace = nextOptions.rgbColorSpace ?? options.rgbColorSpace ?? 'srgb';
+    const appearance = resolveCameraAppearance(scene, captureOptions.appearance);
+    const rgbColorSpace = captureOptions.rgbColorSpace ?? (appearance === MujocoAppearance.Classic ? 'linear-srgb' : 'srgb');
     if (rgbColorSpace !== 'srgb' && rgbColorSpace !== 'linear-srgb') {
       throw new Error('RGB-D capture requires srgb or linear-srgb RGB bytes');
     }
@@ -849,7 +861,7 @@ export function createCameraFrameCaptureSession(
       depth = depthReader!.read(sessionRenderer, camera, captureOptions.flipX ?? false);
     });
     return {
-      rgb, rgbColorSpace, depth, width, height,
+      rgb, rgbColorSpace, appearance, depth, width, height,
       source: getCameraFrameCaptureSource(captureOptions),
       origin: 'top-left', depthUnits: 'meters', depthConvention: 'camera-z',
       flipX: captureOptions.flipX ?? false,
@@ -924,7 +936,7 @@ export function createCameraFrameCaptureSession(
     });
     await readback;
     readRenderTargetToCanvas(sessionRenderer, target, canvas, drawContext, pixels, imageData,
-      width, height, sessionRenderer.outputColorSpace, captureOptions.flipX ?? false, false);
+      width, height, captureOutputColorSpace(captureOptions), captureOptions.flipX ?? false, false);
     return { canvas, camera, width, height, source: getCameraFrameCaptureSource(captureOptions) };
   }
 

@@ -7,9 +7,10 @@ import { useFrame } from '@react-three/fiber';
 import type { ThreeElements } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { registerSceneAppearance } from '../rendering/sceneAppearance';
 import { GeomBuilder } from '../rendering/GeomBuilder';
 import { CAMERA_FRAME_CAPTURE_PRE_RENDER_USER_DATA_KEY } from '../rendering/cameraFrameCapture';
-import { MujocoModel, MujocoRenderOptions } from '../types';
+import { MujocoAppearance, MujocoModel, MujocoRenderOptions } from '../types';
 import { getName } from '../core/SceneLoader';
 import { useMujocoContext } from '../core/MujocoSimProvider';
 
@@ -23,9 +24,9 @@ export interface SceneRendererProps extends Omit<ThreeElements['group'], 'ref'> 
 
 function getRenderOptionsKey(renderOptions: MujocoRenderOptions | undefined) {
   const smoothing = renderOptions?.meshNormalSmoothing;
-  if (!smoothing) return renderOptions?.appearance ?? 'standard';
-  if (smoothing === true) return `${renderOptions?.appearance ?? 'standard'}:meshNormalSmoothing:true`;
-  return `${renderOptions?.appearance ?? 'standard'}:meshNormalSmoothing:${smoothing.tolerance ?? 'default'}`;
+  if (!smoothing) return renderOptions?.appearance ?? MujocoAppearance.Standard;
+  if (smoothing === true) return `${renderOptions?.appearance ?? MujocoAppearance.Standard}:meshNormalSmoothing:true`;
+  return `${renderOptions?.appearance ?? MujocoAppearance.Standard}:meshNormalSmoothing:${smoothing.tolerance ?? 'default'}`;
 }
 
 export function SceneRenderer({ renderOptions, ...props }: SceneRendererProps) {
@@ -78,7 +79,9 @@ export function SceneRenderer({ renderOptions, ...props }: SceneRendererProps) {
 
     // Create body groups with geometry
     const refs: (THREE.Group | null)[] = [];
+    let disposeAppearance: (() => void) | undefined;
     const dispose = () => {
+      disposeAppearance?.();
       for (const body of refs) {
         body?.parent?.remove(body);
         body?.traverse(object => {
@@ -116,6 +119,7 @@ export function SceneRenderer({ renderOptions, ...props }: SceneRendererProps) {
       dispose();
       throw error;
     }
+    if (mjDataRef.current) disposeAppearance = registerSceneAppearance(group, mujocoRef.current, model, mjDataRef.current, renderOptions?.appearance ?? MujocoAppearance.Standard);
     bodyRefs.current = refs;
     return dispose;
   }, [status, geomBuilder, mjModelRef, renderOptionsKey, hiddenBodiesRef, hiddenBodiesVersion]);

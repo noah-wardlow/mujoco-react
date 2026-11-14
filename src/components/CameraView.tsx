@@ -26,6 +26,7 @@ import {
   useState,
 } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { resolveCameraAppearance, withCameraAppearance } from '../rendering/sceneAppearance';
 import type * as THREE from 'three';
 import { useMujoco } from '../core/MujocoSimProvider';
 import {
@@ -42,6 +43,7 @@ import type {
 /** Camera selection + pose options for a live viewport. */
 export type CameraViewportOptions = Pick<
   CameraFrameCaptureOptions,
+  | 'appearance'
   | 'camera'
   | 'cameraName'
   | 'siteName'
@@ -137,7 +139,7 @@ function CameraViewportRenderer({
       gl.setViewport(left, bottom, width, height);
       gl.setScissor(left, bottom, width, height);
       gl.setScissorTest(true);
-      gl.render(scene, descriptor.camera);
+      withCameraAppearance(scene, resolveCameraAppearance(scene, resolved.appearance), () => gl.render(scene, descriptor.camera!));
     }
 
     gl.setScissorTest(false);

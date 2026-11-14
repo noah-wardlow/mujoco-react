@@ -318,29 +318,54 @@ reference objects and aligned RGB/depth previews.
 See [camera capture docs](docs/hooks/use-camera-frame-capture.mdx#metric-rgb-d-capture)
 for projection metadata, moving-camera sessions, and coordinate conventions.
 
-### Native classic appearance
+### Independent viewer and camera appearance
 
-For comparisons with MuJoCo's classic OpenGL renderer, opt in per canvas:
+The viewer defaults to standard PBR rendering. MuJoCo camera captures and live
+camera viewports default to classic model lighting/materials, independently:
 
 ```tsx
-<MujocoCanvas config={config} renderOptions={{ appearance: "mujoco-classic" }}>
-  <Robot />
-</MujocoCanvas>
-// Capture the native display-code bytes without an additional sRGB transfer:
-const frame = api.captureCameraRGBD({
-  cameraName: "agentview", rgbColorSpace: "linear-srgb",
-});
+<MujocoCanvas config={config}><Robot /></MujocoCanvas>
+// No appearance arguments needed for native-style policy cameras:
+const frame = api.captureCameraRGBD({ cameraName: "agentview" });
+// frame.appearance === MujocoAppearance.Classic
+// frame.rgbColorSpace === "linear-srgb" (native display-code bytes)
 ```
 
-This profile reads MJCF material emission, specular and shininess, compiled
-texture color spaces, mesh normals, model lights and the camera headlight.
-Three.js lights do not affect it. The standard appearance and sRGB RGB-D output
-remain the defaults. `frame.rgbColorSpace` records the selected readback.
+Optional overrides use named, typed constants:
 
-The classic profile currently supports finite planes, 2D/cube RGB textures and
-up to eight spot/directional lights including the headlight. It excludes shadows,
-planar reflections and mesh normal smoothing. It approximates the classic
-renderer; camera image agreement does not establish physics or policy score parity.
+```tsx
+import { MujocoAppearance } from "mujoco-react";
+
+const frame = api.captureCameraRGBD({
+  cameraName: "agentview",
+  appearance: MujocoAppearance.Standard, // match the standard viewer
+});
+// The viewer can also be changed independently:
+<MujocoCanvas config={config} renderOptions={{ appearance: MujocoAppearance.Classic }} />
+```
+
+`MujocoAppearance.Standard` and `.Classic` form the derived `MujocoAppearance`
+union type. Unsupported values fail TypeScript checking; string values remain
+valid for JSON/YAML configuration. Capture overrides also work with reusable
+sessions, `useCameraStream` and `CameraView`.
+
+Both render paths share one model, physics state and body transforms. Capture
+lazily caches alternate geometry/materials, swaps them only during synchronous
+rendering and restores the viewer before async readback yields, including on
+failure. It does not step physics. Plain Three.js scenes without managed MuJoCo
+geometry retain standard capture behavior.
+
+Classic uses MJCF emission/specular/shininess, compiled texture color spaces,
+imported mesh normals, model lights and the camera headlight. Three lights do
+not affect these materials. Classic RGB-D defaults to unencoded RGB bytes;
+standard RGB-D defaults to sRGB. Explicit `rgbColorSpace` remains an override.
+PNG/canvas captures and live streams follow the selected appearance's encoding.
+
+Current classic limits: eight spot/directional lights including the headlight,
+2D/cube RGB textures, no shadows or planar reflections. Infinite plane axes use
+the viewer's existing 5-meter visualization proxy; native infinite-horizon
+rendering is not reproduced. Image agreement does not establish physics or
+policy score parity.
 
 ## WebSocket Control
 

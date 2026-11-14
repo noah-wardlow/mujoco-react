@@ -116,7 +116,8 @@ function acquireTexture(model: MujocoModel, id: number) {
 /** Finite planes use the same grid spacing as MuJoCo's classic display lists. */
 export function createClassicPlaneGeometry(model: MujocoModel, geom: number) {
   const size = model.geom_size.subarray(geom*3,geom*3+3);
-  if(size[0]<=0 || size[1]<=0) throw new Error('Classic appearance currently requires finite plane extents');
+  // Match the viewer's existing 5m visualization proxy for infinite plane axes.
+  const halfX = size[0] || 2.5, halfY = size[1] || 2.5;
   const axis = (half:number) => {
     const step=Math.max(size[2],half/98);
     let count=Math.floor(half/step); count-=count%2;
@@ -129,7 +130,7 @@ export function createClassicPlaneGeometry(model: MujocoModel, geom: number) {
     }
     return grid;
   };
-  const x=axis(size[0]),y=axis(size[1]),positions:number[]=[],normals:number[]=[],indices:number[]=[];
+  const x=axis(halfX),y=axis(halfY),positions:number[]=[],normals:number[]=[],indices:number[]=[];
   for(const py of y)for(const px of x){positions.push(px,py,0);normals.push(0,0,1);}
   for(let row=0;row<y.length-1;row++)for(let col=0;col<x.length-1;col++) {
     const a=row*x.length+col,b=a+1,c=a+x.length,d=c+1;
