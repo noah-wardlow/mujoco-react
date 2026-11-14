@@ -1,3 +1,10 @@
+# [12.2.0](https://github.com/noah-wardlow/mujoco-react/compare/v12.1.2...v12.2.0) (2026-11-14)
+
+
+### Features
+
+* add aligned metric RGB-D camera capture ([bada0d5](https://github.com/noah-wardlow/mujoco-react/commit/bada0d5dbc1ad36d7123b0abdad0fa59610abd03))
+
 ## [12.1.2](https://github.com/noah-wardlow/mujoco-react/compare/v12.1.1...v12.1.2) (2026-11-12)
 
 
