@@ -1,3 +1,17 @@
+# [13.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v12.3.0...v13.0.0) (2026-11-14)
+
+
+### Features
+
+* separate camera appearance from the viewer by default ([b097018](https://github.com/noah-wardlow/mujoco-react/commit/b097018c90b00302a49c79e852125b056e8129d0))
+
+
+### BREAKING CHANGES
+
+* Managed MuJoCo camera captures and viewports now default to classic rendering independently of the standard viewer. Classic RGB-D uses native display-code RGB by default. Set appearance to MujocoAppearance.Standard for previous PBR/sRGB camera output. Plain Three scenes retain prior behavior.
+
+Co-Authored-By: OpenAI Codex <noreply@openai.com>
+
 # [12.3.0](https://github.com/noah-wardlow/mujoco-react/compare/v12.2.1...v12.3.0) (2026-11-14)
 
 
