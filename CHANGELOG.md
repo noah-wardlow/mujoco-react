@@ -1,3 +1,10 @@
+# [12.3.0](https://github.com/noah-wardlow/mujoco-react/compare/v12.2.1...v12.3.0) (2026-11-14)
+
+
+### Features
+
+* add opt-in MuJoCo classic camera appearance ([c754af0](https://github.com/noah-wardlow/mujoco-react/commit/c754af087a21a1759d4dc8a03f632f47ec77e44e))
+
 ## [12.2.1](https://github.com/noah-wardlow/mujoco-react/compare/v12.2.0...v12.2.1) (2026-11-14)
 
 
