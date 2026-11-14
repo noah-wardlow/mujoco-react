@@ -1,3 +1,10 @@
+## [13.0.1](https://github.com/noah-wardlow/mujoco-react/compare/v13.0.0...v13.0.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* restore LIBERO camera previews without repeated texture work ([4401ad7](https://github.com/noah-wardlow/mujoco-react/commit/4401ad76b816992a4f442780feb7b1436aced412))
+
 # [13.0.0](https://github.com/noah-wardlow/mujoco-react/compare/v12.3.0...v13.0.0) (2026-11-14)
 
 
