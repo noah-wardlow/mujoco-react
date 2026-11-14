@@ -83,7 +83,7 @@ function acquireTexture(model: MujocoModel, id: number) {
     const bytes = model.tex_data.subarray(model.tex_adr[id],model.tex_adr[id]+width*height*channels);
     const rgba = new Uint8Array(width*height*4);
     for(let i=0;i<width*height;i++) {
-      rgba.set(bytes.subarray(i*channels,i*channels+3),i*4);
+      rgba[i*4]=bytes[i*channels]; rgba[i*4+1]=bytes[i*channels+1]; rgba[i*4+2]=bytes[i*channels+2];
       rgba[i*4+3] = channels === 4 ? bytes[i*channels+3] : 255;
     }
     let texture: THREE.Texture;
@@ -95,8 +95,8 @@ function acquireTexture(model: MujocoModel, id: number) {
       texture.minFilter = THREE.LinearMipmapLinearFilter;
       texture.generateMipmaps = true;
     } else if(m.tex_type[id] === 1) {
-      if(height !== 6*width) throw new Error('Classic cube texture must contain six square faces');
-      const faces = Array.from({length:6},(_,i)=>new THREE.DataTexture(rgba.subarray(i*width*width*4,(i+1)*width*width*4),width,width,THREE.RGBAFormat));
+      if(height !== width && height !== 6*width) throw new Error('Classic cube texture requires one repeated square face or six square faces');
+      const faces = Array.from({length:6},(_,i)=>new THREE.DataTexture(rgba.subarray((height===width?0:i)*width*width*4,((height===width?0:i)+1)*width*width*4),width,width,THREE.RGBAFormat));
       // WebGLTextures supports DataTexture cube faces; older @types/three
       // narrows this constructor to DOM images only.
       texture = new THREE.CubeTexture(faces as unknown as HTMLImageElement[]);

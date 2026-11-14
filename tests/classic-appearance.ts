@@ -99,3 +99,28 @@ test('classic infinite-plane visualization uses the same finite proxy extent as 
  try{close(geometry.boundingBox!.min.x,-2.5);close(geometry.boundingBox!.max.y,2.5);}
  finally{geometry.dispose();f.data.delete();f.native.delete();}
 });
+
+test('native single-image cube textures repeat the same square across all six faces',()=>{
+ const f=fixture(),g=geom(f.native,'cube'),mat=f.m.geom_matid[g],roles=f.m.mat_texid.length/(f.m.mat_rgba.length/4),tex=f.m.mat_texid[mat*roles+1];
+ f.m.tex_height[tex]=f.m.tex_width[tex];
+ const material=createMujocoClassicMaterial(f.m,f.d,g);
+ try {
+  const faces=(material.uniforms.cubeMap.value as THREE.CubeTexture).images as unknown as THREE.DataTexture[];
+  assert.equal(faces.length,6);
+  for(const face of faces)assert.deepEqual(face.image.data,faces[0].image.data);
+ }finally{material.dispose();f.data.delete();f.native.delete();}
+});
+
+test('failed camera representation builds are not repeated on subsequent preview frames',async()=>{
+ const {registerSceneAppearance,withCameraAppearance}=await import('../src/rendering/sceneAppearance');
+ const f=fixture(),root=new THREE.Group(),scene=new THREE.Scene();scene.add(root);
+ const builder=new GeomBuilder(mj as unknown as MujocoModule),mesh=builder.create(f.m,geom(f.native,'floor')) as THREE.Mesh;root.add(mesh);
+ const material=mesh.material,dispose=registerSceneAppearance(root,mj as unknown as MujocoModule,f.m,f.d,MujocoAppearance.Standard);
+ const create=GeomBuilder.prototype.create;let calls=0;
+ GeomBuilder.prototype.create=function(){calls++;throw new Error('unsupported appearance');};
+ try {
+  for(let i=0;i<4;i++)assert.throws(()=>withCameraAppearance(scene,MujocoAppearance.Classic,()=>{}),/unsupported appearance/);
+  assert.equal(calls,1);assert.equal(mesh.material,material);
+  withCameraAppearance(scene,MujocoAppearance.Standard,()=>assert.equal(mesh.material,material));
+ }finally{GeomBuilder.prototype.create=create;dispose();mesh.geometry.dispose();(material as THREE.Material).dispose();builder.dispose();f.data.delete();f.native.delete();}
+});

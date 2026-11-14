@@ -46,13 +46,15 @@ export function registerSceneAppearance(root: THREE.Object3D, engine: MujocoModu
   const builder = new GeomBuilder(engine, { appearance: other });
   let active = viewer;
   let disposed = false;
+  let buildError: unknown;
   owners.set(root, { apply(profile) {
     if (disposed) throw new Error('MuJoCo appearance resources are disposed');
     if (profile === active) return () => {};
+    if (buildError) throw buildError;
     // Build all alternatives before mutating the live scene; a failed build leaves it intact.
-    if (profile !== viewer) for (const entry of entries) {
-      entry.alternate ??= builder.create(model, entry.mesh.userData.geomID, data) as THREE.Mesh;
-    }
+    if (profile !== viewer) try {
+      for (const entry of entries) entry.alternate ??= builder.create(model, entry.mesh.userData.geomID, data) as THREE.Mesh;
+    } catch (error) { buildError = error; throw error; }
     const previous = active;
     const saved = entries.map(entry => ({ geometry: entry.mesh.geometry, material: entry.mesh.material }));
     for (const [i, entry] of entries.entries()) {

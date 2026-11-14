@@ -32,6 +32,7 @@ function streamSignature(options: CameraStreamOptions): string {
     width: options.width,
     height: options.height,
     renderIsolation: options.renderIsolation ?? false,
+    appearance: options.appearance,
   });
 }
 
@@ -47,6 +48,7 @@ export function useCameraStream(
   const mujoco = useMujoco();
   const sessionRef = useRef<CameraFrameCaptureSession | null>(null);
   const signatureRef = useRef<string>('');
+  const failedSignatureRef = useRef<{ signature: string; model: unknown } | null>(null);
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const elapsedRef = useRef(0);
@@ -79,6 +81,8 @@ export function useCameraStream(
     elapsedRef.current = 0;
 
     const signature = streamSignature(opts);
+    const model = mujoco.mjModelRef?.current;
+    if (failedSignatureRef.current?.signature === signature && failedSignatureRef.current.model === model) return;
     if (!sessionRef.current || signatureRef.current !== signature) {
       sessionRef.current?.dispose();
       sessionRef.current = api.createCameraFrameCaptureSession(opts);
@@ -101,6 +105,7 @@ export function useCameraStream(
         ctx.drawImage(frame.canvas, 0, 0);
       })
       .catch(error => {
+        failedSignatureRef.current = { signature, model };
         const failure = error instanceof Error ? error : new Error(String(error));
         if (optionsRef.current.onError) optionsRef.current.onError(failure);
         else console.error('Camera stream capture failed', failure);
