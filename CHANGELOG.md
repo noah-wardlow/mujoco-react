@@ -1,3 +1,15 @@
+# [13.1.0](https://github.com/noah-wardlow/mujoco-react/compare/v13.0.1...v13.1.0) (2026-11-20)
+
+
+### Bug Fixes
+
+* clear the previous scene's files on each load ([00c5737](https://github.com/noah-wardlow/mujoco-react/commit/00c57373bf2d91aada573e7adb6f1c6c4099c2d7))
+
+
+### Features
+
+* let apps choose their MuJoCo engine version ([8fc1ff0](https://github.com/noah-wardlow/mujoco-react/commit/8fc1ff003ab692d01fb183aa901dc26c266d2d92))
+
 ## [13.0.1](https://github.com/noah-wardlow/mujoco-react/compare/v13.0.0...v13.0.1) (2026-11-14)
 
 
