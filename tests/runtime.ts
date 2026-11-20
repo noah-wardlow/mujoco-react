@@ -8,6 +8,7 @@ import {
   getActuatorControlAddress,
   writeActuatorControl,
   getControlMap,
+  loadScene,
 } from '../src/core/SceneLoader';
 import {
   captureSimulationState,
@@ -295,6 +296,28 @@ test('older engines expose MuJoCo 4 model field shapes', () => {
     assert.deepEqual(field('actuator_ctrllimited'), [1, 0]);
   } finally {
     model.delete();
+  }
+});
+
+test('each scene load starts from an empty working directory', async () => {
+  const sources: Record<string, string> = {
+    'https://scenes.test/a/a.xml': '<mujoco><worldbody><geom size=".1"/></worldbody></mujoco>',
+    'https://scenes.test/b/b.xml': '<mujoco><worldbody><geom size=".2"/></worldbody></mujoco>',
+  };
+  const saved = { fetch: globalThis.fetch, DOMParser: globalThis.DOMParser };
+  globalThis.fetch = (async (url: string) => new Response(sources[url] ?? null, { status: url in sources ? 200 : 404 })) as typeof fetch;
+  // Scenes without file references need no real XML parsing.
+  globalThis.DOMParser = class { parseFromString() { return { querySelector: () => null, querySelectorAll: () => [] }; } } as unknown as typeof DOMParser;
+  try {
+    for (const [src, sceneFile] of [['https://scenes.test/a', 'a.xml'], ['https://scenes.test/b', 'b.xml']]) {
+      const { mjModel, mjData } = await loadScene(module, { src, sceneFile });
+      mjData.delete();
+      mjModel.delete();
+    }
+    const fs = module.FS as unknown as { readdir(path: string): string[] };
+    assert.deepEqual(fs.readdir('/working').filter((name) => !name.startsWith('.')), ['b.xml']);
+  } finally {
+    Object.assign(globalThis, saved);
   }
 });
 
