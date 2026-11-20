@@ -58,7 +58,11 @@ direct access to MuJoCo model/data state for robotics work.
 
 - Use the official `@mujoco/mujoco` package as the underlying engine.
 - Keep `@mujoco/mujoco` as a library dependency so default consumers do not need
-  an extra install step.
+  an extra install step. Apps choose another engine with package-manager
+  overrides. Document a release as supported only after adding it to
+  `scripts/test-engines.mjs` and passing `npm run test:engines`.
+- Read engine fields whose shape differs across supported releases through
+  `normalizeModel` in `src/core/engineCompat.ts`, not at individual call sites.
 - Let bundlers resolve the default single-threaded WASM asset through
   `@mujoco/mujoco/mujoco.wasm?url`.
 - Multi-threaded WASM remains opt-in: apps pass the threaded loader and MT WASM

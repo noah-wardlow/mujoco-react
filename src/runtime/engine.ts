@@ -8,7 +8,8 @@ export interface EngineState { signature: number; values: Float64Array }
 export interface EngineInitialization { model: Uint8Array; state: EngineState }
 export interface DisplayState {
   time: number;
-  fields: Record<typeof displayFields[number], Float64Array>;
+  /** plastic is absent before MuJoCo 4. */
+  fields: Record<Exclude<typeof displayFields[number], 'plastic'>, Float64Array> & { plastic?: Float64Array };
   contacts: ContactInfo[];
   integration?: EngineState;
 }
@@ -62,7 +63,7 @@ export class SimulationEngine {
     if (integration) this.mj.mj_forward(this.model, this.data);
     try { return {
       time: this.data.time,
-      fields: Object.fromEntries(displayFields.map(key => [key, new Float64Array(this.data[key])])) as DisplayState['fields'],
+      fields: Object.fromEntries(displayFields.filter(key => this.data[key] !== undefined).map(key => [key, new Float64Array(this.data[key])])) as DisplayState['fields'],
       contacts: complete ? this.contacts() : [],
       ...(integration ? { integration } : {}),
     }; } finally {

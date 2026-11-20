@@ -2,6 +2,7 @@ import type { MujocoModule, MujocoModel, MujocoData, StateSnapshot } from '../ty
 
 const threadCounts = new WeakMap<MujocoModule, number>();
 export function configureModuleThreads(module: MujocoModule, count: number) {
+  if (count > 0 && typeof module.mju_threadpool !== 'function') throw new Error('threadCount requires @mujoco/mujoco 3.10 or later');
   threadCounts.set(module, count);
 }
 export function initializeDataThreads(module: MujocoModule, data: MujocoData) {

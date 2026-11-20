@@ -165,9 +165,10 @@ export async function attachSimulationRuntime(
       complete = display;
     }
     for (const field of displayFields) {
-      const target = data[field];
-      if (!(target instanceof Float64Array || target instanceof Int32Array) || target.length !== display.fields[field].length) throw new Error(`Invalid display field ${field}`);
-      target.set(display.fields[field]);
+      const target = data[field], source = display.fields[field];
+      if (target === undefined && !source) continue;
+      if (!source || !(target instanceof Float64Array || target instanceof Int32Array) || target.length !== source.length) throw new Error(`Invalid display field ${field}`);
+      target.set(source);
     }
     data.time = display.time;
     invalidate();

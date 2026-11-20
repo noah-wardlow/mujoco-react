@@ -11,7 +11,9 @@ import type { WorkerPort } from '../src/runtime/types';
 import type { DisplayState } from '../src/runtime/engine';
 
 const mj = await loadMujoco();
-const xml = `<mujoco><option gravity="0 0 0"/><worldbody><body><joint name="slide" type="slide" stiffness="50" springyield=".1" damping="2"/><geom size=".1" mass="1"/></body></worldbody><actuator><motor joint="slide"/></actuator><sensor><jointpos joint="slide"/></sensor></mujoco>`;
+// Yielding springs (and data.plastic) arrived in MuJoCo 4.
+const mujoco4 = mj.mj_version() >= 4e6;
+const xml = `<mujoco><option gravity="0 0 0"/><worldbody><body><joint name="slide" type="slide" stiffness="50"${mujoco4 ? ' springyield=".1"' : ''} damping="2"/><geom size=".1" mass="1"/></body></worldbody><actuator><motor joint="slide"/></actuator><sensor><jointpos joint="slide"/></sensor></mujoco>`;
 function port(): WorkerPort {
   const worker = new Worker(new URL('./runtime-worker.js', import.meta.url));
   const adapter: WorkerPort = { postMessage: data => worker.postMessage(data), terminate: () => { void worker.terminate(); }, onmessage: null, onerror: null, onmessageerror: null };
@@ -42,7 +44,8 @@ test('real worker matches exact stepping, sensors, plasticity and snapshot repla
     const result = await f.client.advance({ steps: 500, controls: [1] });
     assert.deepEqual(Array.from(result.qpos), Array.from(f.data.qpos));
     assert.deepEqual(result.sensors, result.qpos, 'sensors reflect the completed step, not the preceding pose');
-    assert.deepEqual(Array.from(f.display().fields.plastic), Array.from(f.data.plastic));
+    if (mujoco4) assert.deepEqual(Array.from(f.display().fields.plastic!), Array.from(f.data.plastic));
+    else assert.equal(f.display().fields.plastic, undefined);
     const snapshot = await f.client.saveState();
     const expected = await f.client.advance({ steps: 100 });
     await f.client.reset(); await f.client.restoreState(snapshot);
