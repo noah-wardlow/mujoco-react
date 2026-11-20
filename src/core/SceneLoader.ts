@@ -4,6 +4,7 @@
  */
 
 import { initializeDataThreads } from './engineState';
+import { normalizeModel } from './engineCompat';
 
 import type {
   ActuatedJointInfo,
@@ -546,10 +547,10 @@ interface LoadResult {
 
 function loadModelFromPath(mujoco: MujocoModule, path: string): MujocoModel {
   if (mujoco.MjModel.from_xml_path) {
-    return mujoco.MjModel.from_xml_path(path);
+    return normalizeModel(mujoco, mujoco.MjModel.from_xml_path(path));
   }
   if (mujoco.MjModel.loadFromXML) {
-    return mujoco.MjModel.loadFromXML(path);
+    return normalizeModel(mujoco, mujoco.MjModel.loadFromXML(path));
   }
   throw new Error('MuJoCo WASM module does not expose an XML path loader');
 }

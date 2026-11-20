@@ -16,10 +16,16 @@ import {
   initializeDataThreads,
 } from '../src/core/engineState';
 import { getFlexTopology } from '../src/rendering/flexTopology';
+import { normalizeModel } from '../src/core/engineCompat';
 import type { MujocoModule, MujocoModel, MujocoData } from '../src/types';
 
 const mj = await loadMujoco();
 const module = mj as unknown as MujocoModule;
+// Skips tests whose MJCF needs a newer engine than the one under test (npm run test:engines).
+function requires(version: string) {
+  const [major, minor] = version.split('.').map(Number);
+  return mj.mj_version() < major * 1e6 + minor * 1e3 ? { skip: `requires MuJoCo ${version}` } : {};
+}
 function fixture(xml: string) {
   const model = mj.MjModel.from_xml_string(xml) as unknown as MujocoModel;
   const data = new module.MjData(model);
@@ -147,7 +153,7 @@ test('IK enforces scalar limits and restores qpos on engine failure', () => {
   }
 });
 
-test('multi-input PID does not shift named scalar writes into the wrong channel', () => {
+test('multi-input PID does not shift named scalar writes into the wrong channel', requires('3.12'), () => {
   const { model, data, close } = fixture(
     `<mujoco><worldbody><body><joint name="a"/><geom size=".1"/></body><body pos="1 0 0"><joint name="b"/><geom size=".1"/></body></worldbody><actuator><pid name="servo" joint="a" kp="10" kv="1" input="pos vel ff"/><position name="scalar" joint="b" kp="10"/></actuator></mujoco>`,
   );
@@ -231,7 +237,7 @@ test('ball joint limits bound the rotation angle', () => {
   }
 });
 
-test('orientation controls reset to an identity quaternion', () => {
+test('orientation controls reset to an identity quaternion', requires('3.11'), () => {
   const { model, data, close } = fixture(
     `<mujoco><worldbody><body><joint name="ball" type="ball"/><geom size=".1"/></body></worldbody><actuator><orientation name="servo" joint="ball" input="quat" kp="10"/></actuator></mujoco>`,
   );
@@ -248,6 +254,10 @@ test('orientation controls reset to an identity quaternion', () => {
 test('threaded WASM creates and frees a simulation thread pool', async () => {
   const { default: loadThreaded } = await import('@mujoco/mujoco/mt');
   const mt = await loadThreaded();
+  if (typeof mt.mju_threadpool !== 'function') {
+    assert.throws(() => configureModuleThreads(mt as unknown as MujocoModule, 2), /3\.10 or later/);
+    return;
+  }
   const model = mt.MjModel.from_xml_string(scalarXml),
     data = new mt.MjData(model);
   try {
@@ -257,6 +267,33 @@ test('threaded WASM creates and frees a simulation thread pool', async () => {
     assert.ok(data.time > 0);
   } finally {
     data.delete();
+    model.delete();
+  }
+});
+
+test('older engines expose MuJoCo 4 model field shapes', () => {
+  const model = normalizeModel(module, mj.MjModel.from_xml_string(`<mujoco><asset><texture name="t" type="2d" builtin="checker" width="4" height="4"/>
+<material name="uniform" texture="t" texuniform="true"/><material name="stretched" texture="t"/></asset>
+<worldbody><light castshadow="false"/><light active="false"/>
+<body name="a"><joint name="limited" range="-1 1"/><geom size=".1" material="uniform"/><site name="s1"/></body>
+<body name="b" pos="1 0 0"><joint name="unlimited" range="-1 1" limited="false"/><geom size=".1"/><site name="s2"/></body></worldbody>
+<tendon><spatial range="0 2"><site site="s1"/><site site="s2"/></spatial><spatial limited="false" range="0 2"><site site="s1"/><site site="s2"/></spatial></tendon>
+<equality><weld body1="a" body2="b" active="false"/><connect body1="a" body2="b" anchor="0 0 0"/></equality>
+<actuator><motor joint="limited" ctrlrange="-1 1"/><motor joint="unlimited"/></actuator></mujoco>`) as unknown as MujocoModel);
+  try {
+    const field = (name: string) => Array.from((model as unknown as Record<string, ArrayLike<number>>)[name]);
+    assert.ok(model.tex_adr instanceof Int32Array);
+    assert.equal(model.nactuator, 2);
+    assert.deepEqual(field('actuator_ctrlnum'), [1, 1]);
+    assert.deepEqual(field('actuator_ctrladr'), [0, 1]);
+    assert.deepEqual(field('jnt_limited'), [1, 0]);
+    assert.deepEqual(field('light_active'), [1, 0]);
+    assert.deepEqual(field('light_castshadow'), [0, 1]);
+    assert.deepEqual(field('mat_texuniform'), [1, 0]);
+    assert.deepEqual(field('tendon_limited'), [1, 0]);
+    assert.deepEqual(field('eq_active0'), [0, 1]);
+    assert.deepEqual(field('actuator_ctrllimited'), [1, 0]);
+  } finally {
     model.delete();
   }
 });
@@ -283,7 +320,7 @@ test('3D flex uses only boundary triangles and 1D flex uses line elements', () =
 });
 
 
-test('speculative contacts stop a fast sphere at a thin wall', () => {
+test('speculative contacts stop a fast sphere at a thin wall', requires('4.0'), () => {
   function travel(enabled: boolean) {
     const { model, data, close } = fixture(`<mujoco><option timestep=".02" gravity="0 0 0"><flag speculative="${enabled ? 'enable' : 'disable'}"/></option><worldbody><geom type="box" size=".01 .3 .3" pos="0 0 .4"/><body pos="-.5 0 .4"><joint type="slide" axis="1 0 0"/><geom size=".04" mass="1"/></body></worldbody></mujoco>`);
     try {
@@ -297,7 +334,7 @@ test('speculative contacts stop a fast sphere at a thin wall', () => {
   assert.ok(travel(false) > 1, 'same timestep tunnels without speculative contacts');
 });
 
-test('snapshots preserve yielded spring plastic state and subsequent motion', () => {
+test('snapshots preserve yielded spring plastic state and subsequent motion', requires('4.0'), () => {
   const { model, data, close } = fixture(`<mujoco><option gravity="0 0 0"/><worldbody><body><joint type="slide" stiffness="50" springyield=".1" damping="2"/><geom size=".1" mass="1"/></body></worldbody></mujoco>`);
   try {
     assert.equal(model.nplastic, 1);

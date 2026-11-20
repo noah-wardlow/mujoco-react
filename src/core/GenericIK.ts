@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { MujocoModule, MujocoModel, MujocoData } from '../types';
+import { normalizeModel } from './engineCompat';
 
 export interface GenericIKOptions {
     maxIterations: number;
@@ -94,6 +95,7 @@ export class GenericIK {
         currentQpos: ArrayLike<number> = data.qpos,
         opts?: Partial<GenericIKOptions>,
     ): number[] | null {
+        normalizeModel(this.mujoco, model);
         const o = resolveOptions(opts);
         const targetRotation = new THREE.Quaternion(targetQuat.x, targetQuat.y, targetQuat.z, targetQuat.w);
         if (!Number.isInteger(siteId) || siteId < 0 || siteId >= model.nsite)

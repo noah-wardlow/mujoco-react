@@ -4,6 +4,7 @@ import loadMujoco from '@mujoco/mujoco';
 import * as THREE from 'three';
 import {createClassicPlaneGeometry,createMujocoClassicMaterial} from '../src/rendering/mujocoClassicMaterial';
 import {GeomBuilder} from '../src/rendering/GeomBuilder';
+import {normalizeModel} from '../src/core/engineCompat';
 import {MujocoAppearance} from '../src/types';
 import type {MujocoData,MujocoModel,MujocoModule} from '../src/types';
 const mj=await loadMujoco();
@@ -18,7 +19,7 @@ const xml=`<mujoco><asset>
   <geom name="cube" type="sphere" size=".1" pos="2 0 0" material="cubeMat"/>
   <geom name="floor" type="plane" size="3.3 3 .125"/>
 </worldbody></mujoco>`;
-function fixture(){const native=mj.MjModel.from_xml_string(xml),data=new mj.MjData(native);mj.mj_forward(native,data);return {native,data,m:native as unknown as MujocoModel,d:data as unknown as MujocoData};}
+function fixture(){const native=mj.MjModel.from_xml_string(xml),data=new mj.MjData(native);normalizeModel(mj as unknown as MujocoModule,native as unknown as MujocoModel);mj.mj_forward(native,data);return {native,data,m:native as unknown as MujocoModel,d:data as unknown as MujocoData};}
 const geom=(m:unknown,name:string)=>(mj.mj_name2id as unknown as (m:unknown,k:number,n:string)=>number)(m,5,name);
 const close=(a:number,b:number)=>assert.ok(Math.abs(a-b)<1e-6,`${a} != ${b}`);
 

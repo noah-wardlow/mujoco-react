@@ -16,6 +16,16 @@ Composable [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) wrapper a
 npm install mujoco-react three @react-three/fiber @react-three/drei
 ```
 
+mujoco-react installs the MuJoCo engine, `@mujoco/mujoco` 4.0.1. Your app can run any release from 3.8.1 through 4.0.1 instead, for example the one your reference data came from, by overriding it in `package.json` (npm and bun shown):
+
+```json
+{
+  "overrides": { "@mujoco/mujoco": "3.11.0" }
+}
+```
+
+See [engine versions](docs/installation.mdx#engine-versions) for pnpm, Yarn, and what differs on 3.x engines.
+
 ## Vite Plugin and Type-Safe Names
 
 Use the Vite plugin to generate declaration merging for actuator, sensor, body, joint, site, geom, and keyframe names:
@@ -656,7 +666,7 @@ Loads the MuJoCo WASM module. Wrap your entire app in this.
 | `wasmUrl` | `string?` | Custom WASM URL override |
 | `mtWasmUrl` | `string?` | Custom multi-threaded WASM URL override |
 | `threadedLoader` | `(options?) => Promise<unknown>` | Optional loader imported from `@mujoco/mujoco/mt` |
-| `threadCount` | `number` | Engine worker count; requires threaded WASM; default 0 |
+| `threadCount` | `number` | Engine worker count; requires threaded WASM and `@mujoco/mujoco` 3.10+; default 0 |
 | `wasmVariant` | `"single" \| "threaded" \| "auto"` | MuJoCo WASM build. Defaults to `"single"` |
 | `timeout` | `number` | WASM load timeout in ms |
 | `onError` | `(error: Error) => void` | Called if WASM fails to load |

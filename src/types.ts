@@ -440,6 +440,7 @@ export interface MujocoModule {
   mj_resetCtrl(model: MujocoModel, data: MujocoData): void;
   mj_actuatorInputName(model: MujocoModel, id: number, input: number): string;
   mju_threadpool(data: MujocoData, threads: number): void;
+  mj_printModel(model: MujocoModel, path: string): void;
   MjModel: {
     from_xml_path?: (path: string) => MujocoModel;
     from_xml_string?: (xml: string, vfs?: unknown) => MujocoModel;
@@ -481,6 +482,7 @@ export interface MujocoModule {
       writeFile: (path: string, content: string | Uint8Array) => void;
       readFile: (path: string, opts?: { encoding: string }) => string | Uint8Array;
       mkdir: (path: string) => void;
+      unlink: (path: string) => void;
       unmount: (path: string) => void;
   };
   [key: string]: unknown;

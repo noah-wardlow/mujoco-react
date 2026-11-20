@@ -21,9 +21,44 @@ npm install mujoco-react @react-three/fiber @react-three/drei three
 
 `@mujoco/mujoco` is installed by `mujoco-react` as the underlying MuJoCo WASM engine. The engine is pinned to an exact version so dependency updates cannot silently change simulation behavior.
 
-### Engine compatibility
+### Engine versions
 
-This library uses MuJoCo 4.0.1. When upgrading from the previous engine, review the [upstream migration notes](https://github.com/google-deepmind/mujoco/releases/tag/4.0.0). Existing models can behave differently: tendon wrapping, ball/free-joint RK4 integration, and flex elasticity have changed. Cable plugins and composite elements must migrate to flexcomp; flex edge stiffness/damping cannot be used with the discrete integrator. Recheck model trajectories and regenerate snapshots after upgrading.
+mujoco-react installs MuJoCo 4.0.1. Contact and settling behavior can differ between MuJoCo releases, so an app can run the exact release its reference data came from by overriding the engine in its `package.json`. npm and bun:
+
+```json
+{
+  "overrides": { "@mujoco/mujoco": "3.11.0" }
+}
+```
+
+pnpm:
+
+```json
+{
+  "pnpm": { "overrides": { "@mujoco/mujoco": "3.11.0" } }
+}
+```
+
+Yarn:
+
+```json
+{
+  "resolutions": { "@mujoco/mujoco": "3.11.0" }
+}
+```
+
+Use an exact version, and reinstall after changing it. If your app also depends on `@mujoco/mujoco` directly, pin that dependency to the same version so the app and mujoco-react share one engine.
+
+mujoco-react supports every release from 3.8.1 through 4.0.1 and runs its engine test suite against each one (`npm run test:engines`). On 3.x engines:
+
+- Models loaded by mujoco-react get the MuJoCo 4 field shapes the library reads: `actuator_ctrlnum`, `actuator_ctrladr` and `nactuator` before 3.11 (one control per actuator), `Int32Array` `tex_adr` before 3.14, and the boolean model arrays (`jnt_limited`, `light_active`, `light_castshadow`, `mat_texuniform`, `tendon_limited`, `eq_active0`, and others) that the 3.9–3.14 bindings cannot read. These are read-only copies. Recovering the boolean arrays prints the model once per load, which adds about 0.2 s for a LIBERO scene.
+- MuJoCo 4 features are unavailable: speculative contacts, yielding springs, and `data.plastic`.
+- `threadCount` requires 3.10 or later.
+- Loading many different scenes in one page can exhaust the engine's WASM memory. 3.x engines ran out after about 24 distinct LIBERO scenes; 4.0.1 loaded all 130. Reloading the same scene does not grow memory. A page reload starts a fresh engine.
+
+### Upgrading to MuJoCo 4
+
+When upgrading from the previous engine, review the [upstream migration notes](https://github.com/google-deepmind/mujoco/releases/tag/4.0.0). Existing models can behave differently: tendon wrapping, ball/free-joint RK4 integration, and flex elasticity have changed. Cable plugins and composite elements must migrate to flexcomp; flex edge stiffness/damping cannot be used with the discrete integrator. Recheck model trajectories and regenerate snapshots after upgrading.
 
 The React interface and default single-threaded WASM setup are unchanged. Threaded WASM remains opt-in.
 
