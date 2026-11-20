@@ -545,6 +545,13 @@ interface LoadResult {
   mjData: MujocoData;
 }
 
+/** Mounts an empty in-memory /working; unmounting the previous mount drops its scene files. */
+function resetWorkingDirectory(mujoco: MujocoModule) {
+  try { mujoco.FS.unmount('/working'); } catch { /* first load: nothing mounted */ }
+  try { mujoco.FS.mkdir('/working'); } catch { /* mount point already exists */ }
+  mujoco.FS.mount(mujoco.FS.filesystems.MEMFS, {}, '/working');
+}
+
 function loadModelFromPath(mujoco: MujocoModule, path: string): MujocoModel {
   if (mujoco.MjModel.from_xml_path) {
     return normalizeModel(mujoco, mujoco.MjModel.from_xml_path(path));
@@ -802,8 +809,7 @@ async function loadSceneFromFiles(
   const files = config.files ?? [];
   if (!files.length) throw new Error('loadFromFiles requires at least one File');
 
-  try { mujoco.FS.unmount('/working'); } catch { /* ignore */ }
-  try { mujoco.FS.mkdir('/working'); } catch { /* ignore */ }
+  resetWorkingDirectory(mujoco);
 
   const parser = new DOMParser();
   const byPath = new Map<string, LocalMujocoFile>();
@@ -899,8 +905,7 @@ export async function loadScene(
   }
 
   // 1. Clean up virtual filesystem
-  try { mujoco.FS.unmount('/working'); } catch { /* ignore */ }
-  try { mujoco.FS.mkdir('/working'); } catch { /* ignore */ }
+  resetWorkingDirectory(mujoco);
 
   const baseUrl = config.src.endsWith('/') ? config.src : config.src + '/';
 

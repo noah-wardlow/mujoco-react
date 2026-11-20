@@ -483,7 +483,9 @@ export interface MujocoModule {
       readFile: (path: string, opts?: { encoding: string }) => string | Uint8Array;
       mkdir: (path: string) => void;
       unlink: (path: string) => void;
+      mount: (type: unknown, options: object, mountpoint: string) => void;
       unmount: (path: string) => void;
+      filesystems: { MEMFS: unknown };
   };
   [key: string]: unknown;
 }
